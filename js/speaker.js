@@ -87,6 +87,55 @@ const Speaker = {
       .join("，");
   },
 
+  // ---------- 预下载 ----------
+  // 发布到网站后音频需要联网下载，第一次播放时边下边播容易“没声音”。
+  // 这里提前 fetch 成 blob 存在内存里，播放时直接用本地 blob 地址。
+  // file:// 下 fetch 会被浏览器拦截，失败时自动退回原始地址，不影响离线使用。
+  cache: new Map(), // 原始地址 -> { promise, blobUrl }
+
+  preload(urls) {
+    (Array.isArray(urls) ? urls : [urls]).forEach((url) => {
+      if (!url || this.cache.has(url)) return;
+      const entry = { promise: null, blobUrl: null };
+      // 8 秒内没下载完就先用原地址播放（Audio 自己会继续下载），避免卡住答题流程
+      const timeout = new Promise((resolve) => setTimeout(() => resolve(url), 8000));
+      entry.promise = Promise.race([
+        fetch(url)
+          .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(r.status))))
+          .then((blob) => {
+            entry.blobUrl = URL.createObjectURL(blob);
+            return entry.blobUrl;
+          })
+          .catch(() => url),
+        timeout,
+      ]);
+      this.cache.set(url, entry);
+    });
+  },
+
+  // 播放前取地址：已预下载的直接用 blob；还在下载就等它（最多 8 秒）
+  resolveSrc(url) {
+    const entry = this.cache.get(url);
+    return entry ? entry.promise : Promise.resolve(url);
+  },
+
+  // 为一组练习预热：提示语、星星播报、全部题目涉及的单字与组词音频
+  preloadSession(name, targets) {
+    // 「请找出」始终用通用提示语，名字语音里没有这个文件
+    const urls = ["welcome", "praise1", "praise2", "praise3", "wrong", "done", "cheer"].map(
+      (k) => this.phraseFile(k, name)
+    );
+    urls.push(this.audioUrl("phrases/find.mp3"));
+    for (let i = 0; i <= 20; i++) urls.push(this.audioUrl(`phrases/stars${i}.mp3`));
+    (targets || []).forEach((t) => {
+      const syl = this.syllableAudio(t.pinyin);
+      if (syl) urls.push(syl);
+      const word = this.wordAudio(t);
+      if (word) urls.push(word);
+    });
+    this.preload(urls);
+  },
+
   // ---------- 播放 ----------
   // 顺序播放音频列表，可被打断；单个文件缺失/播放失败时自动跳过
   play(list, onDone) {
@@ -102,12 +151,15 @@ const Speaker = {
         if (onDone) onDone();
         return;
       }
-      const a = new Audio(list[i]);
-      this.current = a;
-      // 播放失败（文件缺失、解码失败）同样跳到下一段，保证流程继续
-      a.onended = () => next(i + 1);
-      a.onerror = () => next(i + 1);
-      a.play().catch(() => next(i + 1));
+      this.resolveSrc(list[i]).then((src) => {
+        if (token !== this.tokens) return;
+        const a = new Audio(src);
+        this.current = a;
+        // 播放失败（文件缺失、解码失败）同样跳到下一段，保证流程继续
+        a.onended = () => next(i + 1);
+        a.onerror = () => next(i + 1);
+        a.play().catch(() => next(i + 1));
+      });
     };
     next(0);
   },

@@ -10,7 +10,9 @@ body {
 }
 
 body {
-  font-family: "Kaiti SC", "KaiTi", "STKaiti", "楷体", serif;
+  /* 界面文字统一使用系统字体；只有田字格里的汉字才用内置微软楷体 */
+  font-family: "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB",
+    "Noto Sans CJK SC", Arial, sans-serif;
   background: #fdf6e9;
   color: #4a3b2a;
   display: flex;
@@ -730,6 +732,8 @@ body.hide-history-chars .history-legend {
 .card .char {
   position: relative;
   z-index: 1;
+  /* 田字格里的汉字使用内置微软楷体，保证各设备字形一致 */
+  font-family: "Kaiti Web", "Kaiti SC", "KaiTi", "STKaiti", "楷体", serif;
   font-size: calc(var(--card-size) * 0.58);
   line-height: 1;
   color: #333;
@@ -881,7 +885,7 @@ body.hide-words .hint-bar:not(:has(#btn-next:not(.hidden))) {
   z-index: 9999;
   pointer-events: none;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.85), rgba(209, 96, 60, 0.55));
+  background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.95), rgba(209, 96, 60, 0.55));
   box-shadow: 0 0 6px rgba(209, 96, 60, 0.35);
   animation: cursorBubble 0.7s ease-out forwards;
 }

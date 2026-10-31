@@ -81,6 +81,8 @@
 
   /* ---------- 选择学习内容：列出现有册 ---------- */
   function renderVolumes(user) {
+    // 进入册目页就开始下载提示语与星星播报，给孩子挑选册的时间，避免练习第一题没声音
+    if (user) Speaker.preloadSession(user.name, []);
     $("#volume-owner").textContent = user ? `${user.name} 想学哪一册？` : "";
     const list = $("#volume-list");
     list.innerHTML = "";
@@ -197,6 +199,8 @@
     });
     show("quiz");
     $("#quiz-user").textContent = `${session.userName} · ${volume.title}`;
+    // 本组所有题目的单字、组词音频一次性预热，后面的题目不再临时等下网络
+    Speaker.preloadSession(session.userName, questions.map((q) => q.target));
     nextQuestion();
   }
 

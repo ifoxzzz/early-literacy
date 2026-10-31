@@ -68,13 +68,17 @@ Early Literacy/
 │   ├── syllables/              # 单字发音，按拼音键命名（kan4.mp3）
 │   ├── words/                  # 组词讲解整句，按「字_拼音键」命名（我_wo3.mp3）
 │   └── users/<名字>/           # 该名字专属的问候/夸奖/结束语
+├── assets/fonts/
+│   └── kaiti.woff2             # 田字格汉字专用的楷体子集（Windows 楷体 SimKai，仅自用）
 ├── tools/                      # 生成工具（运行时不需要，可整体删除）
 │   ├── data/                   # 源文件：字库与名字清单
 │   │   ├── volume-1.txt        # 字库源文件（汉字/拼音/组词，Tab 分隔）
 │   │   ├── volume-titles.txt   # 册名映射：volume-1=一年级上册
 │   │   └── names.txt           # 需要生成真人名字语音的小朋友名字
+│   ├── fonts/                  # 字体源文件（Windows 楷体 SimKai），用于重建字体子集（仅自用，勿公开分发）
 │   ├── scripts/                # Python 生成脚本
 │   │   ├── build_volumes.py    # tools/data/volume-*.txt → data/volumes.js
+│   │   ├── build_font.py       # 从 tools/fonts 抽取田字格汉字 → assets/fonts/kaiti.woff2（已并入生成字库.bat）
 │   │   ├── gen_phrase_audio.py # 生成通用提示语（welcome/find/praise/wrong/done/cheer）
 │   │   ├── gen_syllable_audio.py  # 生成音节音频 + 清单
 │   │   ├── gen_words_audio.py  # 生成组词讲解音频 + 清单
@@ -220,7 +224,13 @@ pip install edge-tts
 运行 `tools/生成音节语音.bat` / `tools/生成组词语音.bat` 补齐；跑脚本后会自动刷新清单。
 
 **改了 JS/CSS 但浏览器还用旧文件？**
-项目使用统一缓存版本：修改任何 `css/js/音频` 后，只需把 `index.html` 头部的 `CACHE_VERSION` +1，全部资源都会换上新的 `?v=`，无需逐个修改。
+项目使用统一缓存版本：修改任何 `css/js/音频/字体` 后，只需把 `index.html` 头部的 `CACHE_VERSION` +1，全部资源都会换上新的 `?v=`，无需逐个修改。
+
+**手机和电脑田字格字体不一样？**
+只有田字格里的汉字使用内置的 Windows 楷体（SimKai）子集 `assets/fonts/kaiti.woff2`（约 110KB），其余界面文字跟随系统字体。发布时**必须把 `assets/fonts/` 一起上传**；新增字库后运行 `tools/生成字库.bat`，它会先重建字库、再自动更新字体子集，最后把 `CACHE_VERSION` +1 即可。
+
+**发布后第一次出题没有声音，点「再听一遍」才响？**
+音频是首次播放时才联网下载的。现在进入册目页和开始练习时都会预下载本组音频（`Speaker.preload`），正常网络下不会再出现；如果仍然偶发，说明那几秒网络确实较慢，会等下载完成后自动播放。
 
 **清空某个小朋友的记录？**
 选册页 → 历史记录 → 「清除记录」（仅影响当前小朋友），或后台删除该小朋友（进度与历史一并删除）。
@@ -231,6 +241,7 @@ pip install edge-tts
 
 - 纯 HTML + CSS + 原生 JavaScript，无框架、无构建、无依赖。
 - 通过 `<script>` 引入字库与音频清单，避免 `file://` 下 `fetch` 被浏览器拦截。
-- 语音：预生成 mp3 + `Audio` 队列播放（可打断）；系统语音使用 Web Speech API 兜底。
+- 语音：预生成 mp3 + `Audio` 队列播放（可打断）；发布环境会提前 fetch 成 blob 预下载，避免首次播放没声音；系统语音使用 Web Speech API 兜底。
+- 字体：只有田字格汉字使用内置 Windows 楷体（SimKai）子集 `assets/fonts/kaiti.woff2`（约 110KB），界面文字用系统字体；新增字库后运行 `tools/生成字库.bat` 会自动重建子集。
 - 音效：Web Audio API 实时合成，无需音频文件。
 - 详细设计见 [design.md](design.md)。

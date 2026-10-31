@@ -208,8 +208,11 @@ MAX_LEVEL = 6;
 
 组词讲解默认读成「天空的天，白天的天」。少量字放在「的」后单独出现时会被 TTS 误读（如「的还」读成 huán），处理方式是在 `tools/scripts/gen_words_audio.py` 的 `PRONOUNCE_ALIAS` 例外表中按拼音登记一个读音固定的同音字（如 `"hái": "孩"`），句尾改用该字后只能读出正确读音（「还有的孩，还是的孩」），听感仍是「还有的还，还是的还」。
 
-### 5.3 播放队列
+### 5.3 播放队列与预下载
 
+- **预下载**：`Speaker.preload(urls)` 用 `fetch` 把音频转成内存 blob（`URL.createObjectURL`），播放时优先用 blob 地址。发布到网站后首次播放不再边下边播，避免「第一题没声音、点再听一遍才响」。单个文件 8 秒内没下完则退回原始地址，不阻塞答题。
+- **预热时机**：进入册目页时预下载提示语与 `stars0~20`；开始一组练习时一次性预下载本组所有题目的单字与组词音频（约十几到几十个小文件）。
+- `file://` 下 `fetch` 会被浏览器拦截，自动退回原始地址，离线使用不受影响。
 - `play(list, onDone)` 顺序播放；每个 `Audio` 的 `onended` / `onerror` 都推进到下一段，缺文件自动跳过。
 - `tokens` 为播放版本号：每次 `stop()` 自增，旧序列的回调发现版本变化后停止，实现「新语音立即打断旧语音」。
 - 朗读关闭时直接执行 `onDone`，不影响答题节奏。
@@ -247,7 +250,7 @@ Web Audio API 实时合成，无文件：
 ### 6.2 田字格（纯 CSS）
 
 - 卡片：正方形，实线外框 `#d1603d`，`::before` / `::after` 画内部十字虚线。
-- 汉字使用楷体栈：`"Kaiti SC", "KaiTi", "STKaiti", "楷体", serif`，字号为卡片边长的 58%。
+- 界面文字使用系统字体（`"Microsoft YaHei", "PingFang SC", …, sans-serif`）；只有田字格里的汉字使用内置的 Windows 楷体（SimKai）子集：`"Kaiti Web", "Kaiti SC", "KaiTi", "STKaiti", "楷体", serif`，字号为卡片边长的 58%。`Kaiti Web` 对应 `assets/fonts/kaiti.woff2`（约 110KB，只抽取字库中的汉字），保证各设备田字格字形一致；字体地址同样带 `?v=CACHE_VERSION`。
 - 拼音绝对定位在卡片顶部，不参与居中计算。
 
 **严格居中方案**：练习页的 `.grid` 使用 `position: absolute; inset: 0`，并用 `align-content: center; justify-content: center` 让卡片整体在**视口中心**居中；顶部栏与底部提示条不参与该区域布局，因此不会把田字格挤偏。`.grid` 本身 `pointer-events: none`，只有卡片 `pointer-events: auto`，空白处不遮挡按钮。
@@ -329,6 +332,7 @@ bottom: calc(50% + var(--card-size) + var(--card-gap) / 2 + clamp(9px, 3vh, 30px
 ```
 tools/data/volume-*.txt
    ├─ tools/scripts/build_volumes.py ────────→ data/volumes.js
+   ├─ tools/scripts/build_font.py ───────────→ assets/fonts/kaiti.woff2（由生成字库.bat 自动调用）
    ├─ tools/scripts/gen_syllable_audio.py ───→ assets/audio/syllables/*.mp3 + index.js
    └─ tools/scripts/gen_words_audio.py ──────→ assets/audio/words/*.mp3 + index.js
 
@@ -342,6 +346,7 @@ tools/scripts/gen_star_audio.py ──────────────→ as
 ```
 
 - 统一使用 `edge-tts` + `zh-CN-XiaoxiaoNeural`（rate `-5%`）。
+- 字体子集使用 `fonttools` + `brotli`，只需安装一次；源字体在 `tools/fonts/SimKai.ttf`（仅自用）。
 - 所有脚本幂等：目标文件存在且大小达标时跳过，可反复运行。
 - 合成失败自动重试 3 次；`gen_syllable_audio.py` 还会优先复用旧的 `assets/audio/chars/<字>.mp3`。
 - 生成结束会自动重写对应 `index.js` 清单，前端据此判断音频是否存在。

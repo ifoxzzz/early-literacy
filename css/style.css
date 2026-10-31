@@ -1,0 +1,892 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  font-family: "Kaiti SC", "KaiTi", "STKaiti", "楷体", serif;
+  background: #fdf6e9;
+  color: #4a3b2a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ---------- 通用视图 ---------- */
+.view {
+  width: 100%;
+  max-width: 720px;
+  height: 100%;
+  max-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.app-title {
+  font-size: clamp(36px, 9vmin, 64px);
+  color: #d1603d;
+  margin-bottom: 24px;
+  letter-spacing: 0.1em;
+}
+
+.btn {
+  font-family: inherit;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  padding: 14px 48px;
+  font-size: clamp(20px, 4.5vmin, 28px);
+  transition: transform 0.15s;
+}
+
+.btn:active {
+  transform: scale(0.94);
+}
+
+.btn-primary {
+  background: #f2a541;
+  color: #fff;
+  box-shadow: 0 4px 0 #d18a2e;
+}
+
+.home-stats {
+  font-size: clamp(18px, 4vmin, 26px);
+  margin-bottom: 40px;
+  color: #8a7a63;
+}
+
+.btn-danger {
+  margin-top: 18px;
+  padding: 8px 26px;
+  font-size: clamp(15px, 3.2vmin, 20px);
+  background: #f0e3e0;
+  color: #b0544a;
+  box-shadow: 0 3px 0 #d5b5af;
+}
+
+.btn-ghost {
+  margin-top: 18px;
+  padding: 8px 26px;
+  font-size: clamp(15px, 3.2vmin, 20px);
+  background: #e8dcc8;
+  color: #8a7a63;
+  box-shadow: 0 3px 0 #cbbfa5;
+}
+
+/* ---------- 选册页 ---------- */
+.volume-owner {
+  font-size: clamp(15px, 3.2vmin, 19px);
+  color: #b09a7d;
+  margin-bottom: 16px;
+}
+
+/* 选册页底部：历史记录 + 返回 */
+.volume-actions {
+  display: flex;
+  gap: 14px;
+}
+
+.volume-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: 56vh;
+  overflow-y: auto;
+  padding: 4px;
+  margin-bottom: 10px;
+}
+
+.volume-card {
+  font-family: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  border: 3px solid #f2a541;
+  background: #fffdf5;
+  border-radius: 16px;
+  padding: 16px 24px;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #e8cfa1;
+  transition: transform 0.15s, background 0.2s;
+}
+
+.volume-card:hover {
+  background: #fff3d6;
+  transform: translateY(-2px);
+}
+
+.volume-card:active {
+  transform: scale(0.97);
+}
+
+.volume-name {
+  font-size: clamp(20px, 4.6vmin, 28px);
+  color: #d1603d;
+}
+
+.volume-meta {
+  font-size: clamp(13px, 3vmin, 17px);
+  color: #9b8669;
+}
+
+/* ---------- 首页：小朋友列表 ---------- */
+.user-list {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+  max-height: 46vh;
+  overflow-y: auto;
+  padding: 4px;
+  margin-bottom: 8px;
+}
+
+.user-card {
+  font-family: inherit;
+  border: 3px solid #f2a541;
+  background: #fffdf5;
+  color: #d1603d;
+  border-radius: 16px;
+  padding: 14px 30px;
+  font-size: clamp(24px, 5.5vmin, 34px);
+  cursor: pointer;
+  box-shadow: 0 4px 0 #e8cfa1;
+  transition: transform 0.15s, background 0.2s;
+}
+
+.user-card:hover {
+  background: #fff3d6;
+  transform: translateY(-2px);
+}
+
+.user-card:active {
+  transform: scale(0.95);
+}
+
+/* ---------- 创建小朋友弹窗 ---------- */
+.dialog-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(74, 59, 42, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.dialog {
+  width: min(86vw, 420px);
+  background: #fffdf5;
+  border-radius: 18px;
+  padding: 24px;
+  text-align: center;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+}
+
+.dialog-title {
+  font-size: clamp(18px, 4vmin, 24px);
+  color: #6b5b45;
+  margin-bottom: 16px;
+}
+
+.dialog-input {
+  width: 100%;
+  font-family: inherit;
+  font-size: clamp(20px, 4.5vmin, 26px);
+  padding: 10px 14px;
+  text-align: center;
+  color: #4a3b2a;
+  background: #fff;
+  border: 2px solid #e0d2b8;
+  border-radius: 12px;
+  outline: none;
+}
+
+.dialog-input:focus {
+  border-color: #f2a541;
+}
+
+.dialog-btns {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.dialog-btns .btn {
+  margin-top: 0;
+  padding: 10px 28px;
+  font-size: clamp(16px, 3.5vmin, 20px);
+}
+
+/* ---------- 后台入口：首页左下角小齿轮 ---------- */
+.admin-entry {
+  position: fixed;
+  left: 14px;
+  bottom: 12px;
+  padding: 8px 10px;
+  font-size: 22px;
+  line-height: 1;
+  color: #c2b49c;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.2s, color 0.2s;
+}
+
+.admin-entry:hover {
+  opacity: 1;
+  color: #8a7a63;
+}
+
+/* ---------- 后台管理页 ---------- */
+#view-admin {
+  justify-content: flex-start;
+  padding-top: 28px;
+}
+
+#view-admin .app-title {
+  margin-bottom: 18px;
+}
+
+.admin-block {
+  width: 100%;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  background: #fffdf5;
+  border: 1px solid #ece0c8;
+  border-radius: 14px;
+}
+
+.admin-title {
+  font-size: clamp(16px, 3.2vmin, 19px);
+  font-weight: 600;
+  color: #8a7a63;
+  margin-bottom: 10px;
+}
+
+.admin-users {
+  max-height: 42vh;
+  overflow-y: auto;
+}
+
+.admin-user {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 2px;
+  border-bottom: 1px dashed #ece0c8;
+}
+
+.admin-user:last-child {
+  border-bottom: none;
+}
+
+.admin-user-name {
+  font-size: clamp(18px, 4vmin, 24px);
+  color: #4a3b2a;
+}
+
+.admin-tip {
+  font-size: clamp(14px, 3vmin, 17px);
+  line-height: 1.6;
+  color: #b09a7d;
+}
+
+/* 后台：练习设置行 */
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 2px;
+}
+
+.setting-row + .setting-row {
+  border-top: 1px dashed #ece0c8;
+}
+
+.setting-label {
+  font-size: clamp(15px, 3.2vmin, 19px);
+  color: #6b5b45;
+}
+
+.setting-opts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setting-input {
+  width: 76px;
+  font-family: inherit;
+  font-size: clamp(16px, 3.5vmin, 20px);
+  text-align: center;
+  color: #4a3b2a;
+  background: #fff;
+  border: 2px solid #e0d2b8;
+  border-radius: 10px;
+  padding: 4px 8px;
+  outline: none;
+}
+
+.setting-input:focus {
+  border-color: #f2a541;
+}
+
+.setting-unit {
+  font-size: clamp(13px, 2.8vmin, 16px);
+  color: #b09a7d;
+}
+
+.admin-block .btn-ghost {
+  margin-top: 12px;
+}
+
+.btn-small {
+  margin-top: 0;
+  padding: 5px 14px;
+  font-size: clamp(13px, 2.8vmin, 16px);
+  box-shadow: 0 2px 0 #d5b5af;
+}
+
+/* ---------- 历史记录页 ---------- */
+#view-history {
+  justify-content: flex-start;
+  padding-top: 28px;
+}
+
+#view-history .app-title {
+  margin-bottom: 8px;
+}
+
+.history-owner {
+  font-size: clamp(15px, 3.2vmin, 19px);
+  color: #b09a7d;
+  margin-bottom: 14px;
+}
+
+.history-toolbar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 10px 10px;
+}
+
+.history-legend {
+  font-size: clamp(12px, 2.6vmin, 15px);
+  color: #b09a7d;
+}
+
+.history-list {
+  width: 100%;
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 8px 16px;
+  margin-bottom: 16px;
+}
+
+.history-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #fffdf5;
+  border-radius: 12px;
+  padding: 10px 16px;
+  box-shadow: 0 2px 0 #eadfc8;
+}
+
+.history-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.history-date {
+  flex-shrink: 0;
+  font-family: Arial, "Segoe UI", sans-serif;
+  font-size: clamp(13px, 2.8vmin, 16px);
+  color: #b09a7d;
+}
+
+/* 得几颗星就画几颗，星多时自动换行 */
+.history-stars {
+  flex: 1;
+  text-align: left;
+  font-size: clamp(22px, 5vmin, 32px);
+  line-height: 1.3;
+  letter-spacing: 2px;
+  word-break: break-all;
+}
+
+.history-stars.none {
+  font-family: inherit;
+  font-size: clamp(14px, 3vmin, 18px);
+  letter-spacing: 0;
+  color: #b09a7d;
+}
+
+/* 本组学过的字：绿色答对、红色答错 */
+.history-chars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-top: 1px dashed #eadfc8;
+  padding-top: 8px;
+}
+
+.hchar {
+  min-width: clamp(34px, 8vmin, 44px);
+  text-align: center;
+  font-size: clamp(24px, 5.5vmin, 34px);
+  line-height: 1.25;
+  border-radius: 8px;
+  border: 2px solid transparent;
+}
+
+.hchar.ok {
+  background: #eaf7e6;
+  border-color: #57a65a;
+  color: #3b7a3e;
+}
+
+.hchar.no {
+  background: #fdeceb;
+  border-color: #d9534f;
+  color: #b8342f;
+}
+
+.history-chars-empty {
+  font-size: clamp(13px, 2.8vmin, 16px);
+  color: #b09a7d;
+}
+
+/* 汉字开关关闭时隐藏汉字与图例 */
+body.hide-history-chars .history-chars,
+body.hide-history-chars .history-legend {
+  display: none;
+}
+
+.history-empty {
+  margin-top: 30vh;
+  text-align: center;
+  font-size: clamp(16px, 3.6vmin, 22px);
+  color: #b09a7d;
+}
+
+/* ---------- 练习页 ---------- */
+/* 田字格是主角：绝对定位铺满整个视图，靠 align/justify center 严格居中于窗口 */
+#view-quiz {
+  --cols: 2;
+  --card-size: min(34vmin, 220px);
+  --card-gap: min(4vmin, 28px);
+  position: relative;
+  justify-content: flex-start;
+}
+
+/* 候选字 6 / 8 个时改为 3 列 / 4 列，卡片自动缩小，行列依旧居中 */
+#view-quiz.cols-3 {
+  --cols: 3;
+  --card-size: min(26vmin, 190px);
+}
+
+#view-quiz.cols-4 {
+  --cols: 4;
+  --card-size: min(21vmin, 150px);
+}
+
+.quiz-header,
+.quiz-bottom {
+  position: relative;
+  z-index: 2;
+}
+
+.quiz-header {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 10px;
+  font-size: clamp(18px, 4vmin, 26px);
+  color: #8a7a63;
+  padding: 8px 8px 0;
+}
+
+/* 再听一遍：绝对定位在田字格上方，不参与流式布局，绝不挤压田字格 */
+.read-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  /* 从底部量起：屏幕中线 + 上排卡片高度 + 半个间距 + 空隙，正好落在第一排上方 */
+  bottom: calc(50% + var(--card-size) + var(--card-gap) / 2 + clamp(9px, 3vh, 30px));
+}
+
+.btn-read {
+  padding: 10px 34px;
+  font-size: clamp(20px, 4.6vmin, 30px);
+  background: #fff3d6;
+  color: #d1603d;
+  border: 3px solid #f2a541;
+  box-shadow: 0 4px 0 #e8cfa1;
+}
+
+.btn-read:active {
+  transform: scale(0.97);
+}
+
+/* 「再听一遍」的喇叭：每 2.8 秒摇一次，吸引小朋友注意，其余时间静止 */
+.btn-read .read-icon {
+  display: inline-block;
+  transform-origin: 50% 60%;
+  animation: read-shake 2.8s ease-in-out infinite;
+}
+
+@keyframes read-shake {
+  0%, 55%, 100% {
+    transform: rotate(0) scale(1);
+  }
+  8% {
+    transform: rotate(-14deg) scale(1.12);
+  }
+  18% {
+    transform: rotate(12deg) scale(1.12);
+  }
+  28% {
+    transform: rotate(-9deg) scale(1.08);
+  }
+  38% {
+    transform: rotate(6deg) scale(1.04);
+  }
+  48% {
+    transform: rotate(-3deg) scale(1.02);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-read .read-icon {
+    animation: none;
+  }
+}
+
+#quiz-user {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #b09a7d;
+  font-size: clamp(13px, 3vmin, 17px);
+}
+
+/* 练习页最底部：当前小朋友与册名 */
+.quiz-footer {
+  width: 100%;
+  text-align: center;
+  margin-top: 6px;
+  color: #b09a7d;
+  font-size: clamp(13px, 3vmin, 17px);
+}
+
+.result-user {
+  font-size: clamp(18px, 4vmin, 24px);
+  color: #d1603d;
+  margin-bottom: 14px;
+}
+
+#quiz-stars {
+  color: #f2a541;
+}
+
+.btn-skip {
+  padding: 6px 16px;
+  font-size: clamp(16px, 3.5vmin, 22px);
+  background: #e8dcc8;
+  color: #8a7a63;
+  box-shadow: 0 3px 0 #cbbfa5;
+}
+
+.header-btns {
+  display: flex;
+  gap: 8px;
+}
+
+/* 开关按钮激活态（拼音显示开启时高亮） */
+.btn-skip.active {
+  background: #f2a541;
+  color: #fff;
+  box-shadow: 0 3px 0 #d18a2e;
+}
+
+.hint-btns {
+  display: flex;
+  gap: 12px;
+}
+
+.grid {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(var(--cols), auto);
+  gap: var(--card-gap);
+  align-content: center;
+  justify-content: center;
+  pointer-events: none; /* 空白区域不挡顶部按钮与底部提示条 */
+}
+
+/* 田字格卡片：实线外框 + 伪元素画内部十字虚线 */
+.card {
+  position: relative;
+  width: var(--card-size);
+  height: var(--card-size);
+  pointer-events: auto;
+  background: #fffdf5;
+  border: 3px solid #d1603d;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, border-color 0.2s, transform 0.15s, box-shadow 0.2s,
+    opacity 0.2s, filter 0.2s;
+}
+
+/* 悬停选中效果（答题锁定后禁用） */
+.grid:not(.locked) .card:hover {
+  transform: scale(1.07);
+  border-color: #f2a541;
+  background: #fff9e8;
+  box-shadow: 0 10px 28px rgba(209, 96, 61, 0.4);
+}
+
+/* 作答后锁定：所有卡片不再响应点击/按压/悬停 */
+.grid.locked .card {
+  cursor: default;
+  pointer-events: none;
+}
+
+/* 作答后非正确答案变淡，弱化干扰（答对/答错均使用） */
+.card.dimmed {
+  opacity: 0.32;
+  filter: grayscale(1);
+}
+
+/* 答错时点中的那张：保留淡红色，和其余变灰的未选卡片区分开 */
+.card.wrong.dimmed {
+  opacity: 0.65;
+  filter: grayscale(0.15);
+  border-color: #c9706c;
+  background: #f9e2e0;
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  top: 50%;
+  border-top: 2px dashed rgba(209, 96, 61, 0.35);
+}
+
+.card::after {
+  content: "";
+  position: absolute;
+  top: 6%;
+  bottom: 6%;
+  left: 50%;
+  border-left: 2px dashed rgba(209, 96, 61, 0.35);
+}
+
+.card .char {
+  position: relative;
+  z-index: 1;
+  font-size: calc(var(--card-size) * 0.58);
+  line-height: 1;
+  color: #333;
+}
+
+/* 拼音：置于卡片上方，不影响田字格居中 */
+.card .pinyin {
+  position: absolute;
+  top: 5%;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  text-align: center;
+  font-family: Arial, "Segoe UI", sans-serif;
+  font-size: max(13px, calc(var(--card-size) * 0.15));
+  color: #b09a7d;
+}
+
+body.hide-pinyin .card .pinyin {
+  display: none;
+}
+
+.card:active {
+  transform: scale(0.96);
+}
+
+/* 答对：绿色 */
+.card.correct {
+  border-color: #57a65a;
+  background: #eaf7e6;
+}
+
+/* 答错：红色抖动 */
+.card.wrong {
+  border-color: #d9534f;
+  background: #fdeceb;
+  animation: shake 0.4s;
+}
+
+/* 正确答案提示：脉冲 */
+.card.reveal {
+  border-color: #57a65a;
+  animation: pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-10px); }
+  40% { transform: translateX(10px); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(6px); }
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(87, 166, 90, 0.5); }
+  50% { box-shadow: 0 0 0 12px rgba(87, 166, 90, 0); }
+}
+
+/* 答对星星动画 */
+.star-pop {
+  position: fixed;
+  z-index: 99;
+  font-size: 64px;
+  pointer-events: none;
+  animation: starPop 1s ease-out forwards;
+}
+
+@keyframes starPop {
+  0% { transform: scale(0.3); opacity: 0; }
+  30% { transform: scale(1.3); opacity: 1; }
+  70% { transform: scale(1) translateY(-10px); opacity: 1; }
+  100% { transform: scale(1) translateY(-40px); opacity: 0; }
+}
+
+/* 练习页底部区域：整体贴底（提示条即使隐藏，用户名也不会跑到顶部） */
+.quiz-bottom {
+  width: 100%;
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* 底部提示条 */
+.hint-bar {
+  width: 100%;
+  min-height: 88px;
+  background: #fff3d6;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 20px;
+}
+
+#hint-text {
+  font-size: clamp(20px, 4.5vmin, 30px);
+  text-align: center;
+}
+
+/* 关闭组词显示时隐藏提示文字（语音仍会朗读） */
+body.hide-words #hint-text {
+  display: none;
+}
+
+/* 组词隐藏且没有"继续"按钮时，整条提示框一起收起，避免留一条空背景 */
+body.hide-words .hint-bar:not(:has(#btn-next:not(.hidden))) {
+  display: none;
+}
+
+/* ---------- 结束页 ---------- */
+/* 结束页星星：逐个弹出来 */
+#result-stars {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  font-size: clamp(28px, 7vmin, 46px);
+  line-height: 1.2;
+  margin-bottom: 20px;
+}
+
+.result-star {
+  animation: starIn 0.45s ease-out both;
+}
+
+@keyframes starIn {
+  0% { transform: scale(0.2); opacity: 0; }
+  60% { transform: scale(1.25); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.result-line {
+  font-size: clamp(20px, 4.5vmin, 30px);
+  margin-bottom: 16px;
+  color: #6b5b45;
+}
+
+#view-result .btn {
+  margin-top: 20px;
+}
+
+/* ---------- 鼠标气泡特效 ---------- */
+/* 光标移动时在原地冒出小气泡并向上飘散，让小朋友一眼找到箭头位置 */
+.cursor-bubble {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.85), rgba(209, 96, 60, 0.55));
+  box-shadow: 0 0 6px rgba(209, 96, 60, 0.35);
+  animation: cursorBubble 0.7s ease-out forwards;
+}
+
+@keyframes cursorBubble {
+  0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0.95; }
+  100% { transform: translate(-50%, -160%) scale(1.2); opacity: 0; }
+}

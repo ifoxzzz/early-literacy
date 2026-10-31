@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>宝宝识字</title>
+  <script>
+    // 全局唯一缓存版本：改动任何 css/js/音频后，只需把这个值 +1，即可让全部缓存失效
+    var CACHE_VERSION = "38";
+    window.APP_VERSION = CACHE_VERSION;
+    document.write('<link rel="stylesheet" href="css/style.css?v=' + CACHE_VERSION + '">');
+  </script>
+</head>
+<body>
+  <!-- 首页：选择小朋友 -->
+  <section id="view-home" class="view">
+    <h1 class="app-title">宝宝识字</h1>
+    <p class="home-stats" id="home-stats"></p>
+    <div class="user-list" id="user-list"></div>
+    <button class="btn btn-ghost" id="btn-create-user">+ 创建小朋友</button>
+    <button class="admin-entry" id="btn-admin" title="后台管理">⚙</button>
+  </section>
+
+  <!-- 选择学习内容（按册） -->
+  <section id="view-volumes" class="view hidden">
+    <h1 class="app-title">选择要学的字</h1>
+    <p class="volume-owner" id="volume-owner"></p>
+    <div class="volume-list" id="volume-list"></div>
+    <div class="volume-actions">
+      <button class="btn btn-ghost" id="btn-history">历史记录</button>
+      <button class="btn btn-ghost" id="btn-volume-back">退出</button>
+    </div>
+  </section>
+
+  <!-- 后台管理（家长用，入口在首页左下角） -->
+  <section id="view-admin" class="view hidden">
+    <h1 class="app-title">后台管理</h1>
+    <section class="admin-block">
+      <h2 class="admin-title">小朋友管理</h2>
+      <div class="admin-users" id="admin-users"></div>
+      <button class="btn btn-ghost" id="btn-admin-add">+ 新增小朋友</button>
+    </section>
+    <section class="admin-block">
+      <h2 class="admin-title">练习设置</h2>
+      <div class="setting-row">
+        <span class="setting-label">每题候选字</span>
+        <span class="setting-opts" id="set-options">
+          <button class="btn btn-skip" data-v="4">4 个</button>
+          <button class="btn btn-skip" data-v="6">6 个</button>
+          <button class="btn btn-skip" data-v="8">8 个</button>
+        </span>
+      </div>
+      <div class="setting-row">
+        <span class="setting-label">每组题数</span>
+        <span class="setting-opts">
+          <input class="setting-input" type="number" id="set-count" min="5" max="20" step="1" />
+          <span class="setting-unit">5 ~ 20 题</span>
+        </span>
+      </div>
+    </section>
+    <button class="btn btn-primary" id="btn-admin-back">返回首页</button>
+  </section>
+
+  <!-- 创建小朋友弹窗 -->
+  <div class="dialog-mask hidden" id="user-dialog">
+    <div class="dialog">
+      <p class="dialog-title">小朋友叫什么名字？</p>
+      <input class="dialog-input" id="user-name-input" maxlength="8" placeholder="例如：小雨" />
+      <div class="dialog-btns">
+        <button class="btn btn-ghost" id="btn-user-cancel">取消</button>
+        <button class="btn btn-primary" id="btn-user-ok">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 历史记录页 -->
+  <section id="view-history" class="view hidden">
+    <h1 class="app-title">练习记录</h1>
+    <p class="history-owner" id="history-owner"></p>
+    <div class="history-toolbar">
+      <span class="history-legend">绿色=答对 · 红色=答错</span>
+      <button class="btn btn-skip active" id="btn-history-chars">汉字</button>
+    </div>
+    <div class="history-list" id="history-list"></div>
+    <button class="btn btn-primary" id="btn-history-back">返回</button>
+    <button class="btn btn-danger" id="btn-reset">清除记录</button>
+  </section>
+
+  <!-- 练习页 -->
+  <section id="view-quiz" class="view hidden">
+    <header class="quiz-header">
+      <span id="quiz-progress"></span>
+      <span id="quiz-stars"></span>
+      <span class="header-btns">
+        <button class="btn btn-skip" id="btn-pinyin">拼音</button>
+        <button class="btn btn-skip" id="btn-words">组词</button>
+        <button class="btn btn-skip" id="btn-sound">🔊</button>
+        <button class="btn btn-skip" id="btn-skip">跳过</button>
+        <button class="btn btn-skip" id="btn-quit">结束</button>
+      </span>
+    </header>
+    <div class="read-bar">
+      <button class="btn btn-read" id="btn-read"><span class="read-icon">🔊</span> 再听一遍</button>
+    </div>
+    <main class="grid" id="grid"></main>
+    <div class="quiz-bottom">
+      <footer class="hint-bar">
+        <p id="hint-text"></p>
+        <span class="hint-btns">
+          <button class="btn btn-primary hidden" id="btn-next">继续</button>
+        </span>
+      </footer>
+      <p class="quiz-footer" id="quiz-user"></p>
+    </div>
+  </section>
+
+  <!-- 结束页 -->
+  <section id="view-result" class="view hidden">
+    <h1 class="app-title">完成啦！</h1>
+    <p class="result-user" id="result-user"></p>
+    <p class="result-line" id="result-stars"></p>
+    <p class="result-line" id="result-accuracy"></p>
+    <p class="result-line" id="result-new"></p>
+    <button class="btn btn-primary" id="btn-continue">继续答题</button>
+    <button class="btn btn-ghost" id="btn-again">返回</button>
+  </section>
+
+  <script>
+    // 按依赖顺序注入业务脚本，全部使用同一个缓存版本号
+    [
+      "data/volumes.js",
+      "js/memory.js",
+      "js/storage.js",
+      "js/quiz.js",
+      "assets/audio/syllables/index.js",
+      "assets/audio/words/index.js",
+      "assets/audio/users/index.js",
+      "js/speaker.js",
+      "js/sound.js",
+      "js/app.js",
+    ].forEach(function (src) {
+      document.write('<script src="' + src + '?v=' + CACHE_VERSION + '"><\/script>');
+    });
+  </script>
+</body>
+</html>

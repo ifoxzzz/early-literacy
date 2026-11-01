@@ -8,8 +8,6 @@ const Storage = {
   // ---------- localStorage 键 ----------
   USERS_KEY: "early-literacy-users", // [{ id, name }]
   CURRENT_KEY: "early-literacy-current", // 当前用户 id
-  LEGACY_PROGRESS: "early-literacy-progress", // 旧版单用户进度（仅用于迁移）
-  LEGACY_HISTORY: "early-literacy-history", // 旧版单用户历史（仅用于迁移）
   HISTORY_MAX: 50, // 每个用户只保留最近 50 组记录
 
   // 显示开关（默认开启，存 "0" 表示关闭）
@@ -19,9 +17,8 @@ const Storage = {
     SHOWCHARS: "early-literacy-showchars", // 历史记录里的汉字
   },
 
-  // 练习设置（家长在后台配置，对所有用户生效）
-  QUIZ_OPTIONS_KEY: "early-literacy-quiz-options", // 每题候选字数：4 / 6 / 8
-  QUIZ_COUNT_KEY: "early-literacy-quiz-count", // 每组题数：5 ~ 20
+  // 练习设置（按小朋友独立保存，见 quizOptionsKey / quizCountKey）
+  OPTION_VALUES: [2, 3, 4, 6, 8, 9], // 每题候选字数可选值
 
   // ---------- 通用 JSON 读写 ----------
   // 解析失败时返回 fallback，避免脏数据让整个应用崩溃
@@ -38,56 +35,6 @@ const Storage = {
 
   writeJSON(key, value) {
     localStorage.setItem(key, JSON.stringify(value));
-  },
-
-  // ---------- 初始化与旧数据迁移 ----------
-  // 首次启动：把旧版单用户数据迁移给默认用户"小朋友"
-  init() {
-    if (this.users().length === 0) {
-      const oldProgress = localStorage.getItem(this.LEGACY_PROGRESS);
-      const oldHistory = localStorage.getItem(this.LEGACY_HISTORY);
-      if (oldProgress || oldHistory) {
-        this.addUser("小朋友");
-        if (oldProgress) localStorage.setItem(this.progressKey(), oldProgress);
-        if (oldHistory) localStorage.setItem(this.historyKey(), oldHistory);
-        localStorage.removeItem(this.LEGACY_PROGRESS);
-        localStorage.removeItem(this.LEGACY_HISTORY);
-      }
-    }
-    this.migrateProgress();
-  },
-
-  // 旧版进度以"汉字"为键；新格式为"汉字|拼音"。
-  // 同一个字只有一个旧读音时直接换键，多个读音时取字库中靠前的那条
-  migrateProgress() {
-    // 建立 汉字 -> [汉字|拼音, ...] 的索引，便于为旧键找到新键
-    const byChar = {};
-    (window.VOLUMES || []).forEach((v) =>
-      v.entries.forEach((e) => {
-        (byChar[e.char] = byChar[e.char] || []).push(`${e.char}|${e.pinyin}`);
-      })
-    );
-    this.users().forEach((u) => {
-      const key = this.progressKey(u.id);
-      const data = this.readJSON(key, null);
-      if (!data) return;
-      let changed = false;
-      const next = {};
-      Object.keys(data).forEach((k) => {
-        if (k.includes("|")) {
-          next[k] = data[k]; // 已是新格式
-          return;
-        }
-        const cands = byChar[k];
-        if (!cands || !cands.length) {
-          next[k] = data[k]; // 字库里已没有的字，原样保留
-          return;
-        }
-        next[cands[0]] = data[k];
-        changed = true;
-      });
-      if (changed) this.writeJSON(key, next);
-    });
   },
 
   // ---------- 用户 ----------
@@ -121,11 +68,13 @@ const Storage = {
     return user;
   },
 
-  // 删除用户：连同其练习进度与历史一起清除
+  // 删除用户：连同其练习进度、历史与练习设置一起清除
   removeUser(id) {
     this.saveUsers(this.users().filter((u) => u.id !== id));
     localStorage.removeItem(this.progressKey(id));
     localStorage.removeItem(this.historyKey(id));
+    localStorage.removeItem(this.quizOptionsKey(id));
+    localStorage.removeItem(this.quizCountKey(id));
     if (this.currentId() === id) localStorage.removeItem(this.CURRENT_KEY);
   },
 
@@ -137,6 +86,14 @@ const Storage = {
 
   historyKey(id) {
     return `early-literacy-history:${id || this.currentId()}`;
+  },
+
+  quizOptionsKey(id) {
+    return `early-literacy-quiz-options:${id || this.currentId()}`;
+  },
+
+  quizCountKey(id) {
+    return `early-literacy-quiz-count:${id || this.currentId()}`;
   },
 
   // ---------- 学习进度 ----------
@@ -201,10 +158,6 @@ const Storage = {
     this.writeJSON(this.historyKey(), list.slice(-this.HISTORY_MAX));
   },
 
-  clearHistory() {
-    localStorage.removeItem(this.historyKey());
-  },
-
   // 清空当前用户的进度与历史
   clearUserData() {
     localStorage.removeItem(this.progressKey());
@@ -221,28 +174,28 @@ const Storage = {
     localStorage.setItem(key, on ? "1" : "0");
   },
 
-  // ---------- 练习设置 ----------
-  // 每题候选字数：只支持 4 / 6 / 8，非法值回落到 4
-  quizOptions() {
-    const v = parseInt(localStorage.getItem(this.QUIZ_OPTIONS_KEY), 10);
-    return [4, 6, 8].includes(v) ? v : 4;
+  // ---------- 练习设置（按小朋友独立保存） ----------
+  // 每题候选字数：只支持 2 / 3 / 4 / 6 / 8 / 9，非法值回落到 4
+  quizOptions(id) {
+    const v = parseInt(localStorage.getItem(this.quizOptionsKey(id)), 10);
+    return this.OPTION_VALUES.includes(v) ? v : 4;
   },
 
-  setQuizOptions(v) {
-    const n = [4, 6, 8].includes(Number(v)) ? Number(v) : 4;
-    localStorage.setItem(this.QUIZ_OPTIONS_KEY, String(n));
+  setQuizOptions(v, id) {
+    const n = this.OPTION_VALUES.includes(Number(v)) ? Number(v) : 4;
+    localStorage.setItem(this.quizOptionsKey(id), String(n));
     return n;
   },
 
   // 每组题数：5 ~ 20，非法值回落到 10
-  quizCount() {
-    const v = parseInt(localStorage.getItem(this.QUIZ_COUNT_KEY), 10);
+  quizCount(id) {
+    const v = parseInt(localStorage.getItem(this.quizCountKey(id)), 10);
     return v >= 5 && v <= 20 ? v : 10;
   },
 
-  setQuizCount(v) {
+  setQuizCount(v, id) {
     const n = Math.max(5, Math.min(20, parseInt(v, 10) || 10));
-    localStorage.setItem(this.QUIZ_COUNT_KEY, String(n));
+    localStorage.setItem(this.quizCountKey(id), String(n));
     return n;
   },
 };

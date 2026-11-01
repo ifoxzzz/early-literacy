@@ -189,10 +189,11 @@ const Speaker = {
   // 为一组练习预热：提示语、星星播报、全部题目涉及的单字与组词音频
   preloadSession(name, targets) {
     // 「请找出」始终用通用提示语，名字语音里没有这个文件
-    const urls = ["welcome", "praise1", "praise2", "praise3", "wrong", "done", "cheer"].map(
-      (k) => this.phraseFile(k, name)
+    const urls = ["welcome", "praise1", "praise2", "praise3", "done", "cheer"].map((k) =>
+      this.phraseFile(k, name)
     );
     urls.push(this.audioUrl("phrases/find.mp3"));
+    urls.push(this.audioUrl("phrases/help.mp3"));
     for (let i = 0; i <= 20; i++) urls.push(this.audioUrl(`phrases/stars${i}.mp3`));
     (targets || []).forEach((t) => {
       const syl = this.syllableAudio(t.pinyin);
@@ -263,11 +264,6 @@ const Speaker = {
     speechSynthesis.speak(u);
   },
 
-  // 用系统语音念小朋友的名字（名字任意、无法预生成），念完再播真人问候语
-  speakName(name, onDone) {
-    this.speak(name, { rate: 1, onDone, guard: true });
-  },
-
   // ---------- 真人语音资源定位 ----------
   // 是否有为该名字预生成的真人人声（清单见 assets/audio/users/index.js）
   hasUserAudio(name) {
@@ -280,11 +276,25 @@ const Speaker = {
   },
 
   // 提示语路径：优先用"带名字"的真人语音，否则用通用提示语
-  // key：welcome / praise1~3 / wrong / done / cheer
+  // key：welcome / praise1~3 / done / cheer
   phraseFile(key, name) {
     return this.hasUserAudio(name)
       ? this.audioUrl(`${this.userDir(name)}${key}.mp3`)
       : this.audioUrl(`phrases/${key}.mp3`);
+  },
+
+  // 单字详情页：先读汉字发音，再读组词讲解
+  readEntry(entry) {
+    const charSrc = this.syllableAudio(entry.pinyin);
+    const wordSrc = this.wordAudio(entry);
+    if (charSrc) {
+      const urls = wordSrc ? [charSrc, wordSrc] : [charSrc];
+      this.preload(urls);
+      this.play(urls);
+      return;
+    }
+    const explain = this.explainText(entry);
+    this.speak(`${entry.char}${explain ? "，" + explain : ""}`);
   },
 
   // ---------- 各场景播报 ----------
@@ -305,16 +315,7 @@ const Speaker = {
     list.push(this.audioUrl("phrases/find.mp3"), charSrc);
     if (wordSrc) list.push(wordSrc);
 
-    // 没有预生成名字语音时，先用系统语音念名字，再播问候语
-    if (first && name && !this.hasUserAudio(name) && "speechSynthesis" in window) {
-      this.stop();
-      const token = this.tokens;
-      this.speakName(name, () => {
-        if (token !== this.tokens) return; // 已被新语音打断
-        this.play(list);
-      });
-      return;
-    }
+    // 没有预生成名字语音时，phraseFile 会自动退回通用提示语，不再插入系统合成音
     this.play(list);
   },
 
@@ -324,12 +325,9 @@ const Speaker = {
     this.play([this.phraseFile(`praise${n}`, name)], onDone);
   },
 
-  // 答错："没关系，正确答案是：" + 正确字发音
-  wrong(target, name) {
-    const list = [this.phraseFile("wrong", name)];
-    const charSrc = this.syllableAudio(target.pinyin);
-    if (charSrc) list.push(charSrc);
-    this.play(list);
+  // 帮帮我：提示语（动画由 app.js 负责）
+  help() {
+    this.play([this.audioUrl("phrases/help.mp3")]);
   },
 
   // 结束页：完成 + 星星数 + 鼓励

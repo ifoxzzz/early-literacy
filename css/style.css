@@ -4,13 +4,18 @@
   box-sizing: border-box;
 }
 
+:root {
+  /* 田字格与汉字表里的汉字统一使用内置楷体，保证各设备字形一致 */
+  --kaiti: "Kaiti Web", "Kaiti SC", "KaiTi", "STKaiti", "楷体", serif;
+}
+
 html,
 body {
   height: 100%;
 }
 
 body {
-  /* 界面文字统一使用系统字体；只有田字格里的汉字才用内置微软楷体 */
+  /* 界面文字统一使用系统字体；只有田字格与汉字表里的汉字才用内置楷体 */
   font-family: "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB",
     "Noto Sans CJK SC", Arial, sans-serif;
   background: #fdf6e9;
@@ -24,6 +29,17 @@ body {
 
 .hidden {
   display: none !important;
+}
+
+/* 烟花画布：铺满视口、盖在页面之上但完全不拦截点击 */
+.fx-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
+  pointer-events: none;
+  z-index: 30;
 }
 
 /* ---------- 通用视图 ---------- */
@@ -97,9 +113,11 @@ body {
   margin-bottom: 16px;
 }
 
-/* 选册页底部：历史记录 + 返回 */
+/* 选册页底部：历史记录 + 练习设置 + 退出 */
 .volume-actions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 14px;
 }
 
@@ -116,6 +134,7 @@ body {
 
 .volume-card {
   font-family: inherit;
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -125,7 +144,7 @@ body {
   border: 3px solid #f2a541;
   background: #fffdf5;
   border-radius: 16px;
-  padding: 16px 24px;
+  padding: 16px 84px 16px 24px; /* 右侧留出图标位置 */
   cursor: pointer;
   box-shadow: 0 4px 0 #e8cfa1;
   transition: transform 0.15s, background 0.2s;
@@ -148,6 +167,123 @@ body {
 .volume-meta {
   font-size: clamp(13px, 3vmin, 17px);
   color: #9b8669;
+}
+
+/* 每册右侧的汉字表图标（在卡片内部，不改变整卡点击开始练习） */
+.volume-icon {
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  width: clamp(40px, 9vmin, 50px);
+  height: clamp(40px, 9vmin, 50px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(20px, 4.5vmin, 26px);
+  line-height: 1;
+  background: #fff3d6;
+  border: 2px solid #f2a541;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.volume-icon:hover {
+  background: #ffe6b8;
+  transform: translateY(-50%) scale(1.08);
+}
+
+.volume-icon:active {
+  transform: translateY(-50%) scale(0.94);
+}
+
+/* ---------- 某一册的汉字表 ---------- */
+#view-volume-words {
+  justify-content: flex-start;
+  padding-top: 28px;
+}
+
+#view-volume-words .app-title {
+  margin-bottom: 6px;
+}
+
+.word-list {
+  width: 100%;
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 8px 16px;
+  margin-bottom: 16px;
+}
+
+.word-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fffdf5;
+  border-radius: 12px;
+  padding: 8px 14px;
+  box-shadow: 0 2px 0 #eadfc8;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.word-item:hover {
+  background: #fff3d6;
+}
+
+.word-item:active {
+  transform: scale(0.99);
+}
+
+.word-play {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  font-size: 18px;
+  line-height: 1;
+  background: #fff3d6;
+  border: 2px solid #f2a541;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.15s, background 0.2s;
+}
+
+.word-play:hover {
+  background: #ffe6b8;
+  transform: scale(1.08);
+}
+
+.word-play:active {
+  transform: scale(0.94);
+}
+
+.word-char {
+  flex: 0 0 auto;
+  width: 50px;
+  text-align: center;
+  font-family: var(--kaiti);
+  font-size: clamp(26px, 6vmin, 36px);
+  line-height: 1.2;
+  color: #333;
+}
+
+.word-pinyin {
+  flex: 0 0 auto;
+  width: clamp(80px, 16vmin, 110px);
+  font-family: Arial, "Segoe UI", sans-serif;
+  font-size: clamp(16px, 3.6vmin, 22px);
+  color: #b09a7d;
+}
+
+.word-words {
+  flex: 1;
+  font-size: clamp(16px, 3.4vmin, 22px);
+  line-height: 1.4;
+  color: #6b5b45;
 }
 
 /* ---------- 首页：小朋友列表 ---------- */
@@ -241,6 +377,31 @@ body {
   font-size: clamp(16px, 3.5vmin, 20px);
 }
 
+/* ---------- 创作者信息：首页右下角，小字低对比 ---------- */
+.creator-credit {
+  position: fixed;
+  right: 14px;
+  bottom: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 2px 10px;
+  max-width: 70vw;
+  font-size: clamp(11px, 2.4vmin, 13px);
+  line-height: 1.5;
+  color: #c2b49c;
+}
+
+.creator-credit a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.creator-credit a:hover {
+  color: #8a7a63;
+  text-decoration: underline;
+}
+
 /* ---------- 后台入口：首页左下角小齿轮 ---------- */
 .admin-entry {
   position: fixed;
@@ -316,7 +477,39 @@ body {
   color: #b09a7d;
 }
 
-/* 后台：练习设置行 */
+/* ---------- 练习设置页（按小朋友保存） ---------- */
+#view-settings {
+  justify-content: flex-start;
+  padding-top: 28px;
+}
+
+#view-settings .app-title {
+  margin-bottom: 8px;
+}
+
+.settings-owner {
+  font-size: clamp(15px, 3.2vmin, 19px);
+  color: #b09a7d;
+  margin-bottom: 14px;
+}
+
+.settings-panel {
+  width: 100%;
+  padding: 14px 16px;
+  background: #fffdf5;
+  border: 1px solid #ece0c8;
+  border-radius: 14px;
+}
+
+.settings-tip {
+  font-size: clamp(13px, 2.9vmin, 16px);
+  line-height: 1.6;
+  color: #b09a7d;
+  margin: 14px 0 18px;
+  text-align: center;
+}
+
+/* 练习设置行（设置页使用） */
 .setting-row {
   display: flex;
   align-items: center;
@@ -337,6 +530,7 @@ body {
 .setting-opts {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -463,13 +657,26 @@ body {
   padding-top: 8px;
 }
 
+/* 历史记录里的汉字：可点击查看详情 */
 .hchar {
   min-width: clamp(34px, 8vmin, 44px);
+  padding: 0 4px;
+  font-family: inherit;
   text-align: center;
   font-size: clamp(24px, 5.5vmin, 34px);
   line-height: 1.25;
   border-radius: 8px;
   border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.hchar:hover {
+  transform: translateY(-2px);
+}
+
+.hchar:active {
+  transform: scale(0.94);
 }
 
 .hchar.ok {
@@ -502,25 +709,78 @@ body.hide-history-chars .history-legend {
   color: #b09a7d;
 }
 
+/* ---------- 通用单字详情页 ---------- */
+#view-card {
+  position: relative;
+  justify-content: flex-start;
+  padding-top: 0;
+}
+
+.detail-header {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  padding: 14px 4px 0;
+}
+
+/* 单格居中：复用答题页的田字格卡片，显示一个汉字 */
+.card-detail {
+  --cols: 1;
+  --rows: 1;
+  --card-size: min(52vmin, 40vh, 340px);
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-detail .card {
+  cursor: default;
+}
+
+.card-detail .card:active {
+  transform: none;
+}
+
+/* 详情页始终显示拼音，方便认读 */
+body.hide-pinyin #view-card .card .pinyin {
+  display: block;
+}
+
+.detail-read {
+  position: relative;
+  z-index: 2;
+  margin-top: 14px;
+  display: flex;
+  justify-content: center;
+}
+
+.detail-bottom {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
 /* ---------- 练习页 ---------- */
 /* 田字格是主角：绝对定位铺满整个视图，靠 align/justify center 严格居中于窗口 */
 #view-quiz {
+  /* 行列与卡片上限由 app.js 按候选字数量、横竖屏动态设置 */
   --cols: 2;
-  --card-size: min(34vmin, 220px);
+  --rows: 1;
+  --card-cap: min(34vmin, 220px);
   --card-gap: min(4vmin, 28px);
+  /* 同时受可用宽度、可用高度与上限约束：竖屏行数多时自动缩小，保证整组不出屏 */
+  --card-size: min(
+    calc((100vw - 24px - (var(--cols) - 1) * var(--card-gap)) / var(--cols)),
+    calc((100vh - 220px - (var(--rows) - 1) * var(--card-gap)) / var(--rows)),
+    var(--card-cap)
+  );
   position: relative;
   justify-content: flex-start;
-}
-
-/* 候选字 6 / 8 个时改为 3 列 / 4 列，卡片自动缩小，行列依旧居中 */
-#view-quiz.cols-3 {
-  --cols: 3;
-  --card-size: min(26vmin, 190px);
-}
-
-#view-quiz.cols-4 {
-  --cols: 4;
-  --card-size: min(21vmin, 150px);
 }
 
 .quiz-header,
@@ -541,17 +801,23 @@ body.hide-history-chars .history-legend {
   padding: 8px 8px 0;
 }
 
-/* 再听一遍：绝对定位在田字格上方，不参与流式布局，绝不挤压田字格 */
+/* 再听一遍 / 帮帮我：绝对定位在田字格上方，不参与流式布局，绝不挤压田字格 */
 .read-bar {
   position: absolute;
   left: 0;
   right: 0;
   z-index: 2;
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   justify-content: center;
-  /* 从底部量起：屏幕中线 + 上排卡片高度 + 半个间距 + 空隙，正好落在第一排上方 */
-  bottom: calc(50% + var(--card-size) + var(--card-gap) / 2 + clamp(9px, 3vh, 30px));
+  gap: 12px;
+  padding: 0 10px;
+  /* 从底部量起：屏幕中线 + 整组田字格高度的一半 + 空隙，正好落在第一排上方 */
+  bottom: calc(
+    50% + (var(--rows) * var(--card-size) + (var(--rows) - 1) * var(--card-gap)) / 2 +
+      clamp(9px, 3vh, 30px)
+  );
 }
 
 .btn-read {
@@ -565,6 +831,26 @@ body.hide-history-chars .history-legend {
 
 .btn-read:active {
   transform: scale(0.97);
+}
+
+/* 帮帮我：尺寸略小于「再听一遍」，用蓝紫色与橙色/绿色区分开 */
+.btn-help {
+  padding: 8px 26px;
+  font-size: clamp(17px, 4vmin, 24px);
+  background: #e7ecfb;
+  color: #4b5aa6;
+  border: 2px solid #8f9ed6;
+  box-shadow: 0 3px 0 #c3cbe8;
+}
+
+.btn-help:active {
+  transform: scale(0.97);
+}
+
+/* 帮帮我启用中（本题已亮出答案）：按钮变淡且不可再点 */
+.btn-help.used {
+  opacity: 0.45;
+  box-shadow: none;
 }
 
 /* 「再听一遍」的喇叭：每 2.8 秒摇一次，吸引小朋友注意，其余时间静止 */
@@ -649,11 +935,6 @@ body.hide-history-chars .history-legend {
   box-shadow: 0 3px 0 #d18a2e;
 }
 
-.hint-btns {
-  display: flex;
-  gap: 12px;
-}
-
 .grid {
   position: absolute;
   inset: 0;
@@ -697,6 +978,68 @@ body.hide-history-chars .history-legend {
   pointer-events: none;
 }
 
+/* ---------- 帮帮我：正确答案移到屏幕中央并放大，其余卡片淡出消失 ---------- */
+.grid.helping .card {
+  transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.3, 1), opacity 0.5s ease,
+    box-shadow 0.5s ease, border-color 0.5s ease;
+}
+
+.grid.helping .card.help-fade {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.9);
+}
+
+/* 平移到屏幕中心的 transform 由 app.js 按卡片位置实时计算；
+   这里先给出放大兜底，并让 :hover 不再覆盖（鼠标停在卡片上时也保持放大） */
+.grid.helping .card.help-target,
+.grid.helping .card.help-target:hover {
+  z-index: 3;
+  transform: scale(1.5);
+  border-color: #57a65a;
+  box-shadow: 0 0 0 8px rgba(87, 166, 90, 0.18), 0 18px 40px rgba(0, 0, 0, 0.16);
+}
+
+/* 放大后的田字格外圈：两圈绿色波纹交替向外扩散，像水波一样把注意力引到答案上 */
+.help-wave,
+.help-wave::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border: 6px solid rgba(87, 166, 90, 0.6);
+  border-radius: 14px;
+  pointer-events: none;
+  animation: help-wave 1.8s ease-out infinite;
+}
+
+.help-wave::after {
+  inset: -5px;
+  border-color: rgba(87, 166, 90, 0.45);
+  animation-delay: 0.9s;
+}
+
+@keyframes help-wave {
+  0% {
+    transform: scale(1);
+    opacity: 0.95;
+  }
+  45% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.45);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .help-wave,
+  .help-wave::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
 /* 作答后非正确答案变淡，弱化干扰（答对/答错均使用） */
 .card.dimmed {
   opacity: 0.32;
@@ -732,8 +1075,8 @@ body.hide-history-chars .history-legend {
 .card .char {
   position: relative;
   z-index: 1;
-  /* 田字格里的汉字使用内置微软楷体，保证各设备字形一致 */
-  font-family: "Kaiti Web", "Kaiti SC", "KaiTi", "STKaiti", "楷体", serif;
+  /* 田字格里的汉字使用内置楷体，保证各设备字形一致 */
+  font-family: var(--kaiti);
   font-size: calc(var(--card-size) * 0.58);
   line-height: 1;
   color: #333;
@@ -766,17 +1109,12 @@ body.hide-pinyin .card .pinyin {
   background: #eaf7e6;
 }
 
-/* 答错：红色抖动 */
+/* 答错：红色抖动，抖完由 app.js 加 .dimmed 变淡；抖动期间起就不可再点 */
 .card.wrong {
   border-color: #d9534f;
   background: #fdeceb;
+  pointer-events: none;
   animation: shake 0.4s;
-}
-
-/* 正确答案提示：脉冲 */
-.card.reveal {
-  border-color: #57a65a;
-  animation: pulse 0.9s ease-in-out infinite;
 }
 
 @keyframes shake {
@@ -785,11 +1123,6 @@ body.hide-pinyin .card .pinyin {
   40% { transform: translateX(10px); }
   60% { transform: translateX(-6px); }
   80% { transform: translateX(6px); }
-}
-
-@keyframes pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(87, 166, 90, 0.5); }
-  50% { box-shadow: 0 0 0 12px rgba(87, 166, 90, 0); }
 }
 
 /* 答对星星动画 */
@@ -831,18 +1164,14 @@ body.hide-pinyin .card .pinyin {
   padding: 12px 20px;
 }
 
-#hint-text {
+#hint-text,
+#card-words {
   font-size: clamp(20px, 4.5vmin, 30px);
   text-align: center;
 }
 
-/* 关闭组词显示时隐藏提示文字（语音仍会朗读） */
-body.hide-words #hint-text {
-  display: none;
-}
-
-/* 组词隐藏且没有"继续"按钮时，整条提示框一起收起，避免留一条空背景 */
-body.hide-words .hint-bar:not(:has(#btn-next:not(.hidden))) {
+/* 关闭组词显示时整条提示框一起收起（语音仍会朗读） */
+body.hide-words .hint-bar {
   display: none;
 }
 

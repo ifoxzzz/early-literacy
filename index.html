@@ -6,10 +6,10 @@
   <title>宝宝识字</title>
   <script>
     // 全局唯一缓存版本：改动任何 css/js/音频后，只需把这个值 +1，即可让全部缓存失效
-    var CACHE_VERSION = "44";
+    var CACHE_VERSION = "62";
     window.APP_VERSION = CACHE_VERSION;
     document.write('<link rel="stylesheet" href="css/style.css?v=' + CACHE_VERSION + '">');
-    // 内置楷体（Windows 楷体 SimKai 子集，仅自用）：只用于田字格里的汉字
+    // 内置楷体（Windows 楷体 SimKai 子集，仅自用）：只用于田字格与汉字表里的汉字
     document.write(
       '<style>@font-face{font-family:"Kaiti Web";' +
         'src:url("assets/fonts/kaiti.woff2?v=' + CACHE_VERSION + '") format("woff2");' +
@@ -25,6 +25,12 @@
     <div class="user-list" id="user-list"></div>
     <button class="btn btn-ghost" id="btn-create-user">+ 创建小朋友</button>
     <button class="admin-entry" id="btn-admin" title="后台管理">⚙</button>
+    <!-- 创作者信息：首页右下角小字，不干扰小朋友点击 -->
+    <footer class="creator-credit">
+      <span>Author: foxzzz</span>
+      <a href="https://www.foxzzz.com/" target="_blank" rel="noopener">foxzzz.com</a>
+      <a href="mailto:i@foxzzz.com">i@foxzzz.com</a>
+    </footer>
   </section>
 
   <!-- 选择学习内容（按册） -->
@@ -34,26 +40,33 @@
     <div class="volume-list" id="volume-list"></div>
     <div class="volume-actions">
       <button class="btn btn-ghost" id="btn-history">历史记录</button>
+      <button class="btn btn-ghost" id="btn-settings">练习设置</button>
       <button class="btn btn-ghost" id="btn-volume-back">退出</button>
     </div>
   </section>
 
-  <!-- 后台管理（家长用，入口在首页左下角） -->
-  <section id="view-admin" class="view hidden">
-    <h1 class="app-title">后台管理</h1>
-    <section class="admin-block">
-      <h2 class="admin-title">小朋友管理</h2>
-      <div class="admin-users" id="admin-users"></div>
-      <button class="btn btn-ghost" id="btn-admin-add">+ 新增小朋友</button>
-    </section>
-    <section class="admin-block">
-      <h2 class="admin-title">练习设置</h2>
+  <!-- 某一册的汉字表（册目页每册右侧图标进入） -->
+  <section id="view-volume-words" class="view hidden">
+    <h1 class="app-title">汉字表</h1>
+    <p class="history-owner" id="words-subtitle"></p>
+    <div class="word-list" id="word-list"></div>
+    <button class="btn btn-primary" id="btn-words-back">返回</button>
+  </section>
+
+  <!-- 练习设置（按小朋友独立保存，入口在选册页） -->
+  <section id="view-settings" class="view hidden">
+    <h1 class="app-title">练习设置</h1>
+    <p class="settings-owner" id="settings-owner"></p>
+    <section class="settings-panel">
       <div class="setting-row">
         <span class="setting-label">每题候选字</span>
         <span class="setting-opts" id="set-options">
+          <button class="btn btn-skip" data-v="2">2 个</button>
+          <button class="btn btn-skip" data-v="3">3 个</button>
           <button class="btn btn-skip" data-v="4">4 个</button>
           <button class="btn btn-skip" data-v="6">6 个</button>
           <button class="btn btn-skip" data-v="8">8 个</button>
+          <button class="btn btn-skip" data-v="9">9 个</button>
         </span>
       </div>
       <div class="setting-row">
@@ -63,6 +76,18 @@
           <span class="setting-unit">5 ~ 20 题</span>
         </span>
       </div>
+    </section>
+    <p class="settings-tip">设置只对这位小朋友生效，下一组练习开始生效。</p>
+    <button class="btn btn-primary" id="btn-settings-back">返回</button>
+  </section>
+
+  <!-- 后台管理（家长用，入口在首页左下角） -->
+  <section id="view-admin" class="view hidden">
+    <h1 class="app-title">后台管理</h1>
+    <section class="admin-block">
+      <h2 class="admin-title">小朋友管理</h2>
+      <div class="admin-users" id="admin-users"></div>
+      <button class="btn btn-ghost" id="btn-admin-add">+ 新增小朋友</button>
     </section>
     <button class="btn btn-primary" id="btn-admin-back">返回首页</button>
   </section>
@@ -92,6 +117,22 @@
     <button class="btn btn-danger" id="btn-reset">清除记录</button>
   </section>
 
+  <!-- 通用单字详情页：田字格 + 拼音 + 读音 + 组词（练习记录等位置复用） -->
+  <section id="view-card" class="view hidden">
+    <header class="detail-header">
+      <button class="btn btn-skip" id="btn-card-back">← 返回</button>
+    </header>
+    <div class="detail-read">
+      <button class="btn btn-read" id="btn-card-read"><span class="read-icon">🔊</span> 读一读</button>
+    </div>
+    <main class="card-detail" id="card-grid"></main>
+    <div class="detail-bottom">
+      <footer class="hint-bar">
+        <p id="card-words"></p>
+      </footer>
+    </div>
+  </section>
+
   <!-- 练习页 -->
   <section id="view-quiz" class="view hidden">
     <header class="quiz-header">
@@ -107,14 +148,12 @@
     </header>
     <div class="read-bar">
       <button class="btn btn-read" id="btn-read"><span class="read-icon">🔊</span> 再听一遍</button>
+      <button class="btn btn-help" id="btn-help"><span class="help-icon">💡</span> 帮帮我</button>
     </div>
     <main class="grid" id="grid"></main>
     <div class="quiz-bottom">
       <footer class="hint-bar">
         <p id="hint-text"></p>
-        <span class="hint-btns">
-          <button class="btn btn-primary hidden" id="btn-next">继续</button>
-        </span>
       </footer>
       <p class="quiz-footer" id="quiz-user"></p>
     </div>
@@ -130,6 +169,9 @@
     <button class="btn btn-primary" id="btn-continue">继续答题</button>
     <button class="btn btn-ghost" id="btn-again">返回</button>
   </section>
+
+  <!-- 烟花特效画布：首次答对时从点击/触摸位置绽放，不拦截任何点击 -->
+  <canvas id="fx-canvas" class="fx-canvas"></canvas>
 
   <script>
     // 按依赖顺序注入业务脚本，全部使用同一个缓存版本号

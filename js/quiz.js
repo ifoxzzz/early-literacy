@@ -78,9 +78,9 @@ const Quiz = {
   },
 
   // 为目标字配干扰项并随机排布
-  // optionCount 是卡片总数（4 / 6 / 8），故干扰项数量为 optionCount - 1（至少 2 个）
+  // optionCount 是卡片总数（2 / 3 / 4 / 6 / 8 / 9），故干扰项数量为 optionCount - 1（至少 1 个）
   buildOptions(target, entries, optionCount) {
-    const want = Math.max(2, (optionCount || 4) - 1);
+    const want = Math.max(1, (optionCount || 4) - 1);
     const others = [];
     const seen = new Set([target.char]); // 同字不同音也只保留一张卡片
     for (const e of this.shuffle(entries || [])) {
@@ -92,12 +92,11 @@ const Quiz = {
     return this.shuffle([target, ...others]);
   },
 
-  // 组卷：返回本次练习的题目队列 [{ target, options, retried }]
+  // 组卷：返回本次练习的题目队列 [{ target, options }]
   buildSession(count, entries, optionCount) {
     return this.pickTargets(count, entries).map((target) => ({
       target,
       options: this.buildOptions(target, entries, optionCount),
-      retried: false,
     }));
   },
 };

@@ -9,6 +9,73 @@ const Speaker = {
   current: null, // 当前播放的 Audio 实例
   tokens: 0, // 播放序列版本号，用于打断旧序列
 
+  // 运行时生成 0.08 秒静音 wav（iOS 上 volume 只读，不能靠调音量静音）
+  silenceUri() {
+    const sr = 8000;
+    const samples = 640;
+    const size = 44 + samples * 2;
+    const buf = new ArrayBuffer(size);
+    const v = new DataView(buf);
+    const tag = (off, s) => {
+      for (let i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i));
+    };
+    tag(0, "RIFF");
+    v.setUint32(4, size - 8, true);
+    tag(8, "WAVE");
+    tag(12, "fmt ");
+    v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true); // PCM
+    v.setUint16(22, 1, true); // 单声道
+    v.setUint32(24, sr, true);
+    v.setUint32(28, sr * 2, true);
+    v.setUint16(32, 2, true);
+    v.setUint16(34, 16, true);
+    tag(36, "data");
+    v.setUint32(40, samples * 2, true);
+    let bin = "";
+    new Uint8Array(buf).forEach((b) => (bin += String.fromCharCode(b)));
+    return "data:audio/wav;base64," + btoa(bin);
+  },
+
+  // 微信内置浏览器 / iOS WebView 不允许"没有用户手势"的自动播放：
+  // 首次点按时用同一个 Audio 元素播放一段极短静音来解锁，之后程序自动 play() 才能发声。
+  // （点击"再听一遍"能响，正是因为那一次点按属于用户手势）
+  player: null, // 全站复用的 Audio 元素，解锁后一直用它播放
+  unlocked: false,
+
+  ensurePlayer() {
+    if (!this.player) this.player = new Audio();
+    return this.player;
+  },
+
+  // 首次用户手势时调用（只能成功解锁一次）
+  unlock() {
+    if (this.unlocked) return;
+    this.unlocked = true;
+    const a = this.ensurePlayer();
+    const token = this.tokens;
+    const finish = () => {
+      // 解锁期间如果已经开始播放正式语音，就不要打断它
+      if (token === this.tokens) {
+        a.pause();
+        try {
+          a.currentTime = 0;
+        } catch (e) {}
+      }
+    };
+    a.src = this.silenceUri();
+    a.play().then(() => setTimeout(finish, 120)).catch(finish);
+  },
+
+  // 监听首次点按/触摸/按键，以及微信 JSBridge 就绪事件
+  bindUnlock() {
+    const once = () => this.unlock();
+    ["pointerdown", "mousedown", "touchstart", "click", "keydown"].forEach((ev) =>
+      document.addEventListener(ev, once, { once: true, passive: true })
+    );
+    document.addEventListener("WeixinJSBridgeReady", once, { once: true });
+  },
+
   // ---------- 开关 ----------
   isEnabled() {
     return localStorage.getItem(this.KEY) !== "0";
@@ -153,12 +220,16 @@ const Speaker = {
       }
       this.resolveSrc(list[i]).then((src) => {
         if (token !== this.tokens) return;
-        const a = new Audio(src);
+        // 复用同一个 Audio 元素：微信里解锁后才能继续自动播放
+        const a = this.ensurePlayer();
         this.current = a;
         // 播放失败（文件缺失、解码失败）同样跳到下一段，保证流程继续
         a.onended = () => next(i + 1);
         a.onerror = () => next(i + 1);
-        a.play().catch(() => next(i + 1));
+        a.src = src;
+        a.play().catch(() => {
+          if (token === this.tokens) next(i + 1);
+        });
       });
     };
     next(0);
@@ -272,3 +343,6 @@ const Speaker = {
     ]);
   },
 };
+
+// 页面一加载就监听首次点按，用于解锁微信/iOS 的自动播放限制
+Speaker.bindUnlock();

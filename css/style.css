@@ -766,27 +766,40 @@ body.hide-pinyin #view-card .card .pinyin {
 }
 
 /* ---------- 练习页 ---------- */
-/* 田字格是主角：绝对定位铺满整个视图，靠 align/justify center 严格居中于窗口 */
+/* 田字格是主角：中间舞台占满顶部按钮与底部提示条之间的空间，卡片在其中居中 */
 #view-quiz {
-  /* 行列与卡片上限由 app.js 按候选字数量、横竖屏动态设置 */
+  /* 行列与卡片尺寸由 app.js 按候选字数量、横竖屏与可用空间动态设置 */
   --cols: 2;
   --rows: 1;
-  --card-cap: min(34vmin, 220px);
-  --card-gap: min(4vmin, 28px);
-  /* 同时受可用宽度、可用高度与上限约束：竖屏行数多时自动缩小，保证整组不出屏 */
-  --card-size: min(
-    calc((100vw - 24px - (var(--cols) - 1) * var(--card-gap)) / var(--cols)),
-    calc((100vh - 220px - (var(--rows) - 1) * var(--card-gap)) / var(--rows)),
-    var(--card-cap)
-  );
+  --card-gap: min(3vmin, 20px);
+  --card-size: min(34vmin, 220px);
   position: relative;
   justify-content: flex-start;
+  /* 练习页在平板/桌面上放宽容器，让田字格能真正用满屏幕宽度 */
+  max-width: 1180px;
+  /* 「帮帮我」时放大并外扩的卡片/波纹限制在本视图内，避免撑出滚动条导致屏幕抖动 */
+  overflow: hidden;
+  /* 收窄内边距，把左右空间尽量留给田字格（竖屏尤其明显） */
+  padding: 6px 6px 8px;
 }
 
 .quiz-header,
 .quiz-bottom {
   position: relative;
   z-index: 2;
+}
+
+/* 中间舞台：除顶部栏与底部提示条之外的全部空间 */
+.quiz-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 2vh, 20px);
 }
 
 .quiz-header {
@@ -801,23 +814,59 @@ body.hide-pinyin #view-card .card .pinyin {
   padding: 8px 8px 0;
 }
 
-/* 再听一遍 / 帮帮我：绝对定位在田字格上方，不参与流式布局，绝不挤压田字格 */
+/* 再听一遍 / 帮帮我：默认排在田字格上方，参与流式布局，由 JS 预留高度，绝不遮盖顶部按钮 */
 .read-bar {
-  position: absolute;
-  left: 0;
-  right: 0;
+  position: relative;
   z-index: 2;
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
   gap: 12px;
-  padding: 0 10px;
-  /* 从底部量起：屏幕中线 + 整组田字格高度的一半 + 空隙，正好落在第一排上方 */
-  bottom: calc(
-    50% + (var(--rows) * var(--card-size) + (var(--rows) - 1) * var(--card-gap)) / 2 +
-      clamp(9px, 3vh, 30px)
+  padding: 0 4px;
+}
+
+/* 横屏且左右空间足够时：按钮移到田字格两侧垂直居中，整个高度都留给田字格 */
+#view-quiz.quiz-side .read-bar {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: block;
+  padding: 0;
+  pointer-events: none;
+}
+
+#view-quiz.quiz-side .btn-read,
+#view-quiz.quiz-side .btn-help {
+  position: absolute;
+  top: 50%;
+  padding: 10px 18px;
+  font-size: clamp(15px, 2.6vmin, 20px);
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+#view-quiz.quiz-side .btn-read {
+  /* 左侧空白区的正中：空白总宽 = 舞台宽 - 整组田字格宽，取其四分之一即左半区中点 */
+  left: calc(
+    (100% - (var(--cols) * var(--card-size) + (var(--cols) - 1) * var(--card-gap))) / 4
   );
+  transform: translate(-50%, -50%);
+}
+
+#view-quiz.quiz-side .btn-help {
+  right: calc(
+    (100% - (var(--cols) * var(--card-size) + (var(--cols) - 1) * var(--card-gap))) / 4
+  );
+  transform: translate(50%, -50%);
+}
+
+#view-quiz.quiz-side .btn-read:active {
+  transform: translate(-50%, -50%) scale(0.97);
+}
+
+#view-quiz.quiz-side .btn-help:active {
+  transform: translate(50%, -50%) scale(0.97);
 }
 
 .btn-read {
@@ -851,6 +900,23 @@ body.hide-pinyin #view-card .card .pinyin {
 .btn-help.used {
   opacity: 0.45;
   box-shadow: none;
+}
+
+/* 窄屏（手机竖屏）：压缩两个按钮，避免换行后挤占田字格高度 */
+@media (max-width: 480px) {
+  .read-bar {
+    gap: 8px;
+  }
+
+  .btn-read {
+    padding: 8px 18px;
+    font-size: clamp(16px, 4.2vmin, 22px);
+  }
+
+  .btn-help {
+    padding: 7px 14px;
+    font-size: clamp(14px, 3.6vmin, 19px);
+  }
 }
 
 /* 「再听一遍」的喇叭：每 2.8 秒摇一次，吸引小朋友注意，其余时间静止 */
@@ -936,9 +1002,9 @@ body.hide-pinyin #view-card .card .pinyin {
 }
 
 .grid {
-  position: absolute;
-  inset: 0;
+  position: relative;
   z-index: 1;
+  flex: 0 0 auto;
   display: grid;
   grid-template-columns: repeat(var(--cols), auto);
   gap: var(--card-gap);
@@ -1032,11 +1098,63 @@ body.hide-pinyin #view-card .card .pinyin {
   }
 }
 
+/* 「帮帮我」的小手：从田字格底部滑到正中，轻点后消失，循环提示可以点这里 */
+.help-hand {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  width: calc(var(--card-size) * 0.24);
+  pointer-events: none;
+  opacity: 0;
+  animation: help-hand 2.2s ease-in-out infinite;
+  animation-delay: 0.5s;
+}
+
+.help-hand svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.18));
+}
+
+@keyframes help-hand {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) translateY(calc(var(--card-size) * 0.34)) scale(0.92);
+  }
+  18% {
+    opacity: 1;
+  }
+  55% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translateY(0) scale(1);
+  }
+  63% {
+    transform: translate(-50%, -50%) translateY(0) scale(0.86);
+  }
+  72% {
+    transform: translate(-50%, -50%) translateY(0) scale(1);
+  }
+  88% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) translateY(0) scale(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .help-wave,
   .help-wave::after {
     animation: none;
     opacity: 0;
+  }
+
+  .help-hand {
+    display: none;
   }
 }
 

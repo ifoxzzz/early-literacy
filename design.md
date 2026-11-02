@@ -127,7 +127,8 @@ window.VOLUMES = [
 | `early-literacy-quiz-options:{id}` | 该小朋友的每题候选字数 2 / 3 / 4 / 6 / 8 / 9 |
 | `early-literacy-quiz-count:{id}` | 该小朋友的每组题数 5 ~ 20 |
 | `early-literacy-sound` | 朗读总开关 |
-| `early-literacy-pinyin` / `-words` / `-showchars` | 三个显示开关 |
+| `early-literacy-pinyin:{id}` / `-words:{id}` | 该小朋友的拼音 / 组词显示开关（未设置时默认开启） |
+| `early-literacy-showchars` | 历史记录里的汉字显示开关（全局） |
 
 显示开关统一约定：值为 `"0"` 表示关闭，其余（含未设置）视为开启（`Storage.pref`）。
 练习设置未保存时使用默认值：每题 4 个候选字、每组 10 题（由 `Storage.quizOptions` / `quizCount` 内置回落）。
@@ -265,41 +266,27 @@ Web Audio API 实时合成，无文件：
 - 界面文字使用系统字体（`"Microsoft YaHei", "PingFang SC", …, sans-serif`）；只有田字格里的汉字使用内置的 Windows 楷体（SimKai）子集：`"Kaiti Web", "Kaiti SC", "KaiTi", "STKaiti", "楷体", serif`，字号为卡片边长的 58%。`Kaiti Web` 对应 `assets/fonts/kaiti.woff2`（约 110KB，只抽取字库中的汉字），保证各设备田字格字形一致；字体地址同样带 `?v=CACHE_VERSION`。
 - 拼音绝对定位在卡片顶部，不参与居中计算。
 
-**严格居中方案**：练习页的 `.grid` 使用 `position: absolute; inset: 0`，并用 `align-content: center; justify-content: center` 让卡片整体在**视口中心**居中；顶部栏与底部提示条不参与该区域布局，因此不会把田字格挤偏。`.grid` 本身 `pointer-events: none`，只有卡片 `pointer-events: auto`，空白处不遮挡按钮。
+**布局方案**：顶部栏与底部提示条之间是一整块 `.quiz-stage`（`flex: 1`），田字格在其中用 `align-content: center; justify-content: center` 居中。按钮与卡片都在流式布局里，绝不覆盖顶部按钮或底部提示条。`.grid` 本身 `pointer-events: none`，只有卡片 `pointer-events: auto`。
 
 **列数与尺寸**：`app.js` 的 `GRID_LAYOUT` 按候选字数量与横竖屏写入 `--cols` / `--rows`，横屏行数少、竖屏列数少：
 
-| 候选字数 | 横屏（列×行） | 竖屏（列×行） | 单卡上限 |
-|---|---|---|---|
-| 2 | 2×1 | 1×2 | `min(40vmin, 220px)` |
-| 3 | 3×1 | 1×3 | `min(30vmin, 190px)` |
-| 4 | 2×2 | 2×2 | `min(34vmin, 220px)` |
-| 6 | 3×2 | 2×3 | `min(26vmin, 190px)` |
-| 8 | 4×2 | 2×4 | `min(21vmin, 150px)` |
-| 9 | 3×3 | 3×3 | `min(24vmin, 160px)` |
+| 候选字数 | 横屏（列×行） | 竖屏（列×行） |
+|---|---|---|
+| 2 | 2×1 | 1×2 |
+| 3 | 3×1 | 1×3 |
+| 4 | 2×2 | 2×2 |
+| 6 | 3×2 | 2×3 |
+| 8 | 4×2 | 2×4 |
+| 9 | 3×3 | 3×3 |
 
-实际卡片边长同时受可用宽度、可用高度（预留顶部栏、再听一遍与底部提示条）和上限约束，任一超限自动缩小；转屏时监听 `resize` 重新计算，练习中即时重排：
+卡片边长由 `applyGridLayout()` 在运行时量取 `.quiz-stage` 的实际宽高后计算，同时扣掉卡片间距、顶部按钮行与底部提示条，并为鼠标悬停时的 `scale(1.07)` 预留膨胀量与 10px 安全余量（保证边缘卡片放大后仍完整可见）；上限为 `min(72vmin, 420px)`。卡片间距为 `min(3vmin, 20px)`。视图启动、转屏、窗口缩放都会重新计算，因此屏幕再矮也不会压到顶部按钮。
 
-```css
---card-size: min(
-  calc((100vw - 24px - (var(--cols) - 1) * var(--card-gap)) / var(--cols)),
-  calc((100vh - 220px - (var(--rows) - 1) * var(--card-gap)) / var(--rows)),
-  var(--card-cap)
-);
-```
+**再听一遍 / 帮帮我**有两种排布：
+- 默认（竖屏，或横屏左右放不下按钮时）：在田字格上方横向居中，参与流式布局，其高度已在卡片尺寸中预留。
+- 横屏且左右空间足够时（`#view-quiz.quiz-side`）：按钮绝对定位到田字格左右空白区，并在各自区域内水平、垂直居中；此时卡片尺寸计算会先扣除两侧按钮宽度，因此不会与按钮或卡片重叠。是否切换由 JS 比较两种方案的卡片边长决定，取更大的那种。
 
-**再听一遍 / 帮帮我**按钮绝对定位在整组田字格上方：
 
-```css
-bottom: calc(
-  50% + (var(--rows) * var(--card-size) + (var(--rows) - 1) * var(--card-gap)) / 2 +
-    clamp(9px, 3vh, 30px)
-);
-```
-
-从视口中线向上累加「整组高度的一半 + 空隙」，行数变为 3、4 时也不会与卡片重叠。两个按钮放在同一个 `.read-bar` 里居中排列，窄屏时自动换行。
-
-**帮帮我动画**：点击后 `useHelp()` 给 `.grid` 加 `helping`，正确卡片加 `help-target`、其余加 `help-fade`（`opacity: 0`），同时播放 `phrases/help.mp3`。为了避免动画被悬停样式覆盖，`.help-target:hover` 与 `.help-target` 共用同一组 `transform`；JS 先用 `getBoundingClientRect()` 强制提交初始状态，再把位移写成内联 `transform: translate(dx,dy) scale(1.5)`，让卡片从原位平滑移动到屏幕中心并放大。`help-target` 内还会插入一个 `.help-wave`（及其 `::after`），两圈绿色细框以 0.9 秒错开、`1 → 1.45` 由内向外扩散并淡出，形成持续的水波效果，提醒孩子看这里。本题随后按跳过处理：只有再点中正确卡片才 `nextQuestion()`，不计分、不写入进度；`nextQuestion` 会清掉 `helping` 与按钮的 `used` 状态。
+**帮帮我动画**：点击后 `useHelp()` 给 `.grid` 加 `helping`，正确卡片加 `help-target`、其余加 `help-fade`（`opacity: 0`），同时播放 `phrases/help.mp3`。为了避免动画被悬停样式覆盖，`.help-target:hover` 与 `.help-target` 共用同一组 `transform`；JS 先用 `getBoundingClientRect()` 强制提交初始状态，再把位移写成内联 `transform: translate(dx,dy) scale(≤1.5)`，让卡片从原位平滑移动到屏幕中心并放大。`help-target` 内还会插入一个 `.help-wave`（及其 `::after`），两圈绿色细框以 0.9 秒错开、`1 → 1.45` 由内向外扩散并淡出，形成持续的水波效果，提醒孩子看这里；同时插入 `.help-hand` 小手图标，每 2.2 秒从田字格底部滑到正中、轻点一下后淡出，循环提示「点这里继续」。放大幅度为 `min(1.5, 舞台宽/卡片宽 - 余量, 舞台高/卡片高 - 余量)`，小屏自动收小，保证放大后仍完整落在舞台内；练习视图 `overflow: hidden`，波纹与小手外扩也不会撑出滚动条造成抖动。`prefers-reduced-motion` 下隐藏小手并停掉波纹。本题随后按跳过处理：只有再点中正确卡片才 `nextQuestion()`，不计分、不写入进度；`nextQuestion` 会清掉 `helping` 与按钮的 `used` 状态。
 
 **底部区域**：`.quiz-bottom { margin-top: auto }`，内部包含提示条与用户名；即使组词提示隐藏（`.hint-bar` 被 `:has` 规则收起），用户名仍贴在页面底部。
 

@@ -17,6 +17,10 @@ const Storage = {
     SHOWCHARS: "early-literacy-showchars", // 历史记录里的汉字
   },
 
+  // 按小朋友隔离的显示开关：拼音、组词按当前用户分别保存
+  // 其余开关（历史汉字）仍为全局设置
+  USER_PREF_KEYS: ["early-literacy-pinyin", "early-literacy-words"],
+
   // 练习设置（按小朋友独立保存，见 quizOptionsKey / quizCountKey）
   OPTION_VALUES: [2, 3, 4, 6, 8, 9], // 每题候选字数可选值
 
@@ -75,6 +79,8 @@ const Storage = {
     localStorage.removeItem(this.historyKey(id));
     localStorage.removeItem(this.quizOptionsKey(id));
     localStorage.removeItem(this.quizCountKey(id));
+    // 拼音、组词开关也按小朋友保存，删除时一并清理
+    this.USER_PREF_KEYS.forEach((k) => localStorage.removeItem(this.prefKey(k, id)));
     if (this.currentId() === id) localStorage.removeItem(this.CURRENT_KEY);
   },
 
@@ -166,12 +172,19 @@ const Storage = {
 
   // ---------- 显示开关（拼音 / 组词 / 历史汉字） ----------
   // 未设置过或值为 "1" 时视为开启
-  pref(key) {
-    return localStorage.getItem(key) !== "0";
+  // 拼音、组词按小朋友隔离；历史汉字为全局设置
+  prefKey(key, id) {
+    if (!this.USER_PREF_KEYS.includes(key)) return key;
+    const uid = id || this.currentId();
+    return uid ? `${key}:${uid}` : key;
   },
 
-  setPref(key, on) {
-    localStorage.setItem(key, on ? "1" : "0");
+  pref(key, id) {
+    return localStorage.getItem(this.prefKey(key, id)) !== "0";
+  },
+
+  setPref(key, on, id) {
+    localStorage.setItem(this.prefKey(key, id), on ? "1" : "0");
   },
 
   // ---------- 练习设置（按小朋友独立保存） ----------

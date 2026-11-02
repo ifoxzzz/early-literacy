@@ -55,6 +55,8 @@
 - **🔊 / 🔇**：朗读与音效总开关。
 - **历史记录里的「汉字」**：控制历史记录中汉字与图例的显隐。
 
+> 拼音与组词按小朋友分别保存（默认都开启），切换小朋友不会互相影响。
+
 ### 记忆与记录
 - **遗忘曲线**：答对升级（10 分钟 → 1 小时 → 1 天 → 2 天 → 4 天 → 7 天 → 15 天），答错归零并 10 分钟后重现。
 - **出题优先级**：到期复习字 → 新字 → 已学未到期字（错得越多越容易被抽中）。
@@ -222,8 +224,8 @@ pip install edge-tts
 | `early-literacy-progress:{id}` | 该小朋友的进度，以「汉字+拼音」为键，值为 `{ level, correct, wrong, lastReview, nextReview }` |
 | `early-literacy-history:{id}` | 该小朋友的历史，最多 50 组 |
 | `early-literacy-sound` | 朗读开关，`0` 为静音 |
-| `early-literacy-pinyin` | 拼音显示，`0` 为隐藏 |
-| `early-literacy-words` | 组词显示，`0` 为隐藏 |
+| `early-literacy-pinyin:{id}` | 该小朋友的拼音显示，`0` 为隐藏（未设置时默认显示） |
+| `early-literacy-words:{id}` | 该小朋友的组词显示，`0` 为隐藏（未设置时默认显示） |
 | `early-literacy-showchars` | 历史记录汉字显示，`0` 为隐藏 |
 | `early-literacy-quiz-options:{id}` | 该小朋友的每题候选字数：`2` / `3` / `4` / `6` / `8` / `9` |
 | `early-literacy-quiz-count:{id}` | 该小朋友的每组题数：`5` ~ `20` |

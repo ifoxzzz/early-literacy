@@ -65,24 +65,69 @@
   }
 
   // 候选字数量对应的行列：横屏行数少、竖屏列数少，避免卡片被拉得又宽又扁
-  // cap 为单张卡片尺寸上限（随数量变化），实际尺寸还会受屏幕宽高约束（见 style.css）
+  // 实际卡片尺寸由 applyGridLayout 按可用空间实时计算
   const GRID_LAYOUT = {
-    2: { landscape: [2, 1], portrait: [1, 2], cap: "min(40vmin, 220px)" },
-    3: { landscape: [3, 1], portrait: [1, 3], cap: "min(30vmin, 190px)" },
-    4: { landscape: [2, 2], portrait: [2, 2], cap: "min(34vmin, 220px)" },
-    6: { landscape: [3, 2], portrait: [2, 3], cap: "min(26vmin, 190px)" },
-    8: { landscape: [4, 2], portrait: [2, 4], cap: "min(21vmin, 150px)" },
-    9: { landscape: [3, 3], portrait: [3, 3], cap: "min(24vmin, 160px)" },
+    2: { landscape: [2, 1], portrait: [1, 2] },
+    3: { landscape: [3, 1], portrait: [1, 3] },
+    4: { landscape: [2, 2], portrait: [2, 2] },
+    6: { landscape: [3, 2], portrait: [2, 3] },
+    8: { landscape: [4, 2], portrait: [2, 4] },
+    9: { landscape: [3, 3], portrait: [3, 3] },
   };
 
-  // 按当前数量 + 横竖屏写入行列变量；转屏时再次调用即可即时切换布局
+  const quizStage = $("#quiz-stage");
+  const readBar = $("#read-bar");
+  const btnRead = $("#btn-read");
+  const btnHelp = $("#btn-help");
+
+  // 按当前数量 + 横竖屏计算行列与卡片尺寸；转屏时再次调用即可即时重排
+  // 原则：田字格尽可能大，且绝不与顶部按钮、底部提示条或「再听一遍/帮帮我」重叠
   function applyGridLayout() {
     const conf = GRID_LAYOUT[session.optionCount] || GRID_LAYOUT[4];
     const portrait = window.innerHeight > window.innerWidth;
     const [cols, rows] = portrait ? conf.portrait : conf.landscape;
+    const vw = document.documentElement.clientWidth;
+    const vh = document.documentElement.clientHeight;
+    const gap = Math.min((3 * Math.min(vw, vh)) / 100, 20); // 与 --card-gap 保持一致
+    // 悬停时卡片会 scale(1.07)，边缘卡片会向屏幕外/上下内容膨胀；
+    // 计算尺寸时把四周膨胀量和一点安全余量预留出来，保证放大后仍完整可见
+    const hoverGrow = 0.07;
+    const safePad = 10;
+    const cap = Math.min(Math.min(vw, vh) * 0.72, 420); // 超大屏时避免单字过大
+    const fitSize = (w, h) =>
+      Math.min(
+        (w - (cols - 1) * gap - safePad * 2) / (cols + hoverGrow),
+        (h - (rows - 1) * gap - safePad * 2) / (rows + hoverGrow),
+        cap
+      );
+
     views.quiz.style.setProperty("--cols", cols);
     views.quiz.style.setProperty("--rows", rows);
-    views.quiz.style.setProperty("--card-cap", conf.cap);
+    views.quiz.style.setProperty("--card-gap", `${gap}px`);
+    views.quiz.classList.remove("quiz-side");
+
+    const stageW = quizStage.clientWidth;
+    const stageH = quizStage.clientHeight;
+    if (!stageW || !stageH) return;
+    const stageGap = parseFloat(getComputedStyle(quizStage).rowGap) || 0;
+    const availW = stageW; // 田字格可用宽度：竖屏时靠收窄视图左右内边距获得
+
+    // 默认：按钮在田字格上方（竖屏或左右空间不足时）
+    const availH = stageH - readBar.offsetHeight - stageGap;
+    const topSize = fitSize(availW, availH);
+    let size = topSize;
+
+    // 横屏且左右放得下按钮时：把「再听一遍」「帮帮我」移到田字格两侧垂直居中
+    // 这样纵向空间全部留给田字格，也就不会遮住顶部按钮
+    if (!portrait) {
+      views.quiz.classList.add("quiz-side");
+      const reserve = Math.max(btnRead.offsetWidth, btnHelp.offsetWidth) + gap;
+      const sideSize = fitSize(availW - reserve * 2, stageH);
+      if (sideSize > topSize) size = sideSize;
+      else views.quiz.classList.remove("quiz-side");
+    }
+
+    views.quiz.style.setProperty("--card-size", `${Math.max(0, Math.floor(size))}px`);
   }
 
   window.addEventListener("resize", () => {
@@ -113,6 +158,8 @@
   function renderVolumes(user) {
     // 进入册目页就开始下载提示语与星星播报，给孩子挑选册的时间，避免练习第一题没声音
     if (user) Speaker.preloadSession(user.name, []);
+    // 拼音 / 组词开关按小朋友保存，切换小朋友后要重新应用
+    refreshDisplaySwitches();
     $("#volume-owner").textContent = user ? `${user.name} 想学哪一册？` : "";
     const list = $("#volume-list");
     list.innerHTML = "";
@@ -300,8 +347,8 @@
       optionCount,
       current: null,
     });
-    applyGridLayout(); // 按候选字数量与当前横竖屏决定列数与卡片尺寸
     show("quiz");
+    applyGridLayout(); // 视图显示后才能测量舞台空间，据此决定行列与卡片尺寸
     $("#quiz-user").textContent = `${session.userName} · ${volume.title}`;
     // 本组所有题目的单字、组词音频一次性预热，后面的题目不再临时等下网络
     Speaker.preloadSession(session.userName, questions.map((q) => q.target));
@@ -385,11 +432,30 @@
     wave.className = "help-wave";
     wave.setAttribute("aria-hidden", "true");
     targetCard.appendChild(wave);
+    // 小手提示：从田字格底部滑到正中、轻点一下再消失，循环提示孩子点这张卡片
+    const hand = document.createElement("span");
+    hand.className = "help-hand";
+    hand.setAttribute("aria-hidden", "true");
+    hand.innerHTML =
+      '<svg viewBox="0 0 64 80" aria-hidden="true">' +
+      '<rect x="26" y="3" width="14" height="44" rx="7" fill="#f5ad63"/>' +
+      '<rect x="5" y="37" width="14" height="22" rx="7" transform="rotate(-22 12 48)" fill="#f5ad63"/>' +
+      '<rect x="13" y="33" width="38" height="33" rx="15" fill="#f5ad63"/>' +
+      '<rect x="16" y="63" width="32" height="9" rx="4.5" fill="#8ecfe0"/>' +
+      "</svg>";
+    targetCard.appendChild(hand);
     // 读取一次位置会强制提交上面的初始状态，再写入位移，动画才会从原位平滑开始
     const rect = targetCard.getBoundingClientRect();
-    const dx = window.innerWidth / 2 - (rect.left + rect.width / 2);
-    const dy = window.innerHeight / 2 - (rect.top + rect.height / 2);
-    targetCard.style.transform = `translate(${dx}px, ${dy}px) scale(1.5)`;
+    // 移到田字格舞台的中心（而不是整个视口中心），与新的居中布局保持一致
+    const stageRect = quizStage.getBoundingClientRect();
+    // 小屏时自动收小放大幅度，保证放大后的卡片仍完整落在舞台内
+    const scale = Math.max(
+      1,
+      Math.min(1.5, (stageRect.width - 16) / rect.width, (stageRect.height - 16) / rect.height)
+    );
+    const dx = stageRect.left + stageRect.width / 2 - (rect.left + rect.width / 2);
+    const dy = stageRect.top + stageRect.height / 2 - (rect.top + rect.height / 2);
+    targetCard.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
   }
 
   function onPick(card, opt, q, evt) {
@@ -622,6 +688,12 @@
 
   // 通用显示开关：状态存 localStorage，按钮高亮 + body 挂 class 控制显隐
   // 默认开启；关闭时给 body 加 hideClass
+  // 拼音、组词按小朋友保存，切换小朋友时需要重新刷新
+  const displayRefreshers = [];
+  function refreshDisplaySwitches() {
+    displayRefreshers.forEach((fn) => fn());
+  }
+
   function bindDisplaySwitch(key, hideClass, btn) {
     const isOn = () => Storage.pref(key);
     const refresh = () => {
@@ -632,6 +704,7 @@
       Storage.setPref(key, !isOn());
       refresh();
     });
+    displayRefreshers.push(refresh);
     refresh();
   }
   // 拼音（即时生效） / 组词（只影响显示，语音仍会朗读） / 历史汉字

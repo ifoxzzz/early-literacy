@@ -1315,6 +1315,62 @@ body.hide-words .hint-bar {
   100% { transform: scale(1); opacity: 1; }
 }
 
+/* 每颗星星弹出瞬间的小礼花：彩色纸屑向四周散开并旋转坠落 */
+#result-fx {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.confetti-piece {
+  position: absolute;
+  width: 6px;
+  height: 9px;
+  transform: translate(-50%, -50%);
+  animation: confetti-burst 0.95s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+/* 星星中心的扩散光环，作为礼花的第一下"炸开" */
+.confetti-ring {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  border: 3px solid #ffd34d;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  animation: confetti-ring 0.55s ease-out forwards;
+  will-change: transform, opacity;
+}
+
+@keyframes confetti-ring {
+  0% {
+    transform: translate(-50%, -50%) scale(0.3);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(3);
+    opacity: 0;
+  }
+}
+
+@keyframes confetti-burst {
+  0% {
+    transform: translate(-50%, -50%) scale(0.5);
+    opacity: 1;
+  }
+  65% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.3)
+      rotate(var(--rot));
+    opacity: 0;
+  }
+}
+
 .result-line {
   font-size: clamp(20px, 4.5vmin, 30px);
   margin-bottom: 16px;

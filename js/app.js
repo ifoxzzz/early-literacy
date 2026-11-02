@@ -412,6 +412,7 @@
     q.helped = true;
     clearTimeout(session.timer);
     $("#btn-help").classList.add("used");
+    Sound.play("help");
     Speaker.help();
 
     const targetKey = Quiz.keyOf(q.target);
@@ -544,6 +545,7 @@
   }
 
   /* ---------- 烟花特效：首次选对时从点击位置连续绽放 ---------- */
+  const FIREWORK_COLORS = ["#ff5252", "#ffca28", "#66bb6a", "#29b6f6", "#ab47bc", "#ff7043"];
   let fwGeneration = 0;
   let fwRaf = 0;
 
@@ -565,7 +567,7 @@
     canvas.style.display = "block";
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    const colors = ["#ff5252", "#ffca28", "#66bb6a", "#29b6f6", "#ab47bc", "#ff7043"];
+    const colors = FIREWORK_COLORS;
     const cx = at ? at.x : w / 2;
     const cy = at ? at.y : h / 2;
     // 点击位置连放三朵，颜色与力度略有差异，像真的烟花一簇簇炸开
@@ -651,6 +653,58 @@
     fwRaf = requestAnimationFrame(frame);
   }
 
+  /* ---------- 结束页：每颗星星弹出时放一圈小礼花 ---------- */
+  let resultFx = null;
+
+  function ensureResultFx() {
+    if (!resultFx) {
+      resultFx = document.createElement("div");
+      resultFx.id = "result-fx";
+      document.body.appendChild(resultFx);
+    }
+    return resultFx;
+  }
+
+  function popStarConfetti(star) {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const rect = star.getBoundingClientRect();
+    if (!rect.width) return; // 页面已切走或星星已被重建
+    const layer = ensureResultFx();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    // 先来一圈快速扩散的光环，再接彩色纸屑，像一朵小礼花炸开
+    const ring = document.createElement("span");
+    ring.className = "confetti-ring";
+    ring.style.left = `${cx}px`;
+    ring.style.top = `${cy}px`;
+    layer.appendChild(ring);
+    setTimeout(() => ring.remove(), 700);
+    for (let i = 0; i < 16; i++) {
+      const piece = document.createElement("span");
+      const angle = (Math.PI * 2 * i) / 16 + Math.random() * 0.45;
+      const dist = 28 + Math.random() * 34;
+      piece.className = "confetti-piece";
+      piece.style.left = `${cx}px`;
+      piece.style.top = `${cy}px`;
+      piece.style.width = `${5 + Math.random() * 3}px`;
+      piece.style.height = `${7 + Math.random() * 5}px`;
+      piece.style.background = FIREWORK_COLORS[i % FIREWORK_COLORS.length];
+      if (i % 3 === 0) piece.style.borderRadius = "50%";
+      piece.style.setProperty("--dx", `${Math.cos(angle) * dist}px`);
+      piece.style.setProperty("--dy", `${Math.sin(angle) * dist + 18}px`);
+      piece.style.setProperty("--rot", `${(Math.random() - 0.5) * 320}deg`);
+      layer.appendChild(piece);
+      setTimeout(() => piece.remove(), 1000);
+    }
+  }
+
+  // 与星星弹出的动画延迟对齐，在每颗星弹到最大的时候炸开一圈
+  function queueStarConfetti() {
+    document.querySelectorAll("#result-stars .result-star").forEach((star, i) => {
+      setTimeout(() => popStarConfetti(star), i * 90 + 260);
+    });
+  }
+
   /* ---------- 结束页 ---------- */
   function renderResult() {
     Storage.addHistory({
@@ -676,6 +730,8 @@
       session.newLearned.length > 0 ? `新学会：${session.newLearned.join("、")}` : "";
     Speaker.result(session.stars, session.userName);
     show("result");
+    // 星星渲染完成后再取位置放礼花，避免量到 0 尺寸
+    if (session.stars > 0) queueStarConfetti();
   }
 
   /* ---------- 事件绑定 ---------- */

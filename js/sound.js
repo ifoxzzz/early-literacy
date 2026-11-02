@@ -8,7 +8,18 @@ const Sound = {
   ensureCtx() {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return null;
-    if (!this.ctx) this.ctx = new AC();
+    if (!this.ctx) {
+      this.ctx = new AC();
+      // iOS / 微信 WebView 的音频引擎必须在用户手势中真正"启动"一次：
+      // 用 1 帧静音缓冲播放，此后同一个上下文里的合成音效才能正常发声
+      try {
+        const buf = this.ctx.createBuffer(1, 1, 22050);
+        const src = this.ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(this.ctx.destination);
+        src.start(0);
+      } catch (e) {}
+    }
     if (this.ctx.state === "suspended") this.ctx.resume();
     return this.ctx;
   },
@@ -43,9 +54,15 @@ const Sound = {
       this.tone(523, 0, 0.14, "triangle"); // 答对：do-mi-sol 上行
       this.tone(659, 0.11, 0.14, "triangle");
       this.tone(784, 0.22, 0.28, "triangle");
+    } else if (name === "help") {
+      // 求助：清脆的"叮~"，两段高音叠加，尾音稍长
+      this.tone(880, 0, 0.22, "sine", 0.18);
+      this.tone(1320, 0.04, 0.5, "sine", 0.12);
     } else if (name === "wrong") {
-      this.tone(220, 0, 0.18, "sine", 0.18); // 答错：温和低音下行
-      this.tone(165, 0.14, 0.28, "sine", 0.18);
+      // 答错：温和的低音下行。手机小扬声器对 200Hz 以下的低频衰减很重，
+      // 因此把音高抬到 349/262Hz 并略提高音量，保证手机上也能听见
+      this.tone(349, 0, 0.16, "triangle", 0.22);
+      this.tone(262, 0.13, 0.26, "triangle", 0.22);
     }
   },
 };

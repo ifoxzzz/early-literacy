@@ -76,9 +76,13 @@
   };
 
   const quizStage = $("#quiz-stage");
+  const quizHint = $("#view-quiz .hint-bar");
   const readBar = $("#read-bar");
   const btnRead = $("#btn-read");
   const btnHelp = $("#btn-help");
+  // 上一次测量时底部提示条的高度：组词文字换行会让提示条变高，
+  // 高度一变就说明舞台被挤小了，需要重新算一次卡片尺寸
+  let layoutHintH = -1;
 
   // 按当前数量 + 横竖屏计算行列与卡片尺寸；转屏时再次调用即可即时重排
   // 原则：田字格尽可能大，且绝不与顶部按钮、底部提示条或「再听一遍/帮帮我」重叠
@@ -128,6 +132,14 @@
     }
 
     views.quiz.style.setProperty("--card-size", `${Math.max(0, Math.floor(size))}px`);
+    layoutHintH = quizHint.offsetHeight;
+  }
+
+  // 题目文字填入提示条后再检查一次：组词较长换行时提示条会变高，
+  // 舞台随之变矮，需要把田字格缩到新的可用空间
+  function fitGridToHint() {
+    if (views.quiz.classList.contains("hidden")) return;
+    if (quizHint.offsetHeight !== layoutHintH) applyGridLayout();
   }
 
   window.addEventListener("resize", () => {
@@ -348,11 +360,15 @@
       current: null,
     });
     show("quiz");
-    applyGridLayout(); // 视图显示后才能测量舞台空间，据此决定行列与卡片尺寸
     $("#quiz-user").textContent = `${session.userName} · ${volume.title}`;
     // 本组所有题目的单字、组词音频一次性预热，后面的题目不再临时等下网络
     Speaker.preloadSession(session.userName, questions.map((q) => q.target));
-    nextQuestion();
+    nextQuestion(); // 先渲染第一题的组词文字，提示条高度才是最终值
+    // 首次进入必须量一次尺寸；下一帧再量一次，避开手机浏览器地址栏/字体回流的时序差
+    applyGridLayout();
+    requestAnimationFrame(() => {
+      if (!views.quiz.classList.contains("hidden")) applyGridLayout();
+    });
   }
 
   // 本题只计一次进度：答对、跳过、求助后点对都会调用
@@ -393,6 +409,8 @@
       grid.appendChild(card);
     });
 
+    fitGridToHint(); // 组词文字换行导致提示条变高时，立即缩小田字格
+
     const isFirst = session.firstQuestion;
     session.firstQuestion = false;
     Speaker.readQuestion(q.target, { welcome: isFirst, name: session.userName });
@@ -428,12 +446,17 @@
       }
     });
     if (!targetCard) return;
-    // 放大后的田字格外圈叠加两圈向外扩散的波纹（动画见 style.css 的 help-wave）
-    const wave = document.createElement("span");
-    wave.className = "help-wave";
-    wave.setAttribute("aria-hidden", "true");
-    targetCard.appendChild(wave);
-    // 小手提示：从田字格底部滑到正中、轻点一下再消失，循环提示孩子点这张卡片
+    // 指尖点中田字格中心后，中心向外扩散三层同心水波（动画见 style.css 的 water-ripple）
+    const ripple = document.createElement("span");
+    ripple.className = "help-ripple";
+    ripple.setAttribute("aria-hidden", "true");
+    for (let i = 0; i < 3; i++) {
+      const ring = document.createElement("span");
+      ring.className = "ripple-ring";
+      ripple.appendChild(ring);
+    }
+    targetCard.appendChild(ripple);
+    // 小手提示：从田字格下方的外部滑上来，指尖点中中心后轻点一下再淡出，循环提示孩子点这张卡片
     const hand = document.createElement("span");
     hand.className = "help-hand";
     hand.setAttribute("aria-hidden", "true");
@@ -759,6 +782,9 @@
     btn.addEventListener("click", () => {
       Storage.setPref(key, !isOn());
       refresh();
+      // 组词显示/收起会改变底部提示条高度，练习中要重新按新空间缩放田字格，
+      // 否则卡片会溢出到提示条、顶部按钮或「再听一遍/帮帮我」上
+      if (!views.quiz.classList.contains("hidden")) applyGridLayout();
     });
     displayRefreshers.push(refresh);
     refresh();

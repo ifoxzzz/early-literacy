@@ -1066,39 +1066,60 @@ body.hide-pinyin #view-card .card .pinyin {
   box-shadow: 0 0 0 8px rgba(87, 166, 90, 0.18), 0 18px 40px rgba(0, 0, 0, 0.16);
 }
 
-/* 放大后的田字格外圈：两圈绿色波纹交替向外扩散，像水波一样把注意力引到答案上 */
-.help-wave,
-.help-wave::after {
-  content: "";
+/* 指尖点中后，从田字格中心向外扩散的层层水波 */
+.help-ripple {
   position: absolute;
-  inset: -3px;
-  border: 6px solid rgba(87, 166, 90, 0.6);
-  border-radius: 14px;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  z-index: 0;
   pointer-events: none;
-  animation: help-wave 1.8s ease-out infinite;
 }
 
-.help-wave::after {
-  inset: -5px;
-  border-color: rgba(87, 166, 90, 0.45);
-  animation-delay: 0.9s;
+/* 三圈波纹都以同一个锚点为中心，动画里统一带 translate(-50%, -50%)，
+   缩放时圆心不会漂移 */
+.help-ripple .ripple-ring {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: calc(var(--card-size) * 0.36);
+  height: calc(var(--card-size) * 0.36);
+  border: 2px solid rgba(87, 166, 90, 0.72);
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.2);
+  animation: water-ripple 2.2s cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
+  animation-delay: 0.5s;
 }
 
-@keyframes help-wave {
-  0% {
-    transform: scale(1);
-    opacity: 0.95;
+.help-ripple .ripple-ring:nth-child(2) {
+  border-color: rgba(87, 166, 90, 0.55);
+  animation-delay: 0.68s;
+}
+
+.help-ripple .ripple-ring:nth-child(3) {
+  border-color: rgba(87, 166, 90, 0.4);
+  animation-delay: 0.86s;
+}
+
+@keyframes water-ripple {
+  0%,
+  54% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.2);
   }
-  45% {
-    opacity: 0.6;
+  58% {
+    opacity: 0.9;
   }
   100% {
-    transform: scale(1.45);
     opacity: 0;
+    transform: translate(-50%, -50%) scale(2.4);
   }
 }
 
-/* 「帮帮我」的小手：从田字格底部滑到正中，轻点后消失，循环提示可以点这里 */
+/* 「帮帮我」的小手：从田字格下方的外部滑上来，指尖点中田字格中心 */
 .help-hand {
   position: absolute;
   left: 50%;
@@ -1107,6 +1128,8 @@ body.hide-pinyin #view-card .card .pinyin {
   width: calc(var(--card-size) * 0.24);
   pointer-events: none;
   opacity: 0;
+  /* 以指尖为缩放原点，按下时指尖仍停在田字格中心 */
+  transform-origin: 50% 3.75%;
   animation: help-hand 2.2s ease-in-out infinite;
   animation-delay: 0.5s;
 }
@@ -1121,34 +1144,33 @@ body.hide-pinyin #view-card .card .pinyin {
 @keyframes help-hand {
   0% {
     opacity: 0;
-    transform: translate(-50%, -50%) translateY(calc(var(--card-size) * 0.34)) scale(0.92);
+    transform: translate(-50%, -50%) translateY(calc(var(--card-size) * 0.78)) scale(0.92);
   }
   18% {
     opacity: 1;
   }
   55% {
     opacity: 1;
-    transform: translate(-50%, -50%) translateY(0) scale(1);
+    transform: translate(-50%, -50%) translateY(calc(var(--card-size) * 0.14)) scale(1);
   }
   63% {
-    transform: translate(-50%, -50%) translateY(0) scale(0.86);
+    transform: translate(-50%, -50%) translateY(calc(var(--card-size) * 0.14)) scale(0.86);
   }
   72% {
-    transform: translate(-50%, -50%) translateY(0) scale(1);
+    transform: translate(-50%, -50%) translateY(calc(var(--card-size) * 0.14)) scale(1);
   }
   88% {
     opacity: 1;
-    transform: translate(-50%, -50%) translateY(0) scale(1);
+    transform: translate(-50%, -50%) translateY(calc(var(--card-size) * 0.14)) scale(1);
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, -50%) translateY(0) scale(1);
+    transform: translate(-50%, -50%) translateY(calc(var(--card-size) * 0.14)) scale(1);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .help-wave,
-  .help-wave::after {
+  .help-ripple .ripple-ring {
     animation: none;
     opacity: 0;
   }

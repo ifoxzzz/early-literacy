@@ -6,7 +6,7 @@
   <title>宝宝识字</title>
   <script>
     // 全局唯一缓存版本：改动任何 css/js/音频后，只需把这个值 +1，即可让全部缓存失效
-    var CACHE_VERSION = "78";
+    var CACHE_VERSION = "80";
     window.APP_VERSION = CACHE_VERSION;
     document.write('<link rel="stylesheet" href="css/style.css?v=' + CACHE_VERSION + '">');
     // 内置楷体（Windows 楷体 SimKai 子集，仅自用）：只用于田字格与汉字表里的汉字
@@ -117,7 +117,7 @@
     <button class="btn btn-danger" id="btn-reset">清除记录</button>
   </section>
 
-  <!-- 通用单字详情页：田字格 + 拼音 + 读音 + 组词（练习记录等位置复用） -->
+  <!-- 通用单字详情页：田字格 + 拼音 + 读音 + 组词 + 注解（练习记录等位置复用） -->
   <section id="view-card" class="view hidden">
     <header class="detail-header">
       <button class="btn btn-skip" id="btn-card-back">← 返回</button>
@@ -129,6 +129,7 @@
     <div class="detail-bottom">
       <footer class="hint-bar">
         <p id="card-words"></p>
+        <p id="card-note"></p>
       </footer>
     </div>
   </section>
@@ -140,7 +141,7 @@
       <span id="quiz-stars"></span>
       <span class="header-btns">
         <button class="btn btn-skip" id="btn-pinyin">拼音</button>
-        <button class="btn btn-skip" id="btn-words">组词</button>
+        <button class="btn btn-skip" id="btn-note">注解</button>
         <button class="btn btn-skip" id="btn-sound">🔊</button>
         <button class="btn btn-skip" id="btn-skip">跳过</button>
         <button class="btn btn-skip" id="btn-quit">结束</button>
@@ -155,7 +156,8 @@
     </div>
     <div class="quiz-bottom">
       <footer class="hint-bar">
-        <p id="hint-text"></p>
+        <p id="hint-words"></p>
+        <p id="hint-note"></p>
       </footer>
       <p class="quiz-footer" id="quiz-user"></p>
     </div>
@@ -184,6 +186,7 @@
       "js/quiz.js",
       "assets/audio/syllables/index.js",
       "assets/audio/words/index.js",
+      "assets/audio/note/index.js",
       "assets/audio/users/index.js",
       "js/speaker.js",
       "js/sound.js",

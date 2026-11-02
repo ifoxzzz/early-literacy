@@ -2,6 +2,11 @@
 (function () {
   const $ = (s) => document.querySelector(s);
 
+  // 字库里可以用「汉字(拼音)」标注强制纠正朗读读音（如 快乐(lè)）；
+  // 标注只给语音生成脚本用，界面展示时去掉括号与拼音，只留汉字。
+  // 清洗规则与系统语音共用 speaker.js 的实现，避免两处正则不一致
+  const displayText = (text) => Speaker.stripAnnotation(text);
+
   // 禁用鼠标右键菜单，避免小朋友误触后不知道如何处理
   document.addEventListener("contextmenu", (e) => e.preventDefault());
 
@@ -49,7 +54,7 @@
     stars: 0,
     firstTryCorrect: 0, // 首答正确题数
     newLearned: [], // 本次新学会的字
-    answers: [], // 本组每个字的首次作答结果 [{ c, pinyin, words, ok }]
+    answers: [], // 本组每个字的首次作答结果 [{ c, pinyin, words, note, ok }]
     firstQuestion: false, // 本组第一题（播放欢迎语）
     userId: "", // 本组属于哪位小朋友（结束页返回时用）
     userName: "", // 当前小朋友名字（用于语音问候）
@@ -80,7 +85,7 @@
   const readBar = $("#read-bar");
   const btnRead = $("#btn-read");
   const btnHelp = $("#btn-help");
-  // 上一次测量时底部提示条的高度：组词文字换行会让提示条变高，
+  // 上一次测量时底部提示条的高度：组词/注解文字换行会让提示条变高，
   // 高度一变就说明舞台被挤小了，需要重新算一次卡片尺寸
   let layoutHintH = -1;
 
@@ -135,7 +140,7 @@
     layoutHintH = quizHint.offsetHeight;
   }
 
-  // 题目文字填入提示条后再检查一次：组词较长换行时提示条会变高，
+  // 题目文字填入提示条后再检查一次：组词/注解较长换行时提示条会变高，
   // 舞台随之变矮，需要把田字格缩到新的可用空间
   function fitGridToHint() {
     if (views.quiz.classList.contains("hidden")) return;
@@ -170,7 +175,7 @@
   function renderVolumes(user) {
     // 进入册目页就开始下载提示语与星星播报，给孩子挑选册的时间，避免练习第一题没声音
     if (user) Speaker.preloadSession(user.name, []);
-    // 拼音 / 组词开关按小朋友保存，切换小朋友后要重新应用
+    // 拼音 / 注解开关按小朋友保存，切换小朋友后要重新应用
     refreshDisplaySwitches();
     $("#volume-owner").textContent = user ? `${user.name} 想学哪一册？` : "";
     const list = $("#volume-list");
@@ -194,16 +199,29 @@
   function renderVolumeWords(volume) {
     volumeWordVolume = volume;
     $("#words-subtitle").textContent = `${volume.title} · 共 ${volume.entries.length} 个字`;
-    $("#word-list").innerHTML = volume.entries
-      .map(
-        (e, i) => `<div class="word-item" data-idx="${i}" title="查看「${e.char}」">
-          <button class="word-play" data-idx="${i}" title="播放读音和组词">🔊</button>
+    // 首行标题栏与数据行使用同一套列宽，滚动时表头固定在顶部
+    const head = `<div class="word-head" aria-hidden="true">
+        <span></span>
+        <span>汉字</span>
+        <span>拼音</span>
+        <span>组词</span>
+        <span>注解</span>
+        <span>掌握程度</span>
+      </div>`;
+    $("#word-list").innerHTML =
+      head +
+      volume.entries
+        .map(
+          (e, i) => `<div class="word-item" data-idx="${i}" title="查看「${e.char}」">
+          <button class="word-play" data-idx="${i}" title="播放读音、组词和注解">🔊</button>
           <span class="word-char">${e.char}</span>
           <span class="word-pinyin">${e.pinyin}</span>
-          <span class="word-words">${e.words}</span>
+          <span class="word-words">${displayText(e.words)}</span>
+          <span class="word-note">${displayText(e.note)}</span>
+          <span class="word-level">${e.level || ""}</span>
         </div>`
-      )
-      .join("");
+        )
+        .join("");
     show("volumeWords");
   }
 
@@ -258,7 +276,10 @@
     cardEntry = entry;
     cardOnBack = (opts && opts.onBack) || null;
     $("#btn-card-back").classList.toggle("hidden", !cardOnBack);
-    $("#card-words").textContent = entry.words ? `组词：${entry.words}` : "";
+    $("#card-words").textContent = entry.words ? `「${displayText(entry.words)}」` : "";
+    const cardNote = displayText(entry.note);
+    $("#card-note").textContent = cardNote;
+    $("#card-note").classList.toggle("hidden", !cardNote);
     const grid = $("#card-grid");
     grid.innerHTML = "";
     const card = document.createElement("div");
@@ -275,10 +296,10 @@
   let historyEntries = [];
   let charEntryMap = null;
 
-  // 新记录自带拼音与组词；旧记录只有汉字，按字库首次出现补齐
+  // 新记录自带拼音、组词与注解；旧记录缺字段时按字库首次出现补齐
   function entryOfAnswer(a) {
-    if (a.pinyin && a.words) {
-      return { char: a.c, pinyin: a.pinyin, words: a.words };
+    if (a.pinyin && a.words && a.note) {
+      return { char: a.c, pinyin: a.pinyin, words: a.words, note: a.note };
     }
     if (!charEntryMap) {
       charEntryMap = new Map();
@@ -288,7 +309,13 @@
         })
       );
     }
-    return charEntryMap.get(a.c) || { char: a.c, pinyin: "", words: "" };
+    const e = charEntryMap.get(a.c);
+    return {
+      char: a.c,
+      pinyin: a.pinyin || (e && e.pinyin) || "",
+      words: a.words || (e && e.words) || "",
+      note: a.note || (e && e.note) || "",
+    };
   }
 
   function renderHistory() {
@@ -361,9 +388,9 @@
     });
     show("quiz");
     $("#quiz-user").textContent = `${session.userName} · ${volume.title}`;
-    // 本组所有题目的单字、组词音频一次性预热，后面的题目不再临时等下网络
+    // 本组所有题目的单字、组词与注解音频一次性预热，后面的题目不再临时等下网络
     Speaker.preloadSession(session.userName, questions.map((q) => q.target));
-    nextQuestion(); // 先渲染第一题的组词文字，提示条高度才是最终值
+    nextQuestion(); // 先渲染第一题的组词/注解文字，提示条高度才是最终值
     // 首次进入必须量一次尺寸；下一帧再量一次，避开手机浏览器地址栏/字体回流的时序差
     applyGridLayout();
     requestAnimationFrame(() => {
@@ -389,7 +416,12 @@
 
     $("#quiz-progress").textContent = `第 ${Math.min(session.done + 1, session.total)}/${session.total} 题`;
     $("#quiz-stars").textContent = `⭐ ${session.stars}`;
-    $("#hint-text").textContent = `组词：${q.target.words}`;
+    // 第一行组词（用「」包起来），第二行注解；拼音标注只给语音脚本，展示时去掉
+    const words = displayText(q.target.words);
+    $("#hint-words").textContent = words ? `「${words}」` : "";
+    const hintNote = displayText(q.target.note);
+    $("#hint-note").textContent = hintNote;
+    $("#hint-note").classList.toggle("hidden", !hintNote);
     $("#btn-help").classList.remove("used"); // 新题目重新允许求助
 
     const grid = $("#grid");
@@ -409,7 +441,7 @@
       grid.appendChild(card);
     });
 
-    fitGridToHint(); // 组词文字换行导致提示条变高时，立即缩小田字格
+    fitGridToHint(); // 组词/注解文字换行导致提示条变高时，立即缩小田字格
 
     const isFirst = session.firstQuestion;
     session.firstQuestion = false;
@@ -540,6 +572,7 @@
         c: q.target.char,
         pinyin: q.target.pinyin,
         words: q.target.words,
+        note: q.target.note || "",
         ok: firstTry,
       });
       markDone(q);
@@ -767,7 +800,7 @@
 
   // 通用显示开关：状态存 localStorage，按钮高亮 + body 挂 class 控制显隐
   // 默认开启；关闭时给 body 加 hideClass
-  // 拼音、组词按小朋友保存，切换小朋友时需要重新刷新
+  // 拼音、注解按小朋友保存，切换小朋友时需要重新刷新
   const displayRefreshers = [];
   function refreshDisplaySwitches() {
     displayRefreshers.forEach((fn) => fn());
@@ -782,16 +815,16 @@
     btn.addEventListener("click", () => {
       Storage.setPref(key, !isOn());
       refresh();
-      // 组词显示/收起会改变底部提示条高度，练习中要重新按新空间缩放田字格，
+      // 注解（组词 + 注解两行）显示/收起会改变底部提示条高度，练习中要重新按新空间缩放田字格，
       // 否则卡片会溢出到提示条、顶部按钮或「再听一遍/帮帮我」上
       if (!views.quiz.classList.contains("hidden")) applyGridLayout();
     });
     displayRefreshers.push(refresh);
     refresh();
   }
-  // 拼音（即时生效） / 组词（只影响显示，语音仍会朗读） / 历史汉字
+  // 拼音（即时生效） / 注解（只影响显示，语音仍会朗读） / 历史汉字
   bindDisplaySwitch(Storage.PREF_KEYS.PINYIN, "hide-pinyin", $("#btn-pinyin"));
-  bindDisplaySwitch(Storage.PREF_KEYS.WORDS, "hide-words", $("#btn-words"));
+  bindDisplaySwitch(Storage.PREF_KEYS.NOTE, "hide-note", $("#btn-note"));
   bindDisplaySwitch(Storage.PREF_KEYS.SHOWCHARS, "hide-history-chars", $("#btn-history-chars"));
 
   // 朗读总开关（状态持久化；静音时同时停止音效与语音）
@@ -838,7 +871,7 @@
     }
     startSession(Storage.currentUser(), volume);
   });
-  // 汉字表：点小喇叭播放读音与组词，点整行进入通用单字详情页
+  // 汉字表：点小喇叭播放读音、组词和注解，点整行进入通用单字详情页
   $("#word-list").addEventListener("click", (e) => {
     const row = e.target.closest(".word-item");
     if (!row) return;
@@ -917,7 +950,7 @@
     const entry = historyEntries[Number(el.dataset.idx)];
     if (entry) openCharCard(entry, { onBack: renderHistory });
   });
-  // 单字详情页：读音 + 组词
+  // 单字详情页：读音 + 组词 + 注解
   $("#btn-card-read").addEventListener("click", () => {
     if (cardEntry) Speaker.readEntry(cardEntry);
   });

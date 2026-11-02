@@ -13,13 +13,15 @@ const Storage = {
   // 显示开关（默认开启，存 "0" 表示关闭）
   PREF_KEYS: {
     PINYIN: "early-literacy-pinyin", // 卡片拼音
-    WORDS: "early-literacy-words", // 底部组词提示
+    NOTE: "early-literacy-note", // 底部组词 + 注解提示（按钮名为「注解」）
     SHOWCHARS: "early-literacy-showchars", // 历史记录里的汉字
   },
 
-  // 按小朋友隔离的显示开关：拼音、组词按当前用户分别保存
-  // 其余开关（历史汉字）仍为全局设置
-  USER_PREF_KEYS: ["early-literacy-pinyin", "early-literacy-words"],
+  // 按小朋友隔离的显示开关：拼音、注解按当前用户分别保存
+  // 其余开关（历史汉字）仍为全局设置；键值直接复用 PREF_KEYS，避免重复维护
+  get USER_PREF_KEYS() {
+    return [this.PREF_KEYS.PINYIN, this.PREF_KEYS.NOTE];
+  },
 
   // 练习设置（按小朋友独立保存，见 quizOptionsKey / quizCountKey）
   OPTION_VALUES: [2, 3, 4, 6, 8, 9], // 每题候选字数可选值
@@ -79,7 +81,7 @@ const Storage = {
     localStorage.removeItem(this.historyKey(id));
     localStorage.removeItem(this.quizOptionsKey(id));
     localStorage.removeItem(this.quizCountKey(id));
-    // 拼音、组词开关也按小朋友保存，删除时一并清理
+    // 拼音、注解开关也按小朋友保存，删除时一并清理
     this.USER_PREF_KEYS.forEach((k) => localStorage.removeItem(this.prefKey(k, id)));
     if (this.currentId() === id) localStorage.removeItem(this.CURRENT_KEY);
   },
@@ -157,6 +159,7 @@ const Storage = {
   },
 
   // 一组练习结束时调用：{ stars, total, correct, chars, volume }
+  // chars 内每条为 { c, pinyin, words, note, ok }
   // 超出 HISTORY_MAX 时丢弃最旧的记录
   addHistory(record) {
     const list = this.loadHistory();
@@ -170,9 +173,9 @@ const Storage = {
     localStorage.removeItem(this.historyKey());
   },
 
-  // ---------- 显示开关（拼音 / 组词 / 历史汉字） ----------
+  // ---------- 显示开关（拼音 / 注解 / 历史汉字） ----------
   // 未设置过或值为 "1" 时视为开启
-  // 拼音、组词按小朋友隔离；历史汉字为全局设置
+  // 拼音、注解按小朋友隔离；历史汉字为全局设置
   prefKey(key, id) {
     if (!this.USER_PREF_KEYS.includes(key)) return key;
     const uid = id || this.currentId();

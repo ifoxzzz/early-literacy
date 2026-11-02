@@ -211,18 +211,48 @@ body {
 .word-list {
   width: 100%;
   flex: 1;
-  overflow-y: auto;
+  overflow: auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 4px 8px 16px;
+  /* 顶部不留内边距：否则表头吸附在内容区顶部，上方会留一条透明缝隙，滚动内容会透出来 */
+  padding: 0 8px 16px;
   margin-bottom: 16px;
 }
 
+/* 表头与数据行共用列宽：喇叭 / 汉字 / 拼音 / 组词 / 注解 / 掌握程度 */
+.word-head,
 .word-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: 40px 50px 92px minmax(90px, 1.1fr) minmax(0, 1.8fr) 72px;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+}
+
+/* 表头固定在滚动容器顶部，向下滚动时列名始终可见 */
+.word-head {
+  position: sticky;
+  /* 略微向上探出 1px：消除亚像素渲染时表头与滚动内容之间的细缝 */
+  top: -1px;
+  z-index: 1;
+  padding: 7px 14px 6px;
+  background: #fdf6e9;
+  border-bottom: 2px solid #eadfc8;
+  /* 向下补一段与页面同色的底色，盖住表头与下一行之间的间隙 */
+  box-shadow: 0 8px 0 #fdf6e9;
+  color: #b09a7d;
+  font-size: clamp(13px, 2.6vmin, 17px);
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.word-head span:nth-child(4),
+.word-head span:nth-child(5) {
+  text-align: left;
+}
+
+.word-item {
   background: #fffdf5;
   border-radius: 12px;
   padding: 8px 14px;
@@ -240,7 +270,6 @@ body {
 }
 
 .word-play {
-  flex: 0 0 auto;
   width: 40px;
   height: 40px;
   font-size: 18px;
@@ -262,8 +291,6 @@ body {
 }
 
 .word-char {
-  flex: 0 0 auto;
-  width: 50px;
   text-align: center;
   font-family: var(--kaiti);
   font-size: clamp(26px, 6vmin, 36px);
@@ -272,18 +299,42 @@ body {
 }
 
 .word-pinyin {
-  flex: 0 0 auto;
-  width: clamp(80px, 16vmin, 110px);
   font-family: Arial, "Segoe UI", sans-serif;
   font-size: clamp(16px, 3.6vmin, 22px);
   color: #b09a7d;
 }
 
 .word-words {
-  flex: 1;
   font-size: clamp(16px, 3.4vmin, 22px);
   line-height: 1.4;
   color: #6b5b45;
+}
+
+/* 注解列：字号略小、颜色略淡，与组词区分开 */
+.word-note {
+  font-size: clamp(14px, 3vmin, 19px);
+  line-height: 1.45;
+  color: #8a7a63;
+}
+
+.word-level {
+  justify-self: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #eef6e9;
+  color: #5f8a4f;
+  font-size: clamp(12px, 2.6vmin, 15px);
+  white-space: nowrap;
+}
+
+/* 窄屏（手机竖屏）：6 列挤不下时允许表格横向滚动，保证每列都看得清 */
+@media (max-width: 560px) {
+  .word-head,
+  .word-item {
+    grid-template-columns: 36px 44px 68px minmax(80px, 1fr) minmax(120px, 1.6fr) 56px;
+    min-width: 540px;
+    gap: 8px;
+  }
 }
 
 /* ---------- 首页：小朋友列表 ---------- */
@@ -1304,14 +1355,24 @@ body.hide-pinyin .card .pinyin {
   padding: 12px 20px;
 }
 
-#hint-text,
+/* 底部提示条：第一行组词（「」包起来），第二行注解 */
+#hint-words,
 #card-words {
   font-size: clamp(20px, 4.5vmin, 30px);
+  color: #4a3b2a;
   text-align: center;
 }
 
-/* 关闭组词显示时整条提示框一起收起（语音仍会朗读） */
-body.hide-words .hint-bar {
+#hint-note,
+#card-note {
+  font-size: clamp(16px, 3.4vmin, 22px);
+  line-height: 1.45;
+  color: #8a7a63;
+  text-align: center;
+}
+
+/* 关闭注解显示时整条提示框一起收起（语音仍会朗读） */
+body.hide-note .hint-bar {
   display: none;
 }
 

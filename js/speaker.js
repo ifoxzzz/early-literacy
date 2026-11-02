@@ -144,11 +144,25 @@ const Speaker = {
     return this.audioUrl(`words/${encodeURIComponent(key)}.mp3`);
   },
 
+  // 注解讲解路径：如 我|wǒ -> note/我_wo3.mp3
+  noteAudio(entry) {
+    const key = `${entry.char}_${this.pinyinKey(entry.pinyin)}`;
+    if (!this.noteSet) this.noteSet = new Set(window.NOTE_AUDIO || []);
+    if (!this.noteSet.has(key)) return null;
+    return this.audioUrl(`note/${encodeURIComponent(key)}.mp3`);
+  },
+
+  // 去掉字库里的「汉字(拼音)」读音标注，只留汉字（标注只给语音生成脚本用）
+  // 界面展示（app.js 的 displayText）与系统语音兜底都复用这里，保证清洗规则一致
+  stripAnnotation(text) {
+    return (text || "").replace(/([\u4e00-\u9fff])\s*[（(]\s*[^（）()]+?\s*[）)]/g, "$1");
+  },
+
   // 组词讲解文本："雨水的雨，下雨的雨"（音频缺失时交给系统语音朗读）
   explainText(entry) {
     return (entry.words || "")
       .split(/[、，,/；;]/)
-      .map((w) => w.trim())
+      .map((w) => this.stripAnnotation(w).trim())
       .filter(Boolean)
       .map((w) => `${w}的${entry.char}`)
       .join("，");
@@ -186,7 +200,7 @@ const Speaker = {
     return entry ? entry.promise : Promise.resolve(url);
   },
 
-  // 为一组练习预热：提示语、星星播报、全部题目涉及的单字与组词音频
+  // 为一组练习预热：提示语、星星播报、全部题目涉及的单字、组词与注解音频
   preloadSession(name, targets) {
     // 「请找出」始终用通用提示语，名字语音里没有这个文件
     const urls = ["welcome", "praise1", "praise2", "praise3", "done", "cheer"].map((k) =>
@@ -200,6 +214,8 @@ const Speaker = {
       if (syl) urls.push(syl);
       const word = this.wordAudio(t);
       if (word) urls.push(word);
+      const note = this.noteAudio(t);
+      if (note) urls.push(note);
     });
     this.preload(urls);
   },
@@ -283,29 +299,39 @@ const Speaker = {
       : this.audioUrl(`phrases/${key}.mp3`);
   },
 
-  // 单字详情页：先读汉字发音，再读组词讲解
+  // 单字详情页：先读汉字发音，再读组词讲解，最后读注解
   readEntry(entry) {
     const charSrc = this.syllableAudio(entry.pinyin);
     const wordSrc = this.wordAudio(entry);
+    const noteSrc = this.noteAudio(entry);
+    const note = this.stripAnnotation(entry.note);
     if (charSrc) {
-      const urls = wordSrc ? [charSrc, wordSrc] : [charSrc];
+      const urls = [charSrc];
+      if (wordSrc) urls.push(wordSrc);
+      if (noteSrc) urls.push(noteSrc);
       this.preload(urls);
-      this.play(urls);
+      // 注解音频缺失时用系统语音补读，保证「先组词、后注解」的顺序不变
+      const after = noteSrc || !note ? null : () => this.isEnabled() && this.speak(note);
+      this.play(urls, after);
       return;
     }
     const explain = this.explainText(entry);
-    this.speak(`${entry.char}${explain ? "，" + explain : ""}`);
+    this.speak(`${entry.char}${explain ? "，" + explain : ""}${note ? "。" + note : ""}`);
   },
 
   // ---------- 各场景播报 ----------
-  // 出题：问候（仅本组第一题）+ "请找出：" + 目标字发音 + 组词讲解
+  // 出题：问候（仅本组第一题）+ "请找出：" + 目标字发音 + 组词讲解 + 注解
   readQuestion(target, opts) {
     const charSrc = this.syllableAudio(target.pinyin);
     const wordSrc = this.wordAudio(target);
+    const noteSrc = this.noteAudio(target);
+    const note = this.stripAnnotation(target.note);
     // 连单字发音都没有时，整句交给系统语音，避免只响一声提示音
     if (!charSrc) {
       const explain = this.explainText(target);
-      this.speak(`请找出：${target.char}${explain ? "，" + explain : ""}`);
+      this.speak(
+        `请找出：${target.char}${explain ? "，" + explain : ""}${note ? "。" + note : ""}`
+      );
       return;
     }
     const first = opts && opts.welcome;
@@ -314,9 +340,12 @@ const Speaker = {
     if (first) list.push(this.phraseFile("welcome", name));
     list.push(this.audioUrl("phrases/find.mp3"), charSrc);
     if (wordSrc) list.push(wordSrc);
+    if (noteSrc) list.push(noteSrc);
 
-    // 没有预生成名字语音时，phraseFile 会自动退回通用提示语，不再插入系统合成音
-    this.play(list);
+    // 注解音频缺失时用系统语音补读；没有预生成名字语音时，
+    // phraseFile 会自动退回通用提示语，不再插入系统合成音
+    const after = noteSrc || !note ? null : () => this.isEnabled() && this.speak(note);
+    this.play(list, after);
   },
 
   // 答对：随机夸奖（播完回调 onDone，用于安排下一题）

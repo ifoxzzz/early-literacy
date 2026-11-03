@@ -15,12 +15,13 @@ const Storage = {
     PINYIN: "early-literacy-pinyin", // 卡片拼音
     NOTE: "early-literacy-note", // 底部组词 + 注解提示（按钮名为「注解」）
     SHOWCHARS: "early-literacy-showchars", // 历史记录里的汉字
+    TOOLS: "early-literacy-quiz-tools", // 练习页顶部按钮行是否展开
   },
 
-  // 按小朋友隔离的显示开关：拼音、注解按当前用户分别保存
+  // 按小朋友隔离的显示开关：拼音、注解、顶部按钮行按当前用户分别保存
   // 其余开关（历史汉字）仍为全局设置；键值直接复用 PREF_KEYS，避免重复维护
   get USER_PREF_KEYS() {
-    return [this.PREF_KEYS.PINYIN, this.PREF_KEYS.NOTE];
+    return [this.PREF_KEYS.PINYIN, this.PREF_KEYS.NOTE, this.PREF_KEYS.TOOLS];
   },
 
   // 练习设置（按小朋友独立保存，见 quizOptionsKey / quizCountKey）

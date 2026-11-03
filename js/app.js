@@ -430,6 +430,7 @@
       current: null,
     });
     show("quiz");
+    refreshQuizTools(); // 恢复该小朋友上次的顶部按钮展开状态
     $("#quiz-user").textContent = `${session.userName} · ${volume.title}`;
     // 本组所有题目的单字、组词与注解音频一次性预热，后面的题目不再临时等下网络
     Speaker.preloadSession(session.userName, questions.map((q) => q.target));
@@ -875,6 +876,22 @@
   bindDisplaySwitch(Storage.PREF_KEYS.PINYIN, "hide-pinyin", $("#btn-pinyin"));
   bindDisplaySwitch(Storage.PREF_KEYS.NOTE, "hide-note", $("#btn-note"));
   bindDisplaySwitch(Storage.PREF_KEYS.SHOWCHARS, "hide-history-chars", $("#btn-history-chars"));
+
+  // 练习页顶部按钮行展开/收起：按小朋友保存（默认展开），折叠后把腾出的空间还给田字格
+  function refreshQuizTools() {
+    const on = Storage.pref(Storage.PREF_KEYS.TOOLS);
+    $("#quiz-tools").classList.toggle("hidden", !on);
+    const btn = $("#btn-tools-toggle");
+    btn.textContent = on ? "▴" : "▾";
+    btn.setAttribute("aria-expanded", String(on));
+    btn.setAttribute("aria-label", on ? "隐藏顶部按钮" : "显示顶部按钮");
+  }
+  $("#btn-tools-toggle").addEventListener("click", () => {
+    Storage.setPref(Storage.PREF_KEYS.TOOLS, !Storage.pref(Storage.PREF_KEYS.TOOLS));
+    refreshQuizTools();
+    if (!views.quiz.classList.contains("hidden")) applyGridLayout();
+  });
+  displayRefreshers.push(refreshQuizTools);
 
   // 朗读总开关（状态持久化；静音时同时停止音效与语音）
   function refreshSoundBtn() {

@@ -1064,13 +1064,12 @@ body.hide-pinyin #view-card .card .pinyin {
   gap: clamp(8px, 2vh, 20px);
 }
 
+/* 顶部两行：第一行按钮、第二行题号 / 折叠按钮 / 星星 */
 .quiz-header {
   width: 100%;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 10px;
+  flex-direction: column;
+  gap: 8px;
   font-size: clamp(18px, 4vmin, 26px);
   color: #8a7a63;
   padding: 8px 8px 0;
@@ -1240,6 +1239,7 @@ body.hide-pinyin #view-card .card .pinyin {
 }
 
 #quiz-stars {
+  justify-self: center;
   color: #f2a541;
 }
 
@@ -1251,9 +1251,34 @@ body.hide-pinyin #view-card .card .pinyin {
   box-shadow: 0 3px 0 #cbbfa5;
 }
 
-.header-btns {
+/* 顶部第一行：拼音 / 注解 / 声音 / 跳过 / 结束，靠右排列，可整行折叠 */
+.quiz-tools {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
+}
+
+/* 顶部第二行：左题号 / 中星星 / 右折叠按钮，左右各占 1fr 保证中间的星星始终居中 */
+.quiz-status {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+#quiz-progress {
+  justify-self: start;
+}
+
+/* 折叠按钮：▴ 收起顶部按钮行，▾ 展开 */
+.btn-tools-toggle {
+  justify-self: end;
+  min-width: 46px;
+  padding: 2px 12px;
+  line-height: 1.1;
+  font-size: clamp(13px, 2.6vmin, 17px);
 }
 
 /* 开关按钮激活态（拼音显示开启时高亮） */

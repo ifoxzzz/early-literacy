@@ -6,7 +6,7 @@
   <title>宝宝识字</title>
   <script>
     // 全局唯一缓存版本：改动任何 css/js/音频后，只需把这个值 +1，即可让全部缓存失效
-    var CACHE_VERSION = "102";
+    var CACHE_VERSION = "104";
     window.APP_VERSION = CACHE_VERSION;
     document.write('<link rel="stylesheet" href="css/style.css?v=' + CACHE_VERSION + '">');
     // 内置楷体（Windows 楷体 SimKai 子集，仅自用）：只用于田字格、汉字表与练习记录里的汉字
@@ -148,15 +148,19 @@
   <!-- 练习页 -->
   <section id="view-quiz" class="view hidden">
     <header class="quiz-header">
-      <span id="quiz-progress"></span>
-      <span id="quiz-stars"></span>
-      <span class="header-btns">
+      <div class="quiz-tools" id="quiz-tools">
         <button class="btn btn-skip" id="btn-pinyin">拼音</button>
         <button class="btn btn-skip" id="btn-note">注解</button>
         <button class="btn btn-skip" id="btn-sound">🔊</button>
         <button class="btn btn-skip" id="btn-skip">跳过</button>
         <button class="btn btn-skip" id="btn-quit">结束</button>
-      </span>
+      </div>
+      <div class="quiz-status">
+        <span id="quiz-progress"></span>
+        <span id="quiz-stars"></span>
+        <button class="btn btn-skip btn-tools-toggle" id="btn-tools-toggle" aria-expanded="true"
+          aria-label="隐藏顶部按钮">▴</button>
+      </div>
     </header>
     <div class="quiz-stage" id="quiz-stage">
       <div class="read-bar" id="read-bar">

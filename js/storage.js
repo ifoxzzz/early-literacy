@@ -1,7 +1,7 @@
-// 数据持久化层：localStorage 读写封装（用户、进度、历史、练习设置、显示开关）
+// 数据持久化层：localStorage 读写封装（用户、进度、记录、练习设置、显示开关）
 //
 // 关键设计：
-// - 多用户隔离：进度与历史按用户 id 分别存储；用户列表与"当前用户"全局共享
+// - 多用户隔离：进度与记录按用户 id 分别存储；用户列表与"当前用户"全局共享
 // - 条目唯一键：`汉字|拼音`，多音字的不同读音各自独立记录
 // - 全部数据留在本机，不依赖网络；页面走 file:// 时也能正常读写
 const Storage = {
@@ -14,12 +14,12 @@ const Storage = {
   PREF_KEYS: {
     PINYIN: "early-literacy-pinyin", // 卡片拼音
     NOTE: "early-literacy-note", // 底部组词 + 注解提示（按钮名为「注解」）
-    SHOWCHARS: "early-literacy-showchars", // 历史记录里的汉字
+    SHOWCHARS: "early-literacy-showchars", // 练习记录里的汉字
     TOOLS: "early-literacy-quiz-tools", // 练习页顶部按钮行是否展开
   },
 
   // 按小朋友隔离的显示开关：拼音、注解、顶部按钮行按当前用户分别保存
-  // 其余开关（历史汉字）仍为全局设置；键值直接复用 PREF_KEYS，避免重复维护
+  // 其余开关（记录汉字）仍为全局设置；键值直接复用 PREF_KEYS，避免重复维护
   get USER_PREF_KEYS() {
     return [this.PREF_KEYS.PINYIN, this.PREF_KEYS.NOTE, this.PREF_KEYS.TOOLS];
   },
@@ -75,7 +75,7 @@ const Storage = {
     return user;
   },
 
-  // 删除用户：连同其练习进度、历史与练习设置一起清除
+  // 删除用户：连同其练习进度、记录与练习设置一起清除
   removeUser(id) {
     this.saveUsers(this.users().filter((u) => u.id !== id));
     localStorage.removeItem(this.progressKey(id));
@@ -169,7 +169,7 @@ const Storage = {
     return { total: (entries || []).length, learned, due };
   },
 
-  // ---------- 历史记录 ----------
+  // ---------- 练习记录 ----------
   loadHistory() {
     return this.readJSON(this.historyKey(), []);
   },
@@ -183,15 +183,15 @@ const Storage = {
     this.writeJSON(this.historyKey(), list.slice(-this.HISTORY_MAX));
   },
 
-  // 清空当前用户的进度与历史
+  // 清空当前用户的进度与记录
   clearUserData() {
     localStorage.removeItem(this.progressKey());
     localStorage.removeItem(this.historyKey());
   },
 
-  // ---------- 显示开关（拼音 / 注解 / 历史汉字） ----------
+  // ---------- 显示开关（拼音 / 注解 / 记录汉字） ----------
   // 未设置过或值为 "1" 时视为开启
-  // 拼音、注解按小朋友隔离；历史汉字为全局设置
+  // 拼音、注解按小朋友隔离；记录汉字为全局设置
   prefKey(key, id) {
     if (!this.USER_PREF_KEYS.includes(key)) return key;
     const uid = id || this.currentId();

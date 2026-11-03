@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>宝宝识字</title>
+  <title>宝贝趣味识字</title>
   <script>
     // 全局唯一缓存版本：改动任何 css/js/音频后，只需把这个值 +1，即可让全部缓存失效
     var CACHE_VERSION = "104";
@@ -20,11 +20,11 @@
 <body>
   <!-- 首页：选择小朋友 -->
   <section id="view-home" class="view">
-    <h1 class="app-title">宝宝识字</h1>
+    <h1 class="app-title">宝贝趣味识字</h1>
     <p class="home-stats" id="home-stats"></p>
     <div class="user-list" id="user-list"></div>
     <button class="btn btn-ghost" id="btn-create-user">+ 创建小朋友</button>
-    <button class="admin-entry" id="btn-admin" title="后台管理">⚙</button>
+    <button class="admin-entry" id="btn-admin" title="应用设置">⚙</button>
     <!-- 创作者信息：首页右下角小字，不干扰小朋友点击 -->
     <footer class="creator-credit">
       <span>Author: foxzzz</span>
@@ -39,7 +39,7 @@
     <p class="volume-owner" id="volume-owner"></p>
     <div class="volume-list" id="volume-list"></div>
     <div class="volume-actions">
-      <button class="btn btn-ghost" id="btn-history">历史记录</button>
+      <button class="btn btn-ghost" id="btn-history">练习记录</button>
       <button class="btn btn-ghost" id="btn-settings">练习设置</button>
       <button class="btn btn-ghost" id="btn-volume-back">退出</button>
     </div>
@@ -89,15 +89,15 @@
     <button class="btn btn-primary" id="btn-settings-back">返回</button>
   </section>
 
-  <!-- 后台管理（家长用，入口在首页左下角） -->
+  <!-- 应用设置（家长用，入口在首页左下角） -->
   <section id="view-admin" class="view hidden">
-    <h1 class="app-title">后台管理</h1>
+    <h1 class="app-title">应用设置</h1>
     <section class="admin-block">
       <h2 class="admin-title">小朋友管理</h2>
       <div class="admin-users" id="admin-users"></div>
       <button class="btn btn-ghost" id="btn-admin-add">+ 新增小朋友</button>
     </section>
-    <button class="btn btn-primary" id="btn-admin-back">返回首页</button>
+    <button class="btn btn-primary" id="btn-admin-back">返回</button>
   </section>
 
   <!-- 创建小朋友弹窗 -->
@@ -112,7 +112,7 @@
     </div>
   </div>
 
-  <!-- 历史记录页 -->
+  <!-- 练习记录页 -->
   <section id="view-history" class="view hidden">
     <h1 class="app-title">练习记录</h1>
     <p class="history-owner" id="history-owner"></p>

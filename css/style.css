@@ -113,7 +113,7 @@ body {
   margin-bottom: 16px;
 }
 
-/* 选册页底部：历史记录 + 练习设置 + 退出 */
+/* 选册页底部：练习记录 + 练习设置 + 退出 */
 .volume-actions {
   display: flex;
   flex-wrap: wrap;
@@ -625,7 +625,7 @@ body {
   text-decoration: underline;
 }
 
-/* ---------- 后台入口：首页左下角小齿轮 ---------- */
+/* ---------- 应用设置入口：首页左下角小齿轮 ---------- */
 .admin-entry {
   position: fixed;
   left: 14px;
@@ -646,7 +646,7 @@ body {
   color: #8a7a63;
 }
 
-/* ---------- 后台管理页 ---------- */
+/* ---------- 应用设置页 ---------- */
 #view-admin {
   justify-content: flex-start;
   padding-top: 28px;
@@ -790,7 +790,7 @@ body {
   box-shadow: 0 2px 0 #d5b5af;
 }
 
-/* ---------- 历史记录页 ---------- */
+/* ---------- 练习记录页 ---------- */
 #view-history {
   justify-content: flex-start;
   padding-top: 28px;
@@ -900,7 +900,7 @@ body {
   padding-top: 8px;
 }
 
-/* 历史记录里的汉字：小田字格（楷体 + 很淡的细十字线），可点击查看详情 */
+/* 练习记录里的汉字：小田字格（楷体 + 很淡的细十字线），可点击查看详情 */
 .hchar {
   width: clamp(34px, 8vmin, 44px);
   height: clamp(34px, 8vmin, 44px);

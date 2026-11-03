@@ -265,7 +265,7 @@
     updateScrollFade($("#word-list"), $("#word-sheet"));
   }
 
-  /* ---------- 后台管理 ---------- */
+  /* ---------- 应用设置 ---------- */
   function renderAdmin() {
     const users = Storage.users();
     const box = $("#admin-users");
@@ -331,8 +331,8 @@
     show("card");
   }
 
-  /* ---------- 历史记录 ---------- */
-  // 当前历史页里每个可点击汉字对应的字库条目
+  /* ---------- 练习记录 ---------- */
+  // 当前记录页里每个可点击汉字对应的字库条目
   let historyEntries = [];
   let charEntryMap = null;
 
@@ -872,7 +872,7 @@
     displayRefreshers.push(refresh);
     refresh();
   }
-  // 拼音（即时生效） / 注解（只影响显示，语音仍会朗读） / 历史汉字
+  // 拼音（即时生效） / 注解（只影响显示，语音仍会朗读） / 记录汉字
   bindDisplaySwitch(Storage.PREF_KEYS.PINYIN, "hide-pinyin", $("#btn-pinyin"));
   bindDisplaySwitch(Storage.PREF_KEYS.NOTE, "hide-note", $("#btn-note"));
   bindDisplaySwitch(Storage.PREF_KEYS.SHOWCHARS, "hide-history-chars", $("#btn-history-chars"));
@@ -982,7 +982,7 @@
   }
   $("#btn-create-user").addEventListener("click", openUserDialog);
   $("#btn-user-cancel").addEventListener("click", closeUserDialog);
-  // 后台：新增完成后若仍在后台页则刷新列表，否则回首页
+  // 应用设置：新增完成后若仍在应用设置页则刷新列表，否则回首页
   function afterUserAdded() {
     closeUserDialog();
     if (views.admin.classList.contains("hidden")) renderHome();
@@ -1020,7 +1020,7 @@
     Speaker.stop();
     backToVolumes();
   });
-  // 历史记录从"选册页"进入，返回时回到该小朋友的选册页
+  // 练习记录从"选册页"进入，返回时回到该小朋友的选册页
   $("#btn-history-back").addEventListener("click", backToVolumes);
   // 练习记录里的汉字：点击进入通用单字详情页，返回时回到记录页
   $("#history-list").addEventListener("click", (e) => {
@@ -1036,7 +1036,7 @@
   $("#btn-card-back").addEventListener("click", () => {
     if (cardOnBack) cardOnBack();
   });
-  // 清除当前小朋友的进度与历史（二次确认），清空后停留在本页
+  // 清除当前小朋友的进度与记录（二次确认），清空后停留在本页
   $("#btn-reset").addEventListener("click", () => {
     if (confirm("确定要清除这位小朋友的所有练习记录吗？此操作不可恢复。")) {
       Storage.clearUserData();
@@ -1055,7 +1055,7 @@
     const user = Storage.users().find((u) => u.id === session.userId) || Storage.currentUser();
     startSession(user, volume);
   });
-  // 后台入口（首页左下角小齿轮）
+  // 应用设置入口（首页左下角小齿轮）
   $("#btn-admin").addEventListener("click", renderAdmin);
   $("#btn-admin-add").addEventListener("click", openUserDialog);
   $("#btn-admin-back").addEventListener("click", renderHome);

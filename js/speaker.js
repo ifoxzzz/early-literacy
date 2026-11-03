@@ -360,7 +360,7 @@ const Speaker = {
   },
 
   // 结束页：完成 + 星星数 + 鼓励
-  // 星星数最多等于每组题数（后台可配 5~20），故音频上限为 20
+  // 星星数最多等于每组题数（练习设置可配 5~20），故音频上限为 20
   result(stars, name) {
     const n = Math.max(0, Math.min(20, Math.round(stars)));
     this.play([

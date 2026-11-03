@@ -6,7 +6,7 @@
   <title>宝贝趣味识字</title>
   <script>
     // 全局唯一缓存版本：改动任何 css/js/音频后，只需把这个值 +1，即可让全部缓存失效
-    var CACHE_VERSION = "116";
+    var CACHE_VERSION = "119";
     window.APP_VERSION = CACHE_VERSION;
     document.write('<link rel="stylesheet" href="css/style.css?v=' + CACHE_VERSION + '">');
     // 内置楷体（Windows 楷体 SimKai 子集，仅自用）：只用于田字格、汉字表与练习记录里的汉字
@@ -206,6 +206,25 @@
       <div class="admin-users" id="admin-users"></div>
       <button class="btn btn-ghost" id="btn-admin-add">+ 新增小朋友</button>
     </section>
+    <section class="admin-block">
+      <h2 class="admin-title">音效</h2>
+      <div class="setting-row">
+        <span class="setting-label">按钮音效</span>
+        <span class="setting-opts">
+          <button class="btn btn-skip" id="btn-click-sound" aria-pressed="true">开启</button>
+        </span>
+      </div>
+    </section>
+    <section class="admin-block">
+      <h2 class="admin-title">缓存清理</h2>
+      <div class="setting-row">
+        <span class="setting-label">音频缓存</span>
+        <span class="setting-opts">
+          <button class="btn btn-skip" id="btn-clear-audio-cache">清理音频缓存</button>
+        </span>
+      </div>
+      <p class="settings-tip">音频文件更新后，点此清理，客户端会重新下载最新音频。</p>
+    </section>
     <button class="btn btn-primary" id="btn-admin-back">返回</button>
   </section>
 
@@ -272,7 +291,6 @@
           <div class="quiz-tools-btns">
             <button class="btn btn-skip" id="btn-pinyin">拼音</button>
             <button class="btn btn-skip" id="btn-note">注解</button>
-            <button class="btn btn-skip" id="btn-sound">🔊</button>
             <button class="btn btn-skip" id="btn-skip">跳过</button>
             <button class="btn btn-skip" id="btn-quit">结束</button>
           </div>

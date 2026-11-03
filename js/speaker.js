@@ -2,10 +2,9 @@
 // 设计要点：
 // - 所有音频路径都由"拼音键"推导，同音字共享文件，避免重复占用空间
 // - 播放采用队列 + 版本号（tokens）机制：新语音会立即打断旧语音
-// - 是否朗读受总开关 early-literacy-sound 控制（静音时直接回调，不阻塞流程）
 const Speaker = {
-  KEY: "early-literacy-sound",
   AUDIO: "assets/audio/",
+  AUDIO_EPOCH_KEY: "early-literacy-audio-cache", // 音频缓存标记：清理后更换，迫使浏览器重新下载
   current: null, // 当前播放的 Audio 实例
   tokens: 0, // 播放序列版本号，用于打断旧序列
 
@@ -76,16 +75,7 @@ const Speaker = {
     document.addEventListener("WeixinJSBridgeReady", once, { once: true });
   },
 
-  // ---------- 开关 ----------
-  isEnabled() {
-    return localStorage.getItem(this.KEY) !== "0";
-  },
-
-  setEnabled(on) {
-    localStorage.setItem(this.KEY, on ? "1" : "0");
-    if (!on) this.stop();
-  },
-
+  // ---------- 播放控制 ----------
   // 停止当前播放并让进行中的序列失效
   stop() {
     this.tokens += 1;
@@ -123,8 +113,18 @@ const Speaker = {
   },
 
   // 给音频路径加版本参数：与 index.html 的 CACHE_VERSION 保持一致，避免浏览器缓存旧语音
+  // 额外带一个缓存标记：在应用设置里清理音频缓存后会更换，让客户端重新下载更新后的音频
   audioUrl(rel) {
-    return `${this.AUDIO}${rel}?v=${window.APP_VERSION || "1"}`;
+    const epoch = this.audioEpoch();
+    return `${this.AUDIO}${rel}?v=${window.APP_VERSION || "1"}${epoch ? `&c=${epoch}` : ""}`;
+  },
+
+  audioEpoch() {
+    try {
+      return localStorage.getItem(this.AUDIO_EPOCH_KEY) || "";
+    } catch (e) {
+      return "";
+    }
   },
 
   // 单字发音路径：同音字共享一个文件（清单见 assets/audio/syllables/index.js）
@@ -173,6 +173,19 @@ const Speaker = {
   // 这里提前 fetch 成 blob 存在内存里，播放时直接用本地 blob 地址。
   // file:// 下 fetch 会被浏览器拦截，失败时自动退回原始地址，不影响离线使用。
   cache: new Map(), // 原始地址 -> { promise, blobUrl }
+
+  // 清理本地音频缓存：停止播放、释放内存中的 blob，并更换缓存标记，
+  // 之后 audioUrl 会带上新的参数，浏览器与 audio 元素都会重新下载最新音频
+  clearAudioCache() {
+    this.stop();
+    this.cache.forEach((entry) => {
+      if (entry.blobUrl) URL.revokeObjectURL(entry.blobUrl);
+    });
+    this.cache.clear();
+    try {
+      localStorage.setItem(this.AUDIO_EPOCH_KEY, Date.now().toString(36));
+    } catch (e) {}
+  },
 
   preload(urls) {
     (Array.isArray(urls) ? urls : [urls]).forEach((url) => {
@@ -246,7 +259,7 @@ const Speaker = {
   // ---------- 播放 ----------
   // 顺序播放音频列表，可被打断；单个文件缺失/播放失败时自动跳过
   play(list, onDone) {
-    if (!this.isEnabled() || list.length === 0) {
+    if (list.length === 0) {
       if (onDone) onDone();
       return;
     }
@@ -334,7 +347,7 @@ const Speaker = {
       if (noteSrc) urls.push(noteSrc);
       this.preload(urls);
       // 注解音频缺失时用系统语音补读，保证「先组词、后注解」的顺序不变
-      const after = noteSrc || !note ? null : () => this.isEnabled() && this.speak(note);
+      const after = noteSrc || !note ? null : () => this.speak(note);
       this.play(urls, after);
       return;
     }
@@ -367,7 +380,7 @@ const Speaker = {
 
     // 注解音频缺失时用系统语音补读；没有预生成名字语音时，
     // phraseFile 会自动退回通用提示语，不再插入系统合成音
-    const after = noteSrc || !note ? null : () => this.isEnabled() && this.speak(note);
+    const after = noteSrc || !note ? null : () => this.speak(note);
     this.play(list, after);
   },
 

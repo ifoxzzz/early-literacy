@@ -332,6 +332,7 @@
       row.append(name, del);
       box.appendChild(row);
     });
+    refreshClickSound();
     show("admin");
   }
 
@@ -984,6 +985,16 @@
   bindDisplaySwitch(Storage.PREF_KEYS.NOTE, "hide-note", $("#btn-note"));
   bindDisplaySwitch(Storage.PREF_KEYS.SHOWCHARS, "hide-history-chars", $("#btn-history-chars"));
 
+  // 按钮音效开关（全局设置，默认开启）：只控制按钮点击音，不影响语音朗读
+  // 单个按钮同时显示当前状态：开启时高亮并显示「开启」，关闭时变灰并显示「关闭」
+  function refreshClickSound() {
+    const on = Storage.pref(Storage.PREF_KEYS.CLICK);
+    const btn = $("#btn-click-sound");
+    btn.classList.toggle("active", on);
+    btn.textContent = on ? "开启" : "关闭";
+    btn.setAttribute("aria-pressed", String(on));
+  }
+
   // 练习页顶部悬浮面板展开/收起：按小朋友保存（默认展开）
   let drawerTimer = 0;
 
@@ -1032,15 +1043,6 @@
   $("#btn-tools-show").addEventListener("click", () => setToolsExpanded(true));
   displayRefreshers.push(refreshQuizTools);
 
-  // 朗读总开关（状态持久化；静音时同时停止音效与语音）
-  function refreshSoundBtn() {
-    $("#btn-sound").textContent = Speaker.isEnabled() ? "🔊" : "🔇";
-  }
-  $("#btn-sound").addEventListener("click", () => {
-    Speaker.setEnabled(!Speaker.isEnabled());
-    refreshSoundBtn();
-  });
-  refreshSoundBtn();
   // 重读本题（答对后正在播夸奖语音并即将进入下一题，此时重读会打断语音回调，忽略）
   $("#btn-read").addEventListener("click", () => {
     const q = session.current;
@@ -1200,6 +1202,22 @@
   // 应用设置入口（首页左下角小齿轮）
   $("#btn-admin").addEventListener("click", renderAdmin);
   $("#btn-admin-add").addEventListener("click", openUserDialog);
+  // 按钮音效开关（全局设置）：点一下切换开启/关闭
+  $("#btn-click-sound").addEventListener("click", () => {
+    Storage.setPref(Storage.PREF_KEYS.CLICK, !Storage.pref(Storage.PREF_KEYS.CLICK));
+    refreshClickSound();
+  });
+  // 清理音频缓存（应用设置）：释放本地缓存的音频并让后续请求重新下载
+  $("#btn-clear-audio-cache").addEventListener("click", () => {
+    Speaker.clearAudioCache();
+    const btn = $("#btn-clear-audio-cache");
+    btn.textContent = "已清理";
+    btn.disabled = true;
+    setTimeout(() => {
+      btn.textContent = "清理音频缓存";
+      btn.disabled = false;
+    }, 1200);
+  });
   $("#btn-admin-back").addEventListener("click", renderHome);
   $("#admin-users").addEventListener("click", (e) => {
     const btn = e.target.closest(".btn-danger");

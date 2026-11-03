@@ -16,10 +16,11 @@ const Storage = {
     NOTE: "early-literacy-note", // 底部组词 + 注解提示（按钮名为「注解」）
     SHOWCHARS: "early-literacy-showchars", // 练习记录里的汉字
     TOOLS: "early-literacy-quiz-tools", // 练习页顶部按钮行是否展开
+    CLICK: "early-literacy-click-sound", // 按钮音效（全局设置）
   },
 
   // 按小朋友隔离的显示开关：拼音、注解、顶部按钮行按当前用户分别保存
-  // 其余开关（记录汉字）仍为全局设置；键值直接复用 PREF_KEYS，避免重复维护
+  // 其余开关（记录汉字、按钮音效）为全局设置；键值直接复用 PREF_KEYS，避免重复维护
   get USER_PREF_KEYS() {
     return [this.PREF_KEYS.PINYIN, this.PREF_KEYS.NOTE, this.PREF_KEYS.TOOLS];
   },

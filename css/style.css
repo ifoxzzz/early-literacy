@@ -1283,7 +1283,7 @@ body.hide-pinyin #view-card .card .pinyin {
   box-shadow: 0 3px 0 #cbbfa5;
 }
 
-/* 顶部第一行：拼音 / 注解 / 声音 / 跳过 / 结束，做成靠右的悬浮面板，可整行折叠 */
+/* 顶部第一行：拼音 / 注解 / 跳过 / 结束，做成靠右的悬浮面板，可整行折叠 */
 .quiz-tools-wrap {
   display: grid;
   grid-template-rows: 1fr;

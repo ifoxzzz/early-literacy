@@ -600,6 +600,39 @@ body {
   font-size: clamp(16px, 3.5vmin, 20px);
 }
 
+/* ---------- 进入练习前的资源加载 ---------- */
+.loading-dialog {
+  padding: 28px 24px 24px;
+}
+
+.loading-tip {
+  font-size: clamp(15px, 3.5vmin, 18px);
+  color: #8c7a63;
+}
+
+.loading-bar {
+  height: 14px;
+  margin: 18px 0 10px;
+  background: #f0e6d2;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.loading-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: #f2a541;
+  border-radius: 999px;
+  transition: width 0.18s ease;
+}
+
+.loading-count {
+  font-size: clamp(14px, 3.2vmin, 16px);
+  color: #9a8b74;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------- 创作者信息：首页右下角，小字低对比 ---------- */
 .creator-credit {
   position: fixed;
@@ -1239,7 +1272,6 @@ body.hide-pinyin #view-card .card .pinyin {
 }
 
 #quiz-stars {
-  justify-self: center;
   color: #f2a541;
 }
 
@@ -1251,34 +1283,164 @@ body.hide-pinyin #view-card .card .pinyin {
   box-shadow: 0 3px 0 #cbbfa5;
 }
 
-/* 顶部第一行：拼音 / 注解 / 声音 / 跳过 / 结束，靠右排列，可整行折叠 */
+/* 顶部第一行：拼音 / 注解 / 声音 / 跳过 / 结束，做成靠右的悬浮面板，可整行折叠 */
+.quiz-tools-wrap {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.24s ease;
+}
+
+.quiz-tools-wrap.collapsed {
+  grid-template-rows: 0fr;
+}
+
 .quiz-tools {
+  display: flex;
+  align-items: stretch;
+  justify-self: end;
+  width: max-content;
+  max-width: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  box-shadow: 0 8px 22px rgba(74, 59, 42, 0.16);
+  visibility: visible;
+  transition: opacity 0.22s ease, transform 0.22s ease, box-shadow 0.2s ease, visibility 0s;
+}
+
+/* 面板右侧的灰色关闭区：整块灰色，中间一个 ✕ */
+.quiz-tools-close {
+  position: relative;
+  /* 盖在滑过来的按钮上面，让按钮看起来收进了灰色区域 */
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 46px;
+  padding: 0;
+  border: 0;
+  background: #e2dac9;
+  color: #8b7c65;
+  font-family: inherit;
+  font-size: clamp(18px, 4vmin, 24px);
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.quiz-tools-close:hover {
+  background: #d8cfbc;
+  color: #6f6250;
+}
+
+.quiz-tools-close:active {
+  background: #cfc5b0;
+}
+
+/* 收起时面板上滑淡出，并延迟隐藏避免折叠动画中途闪烁 */
+.quiz-tools-wrap.collapsed .quiz-tools {
+  opacity: 0;
+  transform: translateY(-10px);
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.22s ease, transform 0.22s ease, visibility 0s linear 0.22s;
+}
+
+.quiz-tools-btns {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+  min-width: 0;
+  padding: 8px;
+  /* 白色底板放在按钮区里，收起时和按钮一起滑进右侧灰色关闭区 */
+  background: rgba(255, 253, 245, 0.96);
+  border-radius: 8px 0 0 8px;
+  transition: transform 0.2s cubic-bezier(0.33, 0, 0.2, 1);
 }
 
-/* 顶部第二行：左题号 / 中星星 / 右折叠按钮，左右各占 1fr 保证中间的星星始终居中 */
+/* 抽屉效果：关闭时按钮连同白色底板整块向右滑进灰色关闭区（被 ✕ 遮住、超出面板的部分被裁掉），
+   滑完再由 .collapsed 折叠面板；展开时反过来从灰色区域里滑出来 */
+.quiz-tools-wrap.drawer-out .quiz-tools-btns,
+.quiz-tools-wrap.collapsed .quiz-tools-btns {
+  transform: translateX(100%);
+}
+
+/* 底板滑走后不再保留外框阴影，避免空出一块只有阴影的区域 */
+.quiz-tools-wrap.drawer-out .quiz-tools,
+.quiz-tools-wrap.collapsed .quiz-tools {
+  box-shadow: none;
+}
+
+/* 顶部第二行：星星靠左，右侧是展开面板的三个点 */
 .quiz-status {
   width: 100%;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
+  min-height: 34px;
 }
 
-#quiz-progress {
-  justify-self: start;
+/* 无背景框的三个点，逐个放大再恢复形成波浪动画 */
+.btn-tools-show {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0.8);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s linear 0.2s;
 }
 
-/* 折叠按钮：▴ 收起顶部按钮行，▾ 展开 */
-.btn-tools-toggle {
-  justify-self: end;
-  min-width: 46px;
-  padding: 2px 12px;
-  line-height: 1.1;
-  font-size: clamp(13px, 2.6vmin, 17px);
+.btn-tools-show .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #b7a88f;
+  animation: dot-pulse 1.5s ease-in-out infinite;
+}
+
+.btn-tools-show .dot:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+.btn-tools-show .dot:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+@keyframes dot-pulse {
+  0%, 55%, 100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  20% {
+    transform: scale(1.45);
+    opacity: 1;
+  }
+}
+
+/* 面板收起后，三个点淡入并轻微放大 */
+.quiz-tools-wrap.collapsed ~ .quiz-status .btn-tools-show {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  pointer-events: auto;
+  transition: opacity 0.2s ease 0.06s, transform 0.2s ease 0.06s, visibility 0s;
 }
 
 /* 开关按钮激活态（拼音显示开启时高亮） */
@@ -1286,6 +1448,28 @@ body.hide-pinyin #view-card .card .pinyin {
   background: #f2a541;
   color: #fff;
   box-shadow: 0 3px 0 #d18a2e;
+}
+
+/* 关闭状态：拼音 / 注解 / 练习记录「汉字」灰态时，左上到右下划一道斜线 */
+#btn-pinyin,
+#btn-note,
+#btn-history-chars {
+  position: relative;
+  overflow: hidden;
+}
+
+#btn-pinyin:not(.active)::after,
+#btn-note:not(.active)::after,
+#btn-history-chars:not(.active)::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 140%;
+  height: 3px;
+  background: rgba(122, 108, 88, 0.7);
+  transform: translate(-50%, -50%) rotate(45deg);
+  pointer-events: none;
 }
 
 .grid {

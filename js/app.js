@@ -62,6 +62,10 @@
     volume: "", // 当前学习的是哪一册
     optionCount: 4, // 每题候选字数（决定田字格布局）
     current: null, // 当前题目
+    gen: 0, // 会话代次：重新开始或退出时自增，用于作废上一组残留的延时回调
+    timer: null, // 进入下一题的 600ms 延时
+    delayTimer: null, // 答对后播放夸奖语音前的 400ms 延时
+    guardTimer: null, // 夸奖语音结束回调的 6 秒兜底
   };
 
   function show(name) {
@@ -246,8 +250,6 @@
 
   /* ---------- 选择学习内容：列出现有册 ---------- */
   function renderVolumes(user) {
-    // 进入册目页就开始下载提示语与星星播报，给孩子挑选册的时间，避免练习第一题没声音
-    if (user) Speaker.preloadSession(user.name, []);
     // 拼音 / 注解开关按小朋友保存，切换小朋友后要重新应用
     refreshDisplaySwitches();
     $("#volume-owner").textContent = user ? `${user.name} 想学哪一册？` : "";
@@ -451,12 +453,58 @@
   }
 
   /* ---------- 练习 ---------- */
-  function startSession(user, volume) {
+  let enteringVolume = false; // 加载遮罩显示期间忽略重复点册
+
+  function showVolumeLoading(volume) {
+    $("#loading-title").textContent = `正在准备「${volume.title}」`;
+    $("#loading-fill").style.width = "0%";
+    $("#loading-count").textContent = "0 / 0";
+    $("#loading-mask").classList.remove("hidden");
+  }
+
+  function updateVolumeLoading(done, total) {
+    const pct = total ? Math.round((done / total) * 100) : 100;
+    $("#loading-fill").style.width = `${pct}%`;
+    $("#loading-count").textContent = `${done} / ${total}`;
+  }
+
+  function hideVolumeLoading() {
+    $("#loading-mask").classList.add("hidden");
+  }
+
+  // 点册后先组好题、预加载本组全部语音，进度条走完再进入练习页
+  function enterVolume(user, volume) {
+    if (enteringVolume) return;
     // 该小朋友自己配置的候选字数 / 每组题数
     const uid = user ? user.id : Storage.currentId();
     const optionCount = Storage.quizOptions(uid);
     const questions = Quiz.buildSession(Storage.quizCount(uid), volume.entries, optionCount);
     if (questions.length === 0) return;
+    enteringVolume = true;
+    // 全部资源已缓存时可能瞬间完成，延迟一点再显示遮罩，避免进度条一闪而过
+    let loadingShown = false;
+    const showTimer = setTimeout(() => {
+      loadingShown = true;
+      showVolumeLoading(volume);
+    }, 150);
+    // 失败或超过 8 秒的文件会退回原始地址，同样计入进度，不会卡在加载页
+    Speaker.preloadSession(
+      user ? user.name : "",
+      questions.map((q) => q.target),
+      updateVolumeLoading
+    ).then(() => {
+      clearTimeout(showTimer);
+      enteringVolume = false;
+      if (loadingShown) hideVolumeLoading();
+      startSession(user, volume, questions, optionCount);
+    });
+  }
+
+  function startSession(user, volume, questions, optionCount) {
+    if (questions.length === 0) return;
+    // 换组时先作废旧代次并清掉上一组可能挂起的回调
+    clearSessionTimers();
+    session.gen += 1;
     Object.assign(session, {
       queue: questions,
       total: questions.length,
@@ -475,10 +523,7 @@
     });
     show("quiz");
     refreshQuizTools(); // 恢复该小朋友上次的顶部按钮展开状态
-    $("#quiz-user").textContent = `${session.userName} · ${volume.title}`;
-    // 本组所有题目的单字、组词与注解音频一次性预热，后面的题目不再临时等下网络
-    Speaker.preloadSession(session.userName, questions.map((q) => q.target));
-    nextQuestion(); // 先渲染第一题的组词/注解文字，提示条高度才是最终值
+    nextQuestion(); // 语音已由 enterVolume 预热，直接渲染第一题的组词/注解文字
     // 首次进入必须量一次尺寸；下一帧再量一次，避开手机浏览器地址栏/字体回流的时序差
     applyGridLayout();
     requestAnimationFrame(() => {
@@ -493,8 +538,19 @@
     session.done += 1;
   }
 
+  // 清掉本组练习挂起的全部延时回调。跳题、退出或重新组卷时必须调用，
+  // 否则上一组的回调会在后台继续出题、朗读，甚至重复写入练习记录
+  function clearSessionTimers() {
+    clearTimeout(session.timer);
+    clearTimeout(session.delayTimer);
+    clearTimeout(session.guardTimer);
+    session.timer = session.delayTimer = session.guardTimer = null;
+  }
+
   function nextQuestion() {
     if (session.queue.length === 0) {
+      // 本组结束：清空当前题，避免已结算的旧题继续被延时回调当作“仍在作答”
+      session.current = null;
       renderResult();
       return;
     }
@@ -502,7 +558,9 @@
     q.locked = false;
     session.current = q;
 
-    $("#quiz-progress").textContent = `第 ${Math.min(session.done + 1, session.total)}/${session.total} 题`;
+    // 题号并入底部信息行：小朋友 · 册名 · 第 x/x 题
+    $("#quiz-user").textContent =
+      `${session.userName} · ${session.volume} · 第 ${Math.min(session.done + 1, session.total)}/${session.total} 题`;
     $("#quiz-stars").textContent = `⭐ ${session.stars}`;
     // 第一行组词（用「」包起来），第二行注解；拼音标注只给语音脚本，展示时去掉
     const words = displayText(q.target.words);
@@ -548,7 +606,7 @@
     const q = session.current;
     if (!q || q.locked || q.helped) return; // 已作答或已求助过，忽略
     q.helped = true;
-    clearTimeout(session.timer);
+    clearSessionTimers();
     $("#btn-help").classList.add("used");
     Sound.play("help");
     Speaker.help();
@@ -668,17 +726,22 @@
     $("#quiz-stars").textContent = `⭐ ${session.stars}`;
 
     // 夸奖语音播完再进入下一题，避免被切断；若语音中途被打断（如关闭声音、
-    // 播放异常）导致回调不触发，用兜底定时器保证流程不会卡在本页
-    setTimeout(() => {
-      if (session.current !== q) return;
+    // 播放异常）导致回调不触发，用兜底定时器保证流程不会卡在本页。
+    // 所有延时都登记在 session 上，并由会话代次校验：跳题/退出后立即作废，
+    // 不会再出现“退出后仍自动出题”或“结束页重复写入记录”
+    const gen = session.gen;
+    session.delayTimer = setTimeout(() => {
+      session.delayTimer = null;
+      if (gen !== session.gen || session.current !== q) return;
       let moved = false;
       const go = () => {
-        if (moved || session.current !== q) return;
+        if (moved || gen !== session.gen || session.current !== q) return;
         moved = true;
-        clearTimeout(guard);
+        clearTimeout(session.guardTimer);
+        session.guardTimer = null;
         session.timer = setTimeout(nextQuestion, 600);
       };
-      const guard = setTimeout(go, 6000);
+      session.guardTimer = setTimeout(go, 6000);
       Speaker.correct(go, session.userName);
     }, 400);
   }
@@ -921,20 +984,52 @@
   bindDisplaySwitch(Storage.PREF_KEYS.NOTE, "hide-note", $("#btn-note"));
   bindDisplaySwitch(Storage.PREF_KEYS.SHOWCHARS, "hide-history-chars", $("#btn-history-chars"));
 
-  // 练习页顶部按钮行展开/收起：按小朋友保存（默认展开），折叠后把腾出的空间还给田字格
+  // 练习页顶部悬浮面板展开/收起：按小朋友保存（默认展开）
+  let drawerTimer = 0;
+
   function refreshQuizTools() {
+    clearTimeout(drawerTimer);
+    drawerTimer = 0;
     const on = Storage.pref(Storage.PREF_KEYS.TOOLS);
-    $("#quiz-tools").classList.toggle("hidden", !on);
-    const btn = $("#btn-tools-toggle");
-    btn.textContent = on ? "▴" : "▾";
-    btn.setAttribute("aria-expanded", String(on));
-    btn.setAttribute("aria-label", on ? "隐藏顶部按钮" : "显示顶部按钮");
+    const wrap = $("#quiz-tools-wrap");
+    wrap.classList.remove("drawer-out");
+    wrap.classList.toggle("collapsed", !on);
+    $("#btn-tools-hide").setAttribute("aria-expanded", String(on));
+    $("#btn-tools-show").setAttribute("aria-expanded", String(on));
   }
-  $("#btn-tools-toggle").addEventListener("click", () => {
-    Storage.setPref(Storage.PREF_KEYS.TOOLS, !Storage.pref(Storage.PREF_KEYS.TOOLS));
-    refreshQuizTools();
-    if (!views.quiz.classList.contains("hidden")) applyGridLayout();
-  });
+
+  // 折叠/展开的 0.24s 内舞台高度持续变化，逐帧重算田字格尺寸才能平滑缩放
+  let toolsResizeRaf = 0;
+  function resizeWhileToolsAnimate() {
+    cancelAnimationFrame(toolsResizeRaf);
+    const until = performance.now() + 260;
+    const tick = (now) => {
+      if (views.quiz.classList.contains("hidden")) return;
+      applyGridLayout();
+      toolsResizeRaf = now < until ? requestAnimationFrame(tick) : 0;
+    };
+    toolsResizeRaf = requestAnimationFrame(tick);
+  }
+
+  function setToolsExpanded(on) {
+    Storage.setPref(Storage.PREF_KEYS.TOOLS, on);
+    if (on) {
+      refreshQuizTools();
+      resizeWhileToolsAnimate();
+      return;
+    }
+    const wrap = $("#quiz-tools-wrap");
+    if (wrap.classList.contains("drawer-out")) return;
+    // 抽屉：按钮先整体向右滑进灰色关闭区，滑完再折叠面板
+    wrap.classList.add("drawer-out");
+    drawerTimer = setTimeout(() => {
+      drawerTimer = 0;
+      refreshQuizTools();
+      resizeWhileToolsAnimate();
+    }, 200);
+  }
+  $("#btn-tools-hide").addEventListener("click", () => setToolsExpanded(false));
+  $("#btn-tools-show").addEventListener("click", () => setToolsExpanded(true));
   displayRefreshers.push(refreshQuizTools);
 
   // 朗读总开关（状态持久化；静音时同时停止音效与语音）
@@ -956,7 +1051,7 @@
   $("#btn-help").addEventListener("click", useHelp);
   // 跳过：不记录对错、不得星，仅推进题号进度（幂等，不重复计数）
   $("#btn-skip").addEventListener("click", () => {
-    clearTimeout(session.timer);
+    clearSessionTimers(); // 取消上一题未走完的“夸奖后进入下一题”流程
     Speaker.stop();
     const q = session.current;
     if (q) markDone(q);
@@ -983,7 +1078,7 @@
       renderVolumeWords(volume);
       return;
     }
-    startSession(Storage.currentUser(), volume);
+    enterVolume(Storage.currentUser(), volume);
   });
   // 册目列表、汉字表、练习记录滚动时更新边缘淡出与滚动条显隐；窗口尺寸变化时重新计算
   bindScrollFx($("#volume-list"));
@@ -1060,7 +1155,10 @@
   // 结束本组练习（已作答的记录保留），回到该小朋友的册目选择页
   $("#btn-quit").addEventListener("click", () => {
     if (!confirm("要结束这组练习吗？")) return;
-    clearTimeout(session.timer);
+    // 退出时作废代次、清空当前题并清掉全部延时，防止离开后仍自动出题或补写记录
+    session.gen += 1;
+    session.current = null;
+    clearSessionTimers();
     Speaker.stop();
     backToVolumes();
   });
@@ -1097,7 +1195,7 @@
       return;
     }
     const user = Storage.users().find((u) => u.id === session.userId) || Storage.currentUser();
-    startSession(user, volume);
+    enterVolume(user, volume);
   });
   // 应用设置入口（首页左下角小齿轮）
   $("#btn-admin").addEventListener("click", renderAdmin);
@@ -1114,4 +1212,6 @@
   });
 
   renderHome();
+  // 首屏就绪：收起加载遮罩
+  if (window.__boot) window.__boot.finish();
 })();

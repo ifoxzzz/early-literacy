@@ -180,8 +180,13 @@ const Speaker = {
       const entry = { promise: null, blobUrl: null };
       // 8 秒内没下载完就先用原地址播放（Audio 自己会继续下载），避免卡住答题流程
       const timeout = new Promise((resolve) => setTimeout(() => resolve(url), 8000));
+      // file:// 下 fetch 会被拦截；旧环境没有 fetch 时同样退回原地址，保证 Promise 不会同步抛错
+      const request =
+        typeof fetch === "function"
+          ? fetch(url)
+          : Promise.reject(new Error("fetch unavailable"));
       entry.promise = Promise.race([
-        fetch(url)
+        request
           .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(r.status))))
           .then((blob) => {
             entry.blobUrl = URL.createObjectURL(blob);
@@ -194,14 +199,32 @@ const Speaker = {
     });
   },
 
+  // 批量预加载并按“已完成文件数”回调进度；失败/超时的文件也会计入完成，
+  // 保证加载界面不会一直卡住。返回 Promise，全部就绪后 resolve
+  preloadAll(urls, onProgress) {
+    const list = [...new Set((urls || []).filter(Boolean))];
+    let done = 0;
+    if (onProgress) onProgress(0, list.length);
+    return Promise.all(
+      list.map((url) => {
+        this.preload(url);
+        return this.cache.get(url).promise.then(() => {
+          done += 1;
+          if (onProgress) onProgress(done, list.length);
+        });
+      })
+    );
+  },
+
   // 播放前取地址：已预下载的直接用 blob；还在下载就等它（最多 8 秒）
   resolveSrc(url) {
     const entry = this.cache.get(url);
     return entry ? entry.promise : Promise.resolve(url);
   },
 
-  // 为一组练习预热：提示语、星星播报、全部题目涉及的单字、组词与注解音频
-  preloadSession(name, targets) {
+  // 为一组练习预热：提示语、星星播报、全部题目涉及的单字、组词与注解音频。
+  // onProgress(done, total) 用于进入练习页前的进度条
+  preloadSession(name, targets, onProgress) {
     // 「请找出」始终用通用提示语，名字语音里没有这个文件
     const urls = ["welcome", "praise1", "praise2", "praise3", "done", "cheer"].map((k) =>
       this.phraseFile(k, name)
@@ -217,7 +240,7 @@ const Speaker = {
       const note = this.noteAudio(t);
       if (note) urls.push(note);
     });
-    this.preload(urls);
+    return this.preloadAll(urls, onProgress);
   },
 
   // ---------- 播放 ----------

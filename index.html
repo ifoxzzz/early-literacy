@@ -6,7 +6,7 @@
   <title>宝贝趣味识字</title>
   <script>
     // 全局唯一缓存版本：改动任何 css/js/音频后，只需把这个值 +1，即可让全部缓存失效
-    var CACHE_VERSION = "107";
+    var CACHE_VERSION = "116";
     window.APP_VERSION = CACHE_VERSION;
     document.write('<link rel="stylesheet" href="css/style.css?v=' + CACHE_VERSION + '">');
     // 内置楷体（Windows 楷体 SimKai 子集，仅自用）：只用于田字格、汉字表与练习记录里的汉字
@@ -16,8 +16,117 @@
         'font-display:swap}</style>'
     );
   </script>
+  <!-- 首屏加载遮罩：样式内联，不依赖 style.css，字库等大文件下载期间先显示进度，避免白屏 -->
+  <style>
+    #boot-splash {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      background: #fdf6e9;
+      font-family: "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", Arial, sans-serif;
+      transition: opacity 0.24s ease;
+    }
+    #boot-splash.done {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .boot-title {
+      font-size: clamp(32px, 8vmin, 56px);
+      color: #d1603d;
+      letter-spacing: 0.1em;
+    }
+    .boot-bar {
+      width: min(60vw, 320px);
+      height: 10px;
+      border-radius: 999px;
+      background: #f0e2c8;
+      overflow: hidden;
+    }
+    .boot-fill {
+      width: 0;
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #f2a541, #d1603d);
+      transition: width 0.25s ease;
+    }
+    .boot-text {
+      font-size: clamp(14px, 3vmin, 18px);
+      color: #9b8669;
+    }
+  </style>
+  <script>
+    // 首屏进度：业务脚本逐个 onload/onerror 汇报，app.js 初始化完成后由 __boot.finish() 收起。
+    // 大文件（字库 volumes.js）下载期间拿不到中间进度，所以进度条按时间缓慢爬升（上限 45%），避免长时间停在 0%
+    window.__boot = (function () {
+      var total = 0;
+      var done = 0;
+      var shown = 0;
+      var startAt = Date.now();
+      var timer = 0;
+
+      function realPct() {
+        return total ? (done / total) * 100 : 0;
+      }
+
+      // 时间爬升：约 6 秒到约 28%，之后越来越慢，最多 45%；真实进度更高时以真实进度为准
+      function creepPct() {
+        var sec = (Date.now() - startAt) / 1000;
+        return 45 * (1 - Math.exp(-sec / 6));
+      }
+
+      function paint() {
+        var pct = Math.max(realPct(), creepPct(), shown);
+        shown = pct;
+        var bar = document.getElementById("boot-fill");
+        var text = document.getElementById("boot-text");
+        if (!bar || !text) return;
+        var value = Math.min(100, Math.round(pct));
+        bar.style.width = value + "%";
+        text.textContent = value >= 100 ? "加载完成" : "正在加载 " + value + "%";
+      }
+
+      function step() {
+        done = Math.min(done + 1, total);
+        paint();
+      }
+
+      function finish() {
+        if (timer) {
+          clearInterval(timer);
+          timer = 0;
+        }
+        done = total;
+        paint();
+        var el = document.getElementById("boot-splash");
+        if (!el) return;
+        el.classList.add("done");
+        setTimeout(function () {
+          if (el.parentNode) el.parentNode.removeChild(el);
+        }, 280);
+      }
+
+      function setTotal(n) {
+        total = n;
+        paint();
+      }
+
+      timer = setInterval(paint, 300);
+      return { setTotal: setTotal, step: step, finish: finish };
+    })();
+  </script>
 </head>
 <body>
+  <div id="boot-splash">
+    <div class="boot-title">宝贝趣味识字</div>
+    <div class="boot-bar"><div class="boot-fill" id="boot-fill"></div></div>
+    <div class="boot-text" id="boot-text">正在加载 0%</div>
+  </div>
+
   <!-- 首页：选择小朋友 -->
   <section id="view-home" class="view">
     <h1 class="app-title">宝贝趣味识字</h1>
@@ -112,6 +221,16 @@
     </div>
   </div>
 
+  <!-- 进入练习前的资源加载遮罩：语音全部就绪后再进入答题 -->
+  <div class="dialog-mask hidden" id="loading-mask" role="status" aria-live="polite">
+    <div class="dialog loading-dialog">
+      <p class="dialog-title" id="loading-title"></p>
+      <p class="loading-tip">正在加载语音，请稍等…</p>
+      <div class="loading-bar" aria-hidden="true"><span class="loading-fill" id="loading-fill"></span></div>
+      <p class="loading-count" id="loading-count">0 / 0</p>
+    </div>
+  </div>
+
   <!-- 练习记录页 -->
   <section id="view-history" class="view hidden">
     <h1 class="app-title">练习记录</h1>
@@ -148,18 +267,25 @@
   <!-- 练习页 -->
   <section id="view-quiz" class="view hidden">
     <header class="quiz-header">
-      <div class="quiz-tools" id="quiz-tools">
-        <button class="btn btn-skip" id="btn-pinyin">拼音</button>
-        <button class="btn btn-skip" id="btn-note">注解</button>
-        <button class="btn btn-skip" id="btn-sound">🔊</button>
-        <button class="btn btn-skip" id="btn-skip">跳过</button>
-        <button class="btn btn-skip" id="btn-quit">结束</button>
+      <div class="quiz-tools-wrap" id="quiz-tools-wrap">
+        <div class="quiz-tools" id="quiz-tools">
+          <div class="quiz-tools-btns">
+            <button class="btn btn-skip" id="btn-pinyin">拼音</button>
+            <button class="btn btn-skip" id="btn-note">注解</button>
+            <button class="btn btn-skip" id="btn-sound">🔊</button>
+            <button class="btn btn-skip" id="btn-skip">跳过</button>
+            <button class="btn btn-skip" id="btn-quit">结束</button>
+          </div>
+          <button class="quiz-tools-close" id="btn-tools-hide" aria-expanded="true"
+            aria-controls="quiz-tools" aria-label="关闭顶部按钮">✕</button>
+        </div>
       </div>
       <div class="quiz-status">
-        <span id="quiz-progress"></span>
         <span id="quiz-stars"></span>
-        <button class="btn btn-skip btn-tools-toggle" id="btn-tools-toggle" aria-expanded="true"
-          aria-label="隐藏顶部按钮">▴</button>
+        <button class="btn-tools-show" id="btn-tools-show"
+          aria-expanded="false" aria-controls="quiz-tools" aria-label="显示顶部按钮">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        </button>
       </div>
     </header>
     <div class="quiz-stage" id="quiz-stage">
@@ -193,8 +319,9 @@
   <canvas id="fx-canvas" class="fx-canvas"></canvas>
 
   <script>
-    // 按依赖顺序注入业务脚本，全部使用同一个缓存版本号
-    [
+    // 按依赖顺序注入业务脚本，全部使用同一个缓存版本号；
+    // 每个脚本加载完成（或失败）都推进首屏进度条，app.js 初始化结束再收起遮罩
+    var bootScripts = [
       "data/volumes.js",
       "js/memory.js",
       "js/storage.js",
@@ -206,8 +333,13 @@
       "js/speaker.js",
       "js/sound.js",
       "js/app.js",
-    ].forEach(function (src) {
-      document.write('<script src="' + src + '?v=' + CACHE_VERSION + '"><\/script>');
+    ];
+    __boot.setTotal(bootScripts.length);
+    bootScripts.forEach(function (src) {
+      document.write(
+        '<script src="' + src + '?v=' + CACHE_VERSION +
+          '" onload="__boot.step()" onerror="__boot.step()"><\/script>'
+      );
     });
   </script>
 </body>

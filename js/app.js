@@ -67,7 +67,51 @@
   function show(name) {
     Object.values(views).forEach((v) => v.classList.add("hidden"));
     views[name].classList.remove("hidden");
+    // 练习页保持屏幕常亮，离开练习页立即释放
+    if (name === "quiz") WakeLock.enable();
+    else WakeLock.disable();
   }
+
+  /* ---------- 屏幕常亮：练习时避免手机自动息屏 ---------- */
+  // 使用 Screen Wake Lock API（安卓 Chrome、iOS Safari 16.4+ 支持，需 HTTPS 或 localhost）
+  const WakeLock = {
+    lock: null,
+    wanted: false, // 当前页面是否希望保持常亮
+
+    async request() {
+      if (!("wakeLock" in navigator)) return; // 不支持的浏览器直接跳过
+      try {
+        this.lock = await navigator.wakeLock.request("screen");
+        this.lock.addEventListener("release", () => {
+          this.lock = null;
+        });
+      } catch (e) {
+        this.lock = null; // 电量过低、系统限制等原因会失败，静默忽略
+      }
+    },
+
+    async enable() {
+      this.wanted = true;
+      if (!this.lock) await this.request();
+    },
+
+    async disable() {
+      this.wanted = false;
+      const lock = this.lock;
+      if (!lock) return;
+      this.lock = null;
+      try {
+        await lock.release();
+      } catch (e) {}
+    },
+  };
+
+  // 切到后台再回来时系统会释放锁，需要重新申请；请求失败时也不必重试
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && WakeLock.wanted && !WakeLock.lock) {
+      WakeLock.request();
+    }
+  });
 
   // 候选字数量对应的行列：横屏行数少、竖屏列数少，避免卡片被拉得又宽又扁
   // 实际卡片尺寸由 applyGridLayout 按可用空间实时计算

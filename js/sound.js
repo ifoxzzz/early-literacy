@@ -58,6 +58,9 @@ const Sound = {
       // 求助：清脆的"叮~"，两段高音叠加，尾音稍长
       this.tone(880, 0, 0.22, "sine", 0.18);
       this.tone(1320, 0.04, 0.5, "sine", 0.12);
+    } else if (name === "click") {
+      // 通用按钮：短促柔和的"嘀"，比答题选中音更轻，避免喧宾夺主
+      this.tone(720, 0, 0.05, "sine", 0.08);
     } else if (name === "wrong") {
       // 答错：温和的低音下行。手机小扬声器对 200Hz 以下的低频衰减很重，
       // 因此把音高抬到 349/262Hz 并略提高音量，保证手机上也能听见
@@ -70,3 +73,20 @@ const Sound = {
 // 首次交互时初始化音频上下文：悬停（mousemove/pointerenter）不算用户手势，
 // 若等到第一次答题才创建，之前的悬停音效会被浏览器自动播放策略静音
 document.addEventListener("pointerdown", () => Sound.ensureCtx(), { once: true });
+
+// 所有按钮统一点击音效：按下即响。
+// - 只匹配 <button> 与模拟按钮行为的 .word-item（汉字表整行）；
+// - 田字格卡片是 div.card，答题时的 pick/correct/wrong 由 app.js 单独播放，此处排除；
+// - 用捕获阶段，保证按下反馈先于按钮自身的逻辑（例如先响再切换静音）。
+document.addEventListener(
+  "pointerdown",
+  (e) => {
+    const target = e.target;
+    if (!target || !target.closest) return;
+    const el = target.closest("button, .word-item");
+    if (!el || el.disabled) return;
+    if (el.closest(".card, .grid")) return;
+    Sound.play("click");
+  },
+  true
+);

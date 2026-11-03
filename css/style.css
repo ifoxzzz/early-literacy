@@ -1317,12 +1317,15 @@ body.hide-pinyin #view-card .card .pinyin {
     opacity 0.2s, filter 0.2s;
 }
 
-/* 悬停选中效果（答题锁定后禁用） */
-.grid:not(.locked) .card:hover {
-  transform: scale(1.07);
-  border-color: #f2a541;
-  background: #fff9e8;
-  box-shadow: 0 10px 28px rgba(209, 96, 61, 0.4);
+/* 悬停选中效果（答题锁定后禁用；已作答卡片不参与；
+   仅在有真实悬停能力的设备上启用，避免手机点按后 hover 粘住导致卡片一直放大） */
+@media (hover: hover) and (pointer: fine) {
+  .grid:not(.locked) .card:not(.wrong):not(.correct):not(.dimmed):hover {
+    transform: scale(1.07);
+    border-color: #f2a541;
+    background: #fff9e8;
+    box-shadow: 0 10px 28px rgba(209, 96, 61, 0.4);
+  }
 }
 
 /* 作答后锁定：所有卡片不再响应点击/按压/悬停 */

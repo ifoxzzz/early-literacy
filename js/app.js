@@ -622,13 +622,19 @@
     }
     $("#quiz-stars").textContent = `⭐ ${session.stars}`;
 
-    // 夸奖语音播完再进入下一题，避免被切断
+    // 夸奖语音播完再进入下一题，避免被切断；若语音中途被打断（如关闭声音、
+    // 播放异常）导致回调不触发，用兜底定时器保证流程不会卡在本页
     setTimeout(() => {
       if (session.current !== q) return;
-      Speaker.correct(() => {
-        if (session.current !== q) return;
+      let moved = false;
+      const go = () => {
+        if (moved || session.current !== q) return;
+        moved = true;
+        clearTimeout(guard);
         session.timer = setTimeout(nextQuestion, 600);
-      }, session.userName);
+      };
+      const guard = setTimeout(go, 6000);
+      Speaker.correct(go, session.userName);
     }, 400);
   }
 
@@ -879,9 +885,11 @@
     refreshSoundBtn();
   });
   refreshSoundBtn();
-  // 重读本题
+  // 重读本题（答对后正在播夸奖语音并即将进入下一题，此时重读会打断语音回调，忽略）
   $("#btn-read").addEventListener("click", () => {
-    if (session.current) Speaker.readQuestion(session.current.target);
+    const q = session.current;
+    if (!q || q.locked) return;
+    Speaker.readQuestion(q.target);
   });
   // 帮帮我：亮出正确答案（本题不计分）
   $("#btn-help").addEventListener("click", useHelp);

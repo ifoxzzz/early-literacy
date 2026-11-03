@@ -81,6 +81,7 @@ const Storage = {
     localStorage.removeItem(this.historyKey(id));
     localStorage.removeItem(this.quizOptionsKey(id));
     localStorage.removeItem(this.quizCountKey(id));
+    localStorage.removeItem(this.lastVolumeKey(id));
     // 拼音、注解开关也按小朋友保存，删除时一并清理
     this.USER_PREF_KEYS.forEach((k) => localStorage.removeItem(this.prefKey(k, id)));
     if (this.currentId() === id) localStorage.removeItem(this.CURRENT_KEY);
@@ -102,6 +103,20 @@ const Storage = {
 
   quizCountKey(id) {
     return `early-literacy-quiz-count:${id || this.currentId()}`;
+  },
+
+  lastVolumeKey(id) {
+    return `early-literacy-last-volume:${id || this.currentId()}`;
+  },
+
+  // ---------- 最近选中的册（按小朋友独立保存） ----------
+  // 选册页把它排到列表第一项并用不同配色区分
+  lastVolume(id) {
+    return localStorage.getItem(this.lastVolumeKey(id)) || "";
+  },
+
+  setLastVolume(volumeId, id) {
+    localStorage.setItem(this.lastVolumeKey(id), String(volumeId));
   },
 
   // ---------- 学习进度 ----------

@@ -121,15 +121,74 @@ body {
   gap: 14px;
 }
 
+/* 册数多时列表按剩余空间伸缩（不足则内部滚动），册数少时只占内容高度，整块居中 */
 .volume-list {
   width: 100%;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  max-height: 56vh;
   overflow-y: auto;
   padding: 4px;
-  margin-bottom: 10px;
+  /* 与 .view 的 16px 内边距相同，按钮上方与下方的留白对称 */
+  margin-bottom: 16px;
+}
+
+/* 册目列表、汉字表、练习记录共用：滚动条默认隐藏，只在滚动/拖动时露出 */
+.volume-list,
+.word-list,
+.history-list {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.volume-list.scrolling,
+.word-list.scrolling,
+.history-list.scrolling {
+  scrollbar-color: #e0cba8 transparent;
+}
+
+.volume-list::-webkit-scrollbar,
+.word-list::-webkit-scrollbar,
+.history-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.volume-list::-webkit-scrollbar-track,
+.word-list::-webkit-scrollbar-track,
+.history-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.volume-list::-webkit-scrollbar-thumb,
+.word-list::-webkit-scrollbar-thumb,
+.history-list::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+}
+
+.volume-list.scrolling::-webkit-scrollbar-thumb,
+.word-list.scrolling::-webkit-scrollbar-thumb,
+.history-list.scrolling::-webkit-scrollbar-thumb {
+  background: #e0cba8;
+}
+
+/* 册目列表、练习记录：内容超出时把上下边缘淡出，避免被生硬切断（滚到顶/底时对应一侧自动取消） */
+.volume-list.fade-top,
+.history-list.fade-top {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 20px);
+  mask-image: linear-gradient(to bottom, transparent, #000 20px);
+}
+
+.volume-list.fade-bottom,
+.history-list.fade-bottom {
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 20px);
+  mask-image: linear-gradient(to top, transparent, #000 20px);
+}
+
+.volume-list.fade-top.fade-bottom,
+.history-list.fade-top.fade-bottom {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 20px, #000 calc(100% - 20px), transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 20px, #000 calc(100% - 20px), transparent);
 }
 
 .volume-card {
@@ -157,6 +216,30 @@ body {
 
 .volume-card:active {
   transform: scale(0.97);
+}
+
+/* 最近点开的册：排在列表第一项，用绿色系与其他册区分 */
+.volume-card.recent {
+  border-color: #57a86f;
+  background: #f1fbf3;
+  box-shadow: 0 4px 0 #c3e5cc;
+}
+
+.volume-card.recent:hover {
+  background: #e5f7e9;
+}
+
+.volume-card.recent .volume-name {
+  color: #2f7d4a;
+}
+
+/* 最近一册与其他册之间的分隔线 */
+.volume-divider {
+  flex: 0 0 auto;
+  width: 90%;
+  height: 1px;
+  margin: 0 auto;
+  background: #ddd0b4;
 }
 
 .volume-name {
@@ -208,45 +291,94 @@ body {
   margin-bottom: 6px;
 }
 
-.word-list {
+/* 汉字表：表头单独占一行，滚动区域在它下方；渐变层只盖在滚动区域上，表头不受影响 */
+.word-sheet {
   width: 100%;
   flex: 1;
-  overflow: auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  /* 顶部不留内边距：否则表头吸附在内容区顶部，上方会留一条透明缝隙，滚动内容会透出来 */
-  padding: 0 8px 16px;
   margin-bottom: 16px;
 }
 
-/* 表头与数据行共用列宽：喇叭 / 汉字 / 拼音 / 组词 / 注解 / 掌握程度 */
+.word-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.word-list {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  /* 不出现横向滚动条：内容靠列宽自适应与换行装下 */
+  overflow-x: hidden;
+  /* 始终预留滚动条宽度，表头按同样的宽度收窄，列才不会错位 */
+  scrollbar-gutter: stable;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 8px;
+}
+
+.word-fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 20px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+/* 顶部渐变层贴在滚动区顶边（表头在滚动区之外，不会被淡出） */
+.word-fade-top {
+  top: 0;
+  background: linear-gradient(to bottom, #fdf6e9, rgba(253, 246, 233, 0));
+}
+
+.word-fade-bottom {
+  bottom: 0;
+  background: linear-gradient(to top, #fdf6e9, rgba(253, 246, 233, 0));
+}
+
+.word-sheet.fade-top .word-fade-top,
+.word-sheet.fade-bottom .word-fade-bottom {
+  opacity: 1;
+}
+
+/* 表头与数据行共用列宽：喇叭 / 汉字 / 拼音 / 组词 / 注解 / 要求
+   列宽随屏幕收放，窄屏也不出现横向滚动条 */
 .word-head,
 .word-item {
   display: grid;
-  grid-template-columns: 40px 50px 92px minmax(90px, 1.1fr) minmax(0, 1.8fr) 72px;
+  grid-template-columns:
+    clamp(30px, 5vw, 40px)
+    clamp(36px, 6.5vw, 50px)
+    clamp(56px, 13vw, 92px)
+    minmax(0, 1.1fr)
+    minmax(0, 1.8fr)
+    clamp(46px, 9vw, 72px);
   align-items: center;
-  gap: 10px;
+  gap: clamp(6px, 1.1vw, 10px);
 }
 
-/* 表头固定在滚动容器顶部，向下滚动时列名始终可见 */
+/* 表头固定的一行：左 22px / 右 30px = 列表内边距与行的内边距 + 预留的滚动条宽度，
+   这样两套网格的总宽度一致，列能对齐 */
 .word-head {
-  position: sticky;
-  /* 略微向上探出 1px：消除亚像素渲染时表头与滚动内容之间的细缝 */
-  top: -1px;
-  z-index: 1;
-  padding: 7px 14px 6px;
+  padding: 7px 30px 6px 22px;
   background: #fdf6e9;
   border-bottom: 2px solid #eadfc8;
-  /* 向下补一段与页面同色的底色，盖住表头与下一行之间的间隙 */
-  box-shadow: 0 8px 0 #fdf6e9;
   color: #b09a7d;
   font-size: clamp(13px, 2.6vmin, 17px);
   font-weight: 700;
   text-align: center;
-  white-space: nowrap;
 }
 
+/* 拼音、组词、注解三列的数据都是左对齐，表头同步左对齐，避免「拼音」看着错位 */
+.word-head span:nth-child(3),
 .word-head span:nth-child(4),
 .word-head span:nth-child(5) {
   text-align: left;
@@ -302,12 +434,15 @@ body {
   font-family: Arial, "Segoe UI", sans-serif;
   font-size: clamp(16px, 3.6vmin, 22px);
   color: #b09a7d;
+  /* 极窄屏时宁可折行也不要撑出横向滚动条 */
+  overflow-wrap: anywhere;
 }
 
 .word-words {
   font-size: clamp(16px, 3.4vmin, 22px);
   line-height: 1.4;
   color: #6b5b45;
+  overflow-wrap: anywhere;
 }
 
 /* 注解列：字号略小、颜色略淡，与组词区分开 */
@@ -315,6 +450,7 @@ body {
   font-size: clamp(14px, 3vmin, 19px);
   line-height: 1.45;
   color: #8a7a63;
+  overflow-wrap: anywhere;
 }
 
 .word-level {
@@ -327,13 +463,49 @@ body {
   white-space: nowrap;
 }
 
-/* 窄屏（手机竖屏）：6 列挤不下时允许表格横向滚动，保证每列都看得清 */
+/* 窄屏（手机竖屏）：收紧固定列与间距，内容靠换行装下，不出现横向滚动条 */
 @media (max-width: 560px) {
   .word-head,
   .word-item {
-    grid-template-columns: 36px 44px 68px minmax(80px, 1fr) minmax(120px, 1.6fr) 56px;
-    min-width: 540px;
-    gap: 8px;
+    grid-template-columns: 26px 34px 50px minmax(0, 1fr) minmax(0, 1.2fr) 46px;
+    gap: 6px;
+  }
+
+  .word-head {
+    /* 左 16 / 右 24 = 列表内边距 8 + 行内边距 8 + 预留滚动条 8 */
+    padding: 6px 24px 5px 16px;
+    font-size: clamp(11px, 2.8vmin, 15px);
+  }
+
+  .word-item {
+    padding: 8px;
+  }
+
+  .word-play {
+    width: 26px;
+    height: 26px;
+    font-size: 13px;
+  }
+
+  .word-char {
+    font-size: clamp(22px, 6vmin, 30px);
+  }
+
+  .word-pinyin {
+    font-size: clamp(12px, 3.2vmin, 16px);
+  }
+
+  .word-words {
+    font-size: clamp(13px, 3.4vmin, 19px);
+  }
+
+  .word-note {
+    font-size: clamp(12px, 3vmin, 17px);
+  }
+
+  .word-level {
+    padding: 2px 6px;
+    font-size: clamp(11px, 2.6vmin, 13px);
   }
 }
 
@@ -648,14 +820,34 @@ body {
   color: #b09a7d;
 }
 
+/* 关闭「汉字」时图例会一起隐藏，用 auto 边距让按钮始终贴右，不会跳到左边 */
+#btn-history-chars {
+  margin-left: auto;
+}
+
+/* 练习记录：滚动区之外、位于记录区域下方右侧的「清除记录」 */
+.history-reset-row {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 10px;
+  margin-bottom: 12px;
+}
+
+.history-reset-row .btn-danger {
+  margin-top: 0;
+}
+
+/* 记录少时只占内容高度、整块居中（按钮上靠）；记录多时压缩滚动、按钮落到页面底部 */
 .history-list {
   width: 100%;
-  flex: 1;
+  flex: 0 1 auto;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 4px 8px 16px;
+  padding: 4px 8px;
+  /* 与 .view 的 16px 内边距相同，按钮上方与下方的留白对称 */
   margin-bottom: 16px;
 }
 
@@ -708,18 +900,37 @@ body {
   padding-top: 8px;
 }
 
-/* 历史记录里的汉字：可点击查看详情 */
+/* 历史记录里的汉字：小田字格（楷体 + 很淡的细十字线），可点击查看详情 */
 .hchar {
-  min-width: clamp(34px, 8vmin, 44px);
-  padding: 0 4px;
-  font-family: inherit;
+  width: clamp(34px, 8vmin, 44px);
+  height: clamp(34px, 8vmin, 44px);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--kaiti);
   text-align: center;
-  font-size: clamp(24px, 5.5vmin, 34px);
-  line-height: 1.25;
-  border-radius: 8px;
-  border: 2px solid transparent;
+  font-size: clamp(22px, 5.2vmin, 32px);
+  line-height: 1;
+  border-radius: 6px;
+  border: 1px solid rgba(176, 154, 125, 0.4);
+  /* 十字格线用背景渐变画在字的下层，1px 细线、颜色很淡 */
+  background-image: linear-gradient(
+      to right,
+      transparent calc(50% - 0.5px),
+      rgba(150, 120, 80, 0.2) calc(50% - 0.5px),
+      rgba(150, 120, 80, 0.2) calc(50% + 0.5px),
+      transparent calc(50% + 0.5px)
+    ),
+    linear-gradient(
+      to bottom,
+      transparent calc(50% - 0.5px),
+      rgba(150, 120, 80, 0.2) calc(50% - 0.5px),
+      rgba(150, 120, 80, 0.2) calc(50% + 0.5px),
+      transparent calc(50% + 0.5px)
+    );
   cursor: pointer;
-  transition: transform 0.15s;
+  transition: transform 0.15s, border-color 0.15s;
 }
 
 .hchar:hover {
@@ -731,14 +942,14 @@ body {
 }
 
 .hchar.ok {
-  background: #eaf7e6;
-  border-color: #57a65a;
+  background-color: #eaf7e6;
+  border-color: rgba(87, 166, 90, 0.4);
   color: #3b7a3e;
 }
 
 .hchar.no {
-  background: #fdeceb;
-  border-color: #d9534f;
+  background-color: #fdeceb;
+  border-color: rgba(217, 83, 79, 0.4);
   color: #b8342f;
 }
 

@@ -6,10 +6,10 @@
   <title>宝宝识字</title>
   <script>
     // 全局唯一缓存版本：改动任何 css/js/音频后，只需把这个值 +1，即可让全部缓存失效
-    var CACHE_VERSION = "86";
+    var CACHE_VERSION = "101";
     window.APP_VERSION = CACHE_VERSION;
     document.write('<link rel="stylesheet" href="css/style.css?v=' + CACHE_VERSION + '">');
-    // 内置楷体（Windows 楷体 SimKai 子集，仅自用）：只用于田字格与汉字表里的汉字
+    // 内置楷体（Windows 楷体 SimKai 子集，仅自用）：只用于田字格、汉字表与练习记录里的汉字
     document.write(
       '<style>@font-face{font-family:"Kaiti Web";' +
         'src:url("assets/fonts/kaiti.woff2?v=' + CACHE_VERSION + '") format("woff2");' +
@@ -49,7 +49,15 @@
   <section id="view-volume-words" class="view hidden">
     <h1 class="app-title">汉字表</h1>
     <p class="history-owner" id="words-subtitle"></p>
-    <div class="word-list" id="word-list"></div>
+    <div class="word-sheet" id="word-sheet">
+      <div class="word-head" id="word-head" aria-hidden="true"></div>
+      <div class="word-body">
+        <div class="word-list" id="word-list"></div>
+        <!-- 上下边缘的淡出渐变层，只盖在滚动区域上，表头独立在外不受影响 -->
+        <div class="word-fade word-fade-top" aria-hidden="true"></div>
+        <div class="word-fade word-fade-bottom" aria-hidden="true"></div>
+      </div>
+    </div>
     <button class="btn btn-primary" id="btn-words-back">返回</button>
   </section>
 
@@ -113,8 +121,11 @@
       <button class="btn btn-skip active" id="btn-history-chars">汉字</button>
     </div>
     <div class="history-list" id="history-list"></div>
+    <!-- 排在滚动区之外，位于记录区域下方右侧 -->
+    <div class="history-reset-row">
+      <button class="btn btn-danger" id="btn-reset">清除记录</button>
+    </div>
     <button class="btn btn-primary" id="btn-history-back">返回</button>
-    <button class="btn btn-danger" id="btn-reset">清除记录</button>
   </section>
 
   <!-- 通用单字详情页：田字格 + 拼音 + 读音 + 组词 + 注解（练习记录等位置复用） -->

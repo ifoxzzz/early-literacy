@@ -171,6 +171,35 @@
     show("home");
   }
 
+  /* ---------- 滚动容器效果：边缘淡出 + 滚动条自动隐藏 ---------- */
+  // 内容超出时给容器加 fade-top / fade-bottom，滚到顶/底则取消对应一侧
+  // fadeEl 省略时类加在容器自身（用遮罩）；汉字表传外层 .word-sheet（用渐变层），
+  // 因为它的滚动区上方还有独立表头，遮罩会把表头一起淡掉
+  function updateScrollFade(el, fadeEl) {
+    if (!el || !el.clientHeight) return; // 所在视图隐藏时不计算
+    const target = fadeEl || el;
+    target.classList.toggle("fade-top", el.scrollTop > 2);
+    target.classList.toggle(
+      "fade-bottom",
+      el.scrollTop + el.clientHeight < el.scrollHeight - 2
+    );
+  }
+
+  // 滚动条只在滚动/拖动时露出：滚动时加 scrolling 类，停手 0.6 秒后移除
+  const scrollTimers = new WeakMap();
+  function showScrollbarTemporarily(el) {
+    el.classList.add("scrolling");
+    clearTimeout(scrollTimers.get(el));
+    scrollTimers.set(el, setTimeout(() => el.classList.remove("scrolling"), 600));
+  }
+
+  function bindScrollFx(el, fadeEl) {
+    el.addEventListener("scroll", () => {
+      updateScrollFade(el, fadeEl);
+      showScrollbarTemporarily(el);
+    });
+  }
+
   /* ---------- 选择学习内容：列出现有册 ---------- */
   function renderVolumes(user) {
     // 进入册目页就开始下载提示语与星星播报，给孩子挑选册的时间，避免练习第一题没声音
@@ -180,17 +209,30 @@
     $("#volume-owner").textContent = user ? `${user.name} 想学哪一册？` : "";
     const list = $("#volume-list");
     list.innerHTML = "";
-    window.VOLUMES.forEach((v) => {
+    // 最近点开过的册排到第一项，并用不同配色 + 分隔线与其他册区分（按小朋友保存）
+    const lastId = user ? Storage.lastVolume(user.id) : "";
+    const volumes = window.VOLUMES.slice();
+    const recentIndex = lastId ? volumes.findIndex((v) => String(v.id) === lastId) : -1;
+    const hasRecent = recentIndex >= 0;
+    if (recentIndex > 0) volumes.unshift(volumes.splice(recentIndex, 1)[0]);
+    volumes.forEach((v, i) => {
       const s = Storage.statsFor(v.entries);
       const card = document.createElement("button");
-      card.className = "volume-card";
+      card.className = hasRecent && i === 0 ? "volume-card recent" : "volume-card";
       card.dataset.id = v.id;
       card.innerHTML = `<span class="volume-name">${v.title}</span>
         <span class="volume-meta">共 ${s.total} 字 · 已学 ${s.learned} · 待复习 ${s.due}</span>
         <span class="volume-icon" role="img" aria-label="查看本册汉字" title="查看本册汉字">📖</span>`;
       list.appendChild(card);
+      if (hasRecent && i === 0) {
+        const divider = document.createElement("div");
+        divider.className = "volume-divider";
+        divider.setAttribute("aria-hidden", "true");
+        list.appendChild(divider);
+      }
     });
     show("volumes");
+    updateScrollFade($("#volume-list"));
   }
 
   /* ---------- 某一册的汉字表（册目页右侧图标进入） ---------- */
@@ -199,18 +241,15 @@
   function renderVolumeWords(volume) {
     volumeWordVolume = volume;
     $("#words-subtitle").textContent = `${volume.title} · 共 ${volume.entries.length} 个字`;
-    // 首行标题栏与数据行使用同一套列宽，滚动时表头固定在顶部
-    const head = `<div class="word-head" aria-hidden="true">
+    // 表头独立于滚动区域，列宽与数据行共用同一套网格，既不会盖住数据也不会被淡出
+    $("#word-head").innerHTML = `
         <span></span>
         <span>汉字</span>
         <span>拼音</span>
         <span>组词</span>
         <span>注解</span>
-        <span>掌握程度</span>
-      </div>`;
-    $("#word-list").innerHTML =
-      head +
-      volume.entries
+        <span>要求</span>`;
+    $("#word-list").innerHTML = volume.entries
         .map(
           (e, i) => `<div class="word-item" data-idx="${i}" title="查看「${e.char}」">
           <button class="word-play" data-idx="${i}" title="播放读音、组词和注解">🔊</button>
@@ -223,6 +262,7 @@
         )
         .join("");
     show("volumeWords");
+    updateScrollFade($("#word-list"), $("#word-sheet"));
   }
 
   /* ---------- 后台管理 ---------- */
@@ -360,7 +400,10 @@
         })
         .join("");
     }
+    // 没有记录时不显示「清除记录」
+    $("#btn-reset").classList.toggle("hidden", list.length === 0);
     show("history");
+    updateScrollFade($("#history-list"));
   }
 
   /* ---------- 练习 ---------- */
@@ -865,11 +908,22 @@
     if (!card) return;
     const volume = window.VOLUMES.find((v) => String(v.id) === card.dataset.id);
     if (!volume) return;
+    // 记住最近点开的册，下次进入该小朋友的选册页时排在第一项
+    Storage.setLastVolume(volume.id);
     if (e.target.closest(".volume-icon")) {
       renderVolumeWords(volume);
       return;
     }
     startSession(Storage.currentUser(), volume);
+  });
+  // 册目列表、汉字表、练习记录滚动时更新边缘淡出与滚动条显隐；窗口尺寸变化时重新计算
+  bindScrollFx($("#volume-list"));
+  bindScrollFx($("#word-list"), $("#word-sheet"));
+  bindScrollFx($("#history-list"));
+  window.addEventListener("resize", () => {
+    updateScrollFade($("#volume-list"));
+    updateScrollFade($("#word-list"), $("#word-sheet"));
+    updateScrollFade($("#history-list"));
   });
   // 汉字表：点小喇叭播放读音、组词和注解，点整行进入通用单字详情页
   $("#word-list").addEventListener("click", (e) => {

@@ -793,27 +793,34 @@
   let fwGeneration = 0;
   let fwRaf = 0;
 
-  // 连续首次答对时，让 N 颗星星绕着烟花炸点旋转（N = 连续次数，连续第 1 次不显示，从第 2 次起为 2 颗）
+  // 连续首次答对时，让星星绕着烟花炸点旋转（连续第 1 次不显示，从第 2 次起为 2 颗）
+  // 数量按面额折算：10 颗星 = 1 颗太阳，5 颗星 = 1 颗月亮，余下仍是星星
   function spawnOrbitStars(cx, cy, count) {
     // 新一次烟花开始前清掉上一组残留的环绕星星
     document.querySelectorAll(".fw-orbit").forEach((el) => el.remove());
     if (!count) return;
-    for (let i = 0; i < count; i++) {
+    const tokens = [];
+    for (let n = count; n >= 10; n -= 10) tokens.push("☀️");
+    count %= 10;
+    for (let n = count; n >= 5; n -= 5) tokens.push("🌙");
+    count %= 5;
+    for (let i = 0; i < count; i++) tokens.push("⭐");
+    tokens.forEach((text, i) => {
       const orbit = document.createElement("span");
       orbit.className = "fw-orbit";
       orbit.style.left = `${cx}px`;
       orbit.style.top = `${cy}px`;
       orbit.style.setProperty("--r", `${68 + (i % 2) * 16}px`);
-      orbit.style.setProperty("--start", `${(360 / count) * i}deg`);
+      orbit.style.setProperty("--start", `${(360 / tokens.length) * i}deg`);
       orbit.style.animationDelay = `${i * 0.05}s`;
       const star = document.createElement("span");
       star.className = "fw-orbit-star";
-      star.textContent = "⭐";
+      star.textContent = text;
       orbit.appendChild(star);
       document.body.appendChild(orbit);
       // 烟花约 2 秒结束，之后星星再绕转约 2 秒才消失（含出场错开的时间）
       setTimeout(() => orbit.remove(), 4200 + i * 50);
-    }
+    });
   }
 
   function playFireworks(at, orbitCount) {

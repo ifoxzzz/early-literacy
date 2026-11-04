@@ -1168,8 +1168,17 @@
 
   $("#btn-history").addEventListener("click", renderHistory);
   // 结束本组练习（已作答的记录保留），回到该小朋友的册目选择页
+  // 不用系统 confirm：手机端 WebView 的系统对话框可能触发返回或关闭页面等不一致行为；
+  // 改为应用内对话框，点「确定」才结束，点屏幕其他位置直接关闭对话框
   $("#btn-quit").addEventListener("click", () => {
-    if (!confirm("要结束这组练习吗？")) return;
+    $("#quit-dialog").classList.remove("hidden");
+  });
+  $("#quit-dialog").addEventListener("click", () => {
+    $("#quit-dialog").classList.add("hidden");
+  });
+  $("#btn-quit-ok").addEventListener("click", (e) => {
+    e.stopPropagation(); // 避免触发遮罩的关闭逻辑
+    $("#quit-dialog").classList.add("hidden");
     // 退出时作废代次、清空当前题并清掉全部延时，防止离开后仍自动出题或补写记录
     session.gen += 1;
     session.current = null;

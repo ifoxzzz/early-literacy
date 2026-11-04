@@ -6,7 +6,7 @@
   <title>宝贝趣味识字</title>
   <script>
     // 全局唯一缓存版本：改动任何 css/js/音频后，只需把这个值 +1，即可让全部缓存失效
-    var CACHE_VERSION = "121";
+    var CACHE_VERSION = "122";
     window.APP_VERSION = CACHE_VERSION;
     document.write('<link rel="stylesheet" href="css/style.css?v=' + CACHE_VERSION + '">');
     // 内置楷体（Windows 楷体 SimKai 子集）：只用于田字格、汉字表与练习记录里的汉字
@@ -246,6 +246,16 @@
       <div class="dialog-btns">
         <button class="btn btn-ghost" id="btn-user-cancel">取消</button>
         <button class="btn btn-primary" id="btn-user-ok">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 结束练习确认：应用内对话框，点「确定」结束并返回册目页，点屏幕任意位置取消 -->
+  <div class="dialog-mask hidden" id="quit-dialog">
+    <div class="dialog">
+      <p class="dialog-title">要结束这组练习吗？</p>
+      <div class="dialog-btns">
+        <button class="btn btn-primary" id="btn-quit-ok">确定</button>
       </div>
     </div>
   </div>

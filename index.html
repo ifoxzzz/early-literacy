@@ -6,7 +6,7 @@
   <title>宝贝趣味识字</title>
   <script>
     // 全局唯一缓存版本：改动任何 css/js/音频后，只需把这个值 +1，即可让全部缓存失效
-    var CACHE_VERSION = "143";
+    var CACHE_VERSION = "152";
     window.APP_VERSION = CACHE_VERSION;
     document.write('<link rel="stylesheet" href="css/style.css?v=' + CACHE_VERSION + '">');
     // 内置楷体（Windows 楷体 SimKai 子集）：只用于田字格、汉字表与练习记录里的汉字
@@ -333,7 +333,7 @@
       </div>
       <div class="quiz-status">
         <span id="quiz-stars" data-count="0"><span class="qs-icon">⭐</span><span class="qs-num" id="quiz-star-num">0</span></span>
-        <button class="btn-gift" id="btn-gift" aria-label="礼物展柜">
+        <button class="btn-gift" id="btn-gift" aria-label="我的礼物">
           <span class="gift-icon">🎁</span>
         </button>
         <button class="btn-tools-show" id="btn-tools-show"
@@ -375,12 +375,29 @@
 
   <!-- 礼物展柜：展示当前小朋友收集到的全部礼物 -->
   <section id="view-gifts" class="view hidden">
-    <h1 class="app-title">礼物展柜</h1>
+    <h1 class="app-title">我的礼物</h1>
     <p class="gift-owner" id="gifts-owner"></p>
+    <div class="gift-mode-bar">
+      <button class="gift-mode-btn active" data-mode="shelf">橱窗</button>
+      <button class="gift-mode-btn" data-mode="list">记录</button>
+    </div>
     <div class="gift-shelf" id="gift-shelf"></div>
-    <p class="gift-empty hidden" id="gift-empty">还没有礼物，答对 6 题及以上就能挑选礼物啦！</p>
-    <button class="btn btn-primary" id="btn-gifts-back">返回</button>
+    <div class="gift-list hidden" id="gift-list"></div>
+    <p class="gift-empty hidden" id="gift-empty">还没有礼物，答对 5 题及以上就能挑选礼物啦！</p>
+    <div class="gift-actions">
+      <div class="gift-trash hidden" id="gift-trash" title="拖到这里删除">🗑️</div>
+      <button class="btn btn-primary" id="btn-gifts-back">返回</button>
+    </div>
   </section>
+
+  <!-- 礼物放大展示 overlay：点展柜里的礼物触发，点任意位置恢复 -->
+  <div class="gift-zoom-overlay hidden" id="gift-zoom">
+    <div class="gift-zoom-inner">
+      <span class="gift-zoom-icon" id="gift-zoom-icon"></span>
+      <span class="gift-zoom-name" id="gift-zoom-name"></span>
+      <span class="gift-zoom-count" id="gift-zoom-count"></span>
+    </div>
+  </div>
 
   <!-- 烟花特效画布：首次答对时从点击/触摸位置绽放，不拦截任何点击 -->
   <canvas id="fx-canvas" class="fx-canvas"></canvas>

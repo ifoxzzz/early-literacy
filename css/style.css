@@ -2249,12 +2249,42 @@ body.hide-note .hint-bar {
   margin-bottom: 16px;
 }
 
+/* 橱窗：奶油色展柜——柔和边框 + 顶部聚光 + 细腻玻璃反光 + 轻微纵深阴影 */
 .gift-shelf {
+  position: relative;
   width: 100%;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
   gap: 10px;
   margin-bottom: 18px;
+  padding: 18px;
+  border: 3px solid #e6d2ab;
+  border-radius: 22px;
+  /* 内衬：顶部一团柔光，向下过渡到暖奶油色 */
+  background:
+    radial-gradient(ellipse 90% 55% at 50% 0%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 70%),
+    linear-gradient(to bottom, #fff8e9, #f6e8cc);
+  box-shadow:
+    inset 0 3px 8px rgba(180, 140, 90, 0.14),
+    inset 0 -4px 10px rgba(180, 140, 90, 0.1),
+    0 4px 0 #ead8b4,
+    0 10px 22px rgba(160, 120, 70, 0.12);
+}
+
+/* 玻璃反光：一道宽而淡的斜向柔光，模拟橱窗玻璃，不抢眼 */
+.gift-shelf::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 19px;
+  pointer-events: none;
+  background: linear-gradient(
+    118deg,
+    transparent 38%,
+    rgba(255, 255, 255, 0.22) 47%,
+    rgba(255, 255, 255, 0.05) 54%,
+    transparent 62%
+  );
 }
 
 .gift-shelf-item {
@@ -2263,10 +2293,10 @@ body.hide-note .hint-bar {
   align-items: center;
   gap: 2px;
   padding: 12px 6px 9px;
-  background: #fffdf5;
-  border: 2px solid #e8dcc6;
+  background: #fffdf8;
+  border: 2px solid #f3e4c4;
   border-radius: 16px;
-  box-shadow: 0 4px 0 #eadfcb;
+  box-shadow: 0 2px 0 #f0e0bd, 0 4px 10px rgba(170, 130, 80, 0.1);
 }
 
 .gift-shelf-icon {
@@ -2279,17 +2309,225 @@ body.hide-note .hint-bar {
   font-size: clamp(13px, 3vmin, 16px);
 }
 
-.gift-shelf-count {
-  color: #b09a7d;
-  font-size: clamp(12px, 2.6vmin, 14px);
-}
-
 .gift-empty {
   color: #b09a7d;
   font-size: clamp(16px, 3.6vmin, 20px);
   text-align: center;
   line-height: 1.6;
   margin: 10px 0 22px;
+}
+
+/* 橱窗卡片：可点击放大，也可拖拽排序/拖进垃圾篓 */
+.gift-shelf-item {
+  font-family: inherit;
+  cursor: grab;
+  user-select: none;
+  transition: transform 0.15s, background 0.15s;
+}
+.gift-shelf-item:hover {
+  background: #fff3d6;
+  transform: translateY(-2px);
+}
+.gift-shelf-item:active {
+  cursor: grabbing;
+}
+/* 拖拽中的卡片：半透明显示在原位置，浏览器自带拖拽影像跟随光标 */
+.gift-shelf-item.dragging {
+  opacity: 0.35;
+  transform: none;
+}
+/* 新获得的礼物：边框闪烁，点击后移除 .fresh 类消失 */
+.gift-shelf-item.fresh {
+  border-color: #ff9d2e;
+  animation: gift-fresh-flash 0.9s ease-in-out infinite;
+}
+@keyframes gift-fresh-flash {
+  0%, 100% {
+    border-color: #e8dcc6;
+    box-shadow: 0 4px 0 #eadfcb;
+  }
+  50% {
+    border-color: #ff9d2e;
+    box-shadow: 0 4px 0 #eadfcb, 0 0 14px 3px rgba(255, 157, 46, 0.75);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gift-shelf-item.fresh {
+    animation: none;
+    border-color: #ff9d2e;
+    box-shadow: 0 4px 0 #eadfcb, 0 0 10px 2px rgba(255, 157, 46, 0.6);
+  }
+}
+
+/* 底部操作区：返回按钮居中，垃圾篓贴最左 */
+.gift-actions {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 垃圾篓：拖拽时高亮（ready），悬停变大（hover），吞下礼物时抖动（gulp） */
+.gift-trash {
+  position: absolute;
+  left: 0;
+  font-size: clamp(30px, 7vmin, 44px);
+  line-height: 1;
+  padding: 10px 14px;
+  border: 2px dashed #d8c9ae;
+  border-radius: 16px;
+  background: #fbf4e4;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+.gift-trash.ready {
+  border-color: #c98a5a;
+  background: #fff3d6;
+  animation: gift-trash-breathe 1.2s ease-in-out infinite;
+}
+.gift-trash.hover {
+  transform: scale(1.3);
+  border-color: #d1603d;
+  background: #ffe4d6;
+  animation: none;
+}
+.gift-trash.gulp {
+  animation: gift-trash-gulp 0.5s ease-in-out;
+}
+@keyframes gift-trash-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+/* 变大 → 左右抖动 → 恢复 */
+@keyframes gift-trash-gulp {
+  0% { transform: scale(1); }
+  25% { transform: scale(1.4) rotate(-8deg); }
+  45% { transform: scale(1.4) rotate(7deg); }
+  62% { transform: scale(1.35) rotate(-5deg); }
+  78% { transform: scale(1.2) rotate(3deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gift-trash.ready,
+  .gift-trash.gulp {
+    animation: none;
+  }
+}
+
+/* 模式切换：橱窗 / 记录 */
+.gift-mode-bar {
+  display: flex;
+  gap: 6px;
+  margin: 2px 0 12px;
+  background: #f1e7d3;
+  padding: 4px;
+  border-radius: 999px;
+}
+.gift-mode-btn {
+  font-family: inherit;
+  flex: 1;
+  padding: 6px 18px;
+  border: none;
+  background: transparent;
+  color: #8a7a63;
+  font-size: clamp(14px, 3vmin, 18px);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.gift-mode-btn.active {
+  background: #f2a541;
+  color: #fff;
+  box-shadow: 0 2px 0 #d18a2e;
+}
+
+/* 记录模式：每行一条，最新在上 */
+.gift-list {
+  width: 100%;
+  max-height: 56vh;
+  overflow-y: auto;
+  padding-right: 4px;
+  margin-bottom: 14px;
+  scrollbar-width: thin;
+}
+.gift-list-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #fffdf5;
+  border: 2px solid #e8dcc6;
+  border-radius: 14px;
+  margin-bottom: 8px;
+}
+.gift-list-icon {
+  font-size: clamp(26px, 6vmin, 36px);
+  line-height: 1;
+}
+.gift-list-name {
+  flex: 1;
+  color: #6b5b45;
+  font-size: clamp(15px, 3.2vmin, 18px);
+}
+.gift-list-stars {
+  color: #d1603d;
+  font-size: clamp(13px, 2.8vmin, 16px);
+  font-weight: 600;
+}
+.gift-list-time {
+  color: #b09a7d;
+  font-size: clamp(12px, 2.5vmin, 14px);
+}
+
+/* 礼物放大 overlay：全屏暗遮罩 + 居中礼物，点任意位置恢复 */
+.gift-zoom-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9900;
+  background: rgba(0, 0, 0, 0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.28s ease;
+}
+.gift-zoom-overlay.active {
+  background: rgba(0, 0, 0, 0.55);
+}
+.gift-zoom-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 30px 40px;
+  background: #fffdf5;
+  border-radius: 24px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+  transform: scale(0.6);
+  opacity: 0;
+  transition: transform 0.32s cubic-bezier(0.2, 1.2, 0.3, 1), opacity 0.25s ease;
+}
+.gift-zoom-overlay.active .gift-zoom-inner {
+  transform: scale(1);
+  opacity: 1;
+}
+.gift-zoom-icon {
+  font-size: clamp(90px, 24vmin, 180px);
+  line-height: 1;
+}
+.gift-zoom-name {
+  color: #d1603d;
+  font-size: clamp(22px, 5vmin, 34px);
+  font-weight: 600;
+}
+.gift-zoom-count {
+  color: #8a7a63;
+  font-size: clamp(16px, 3.5vmin, 22px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .gift-zoom-inner {
+    transition: none;
+  }
 }
 
 #btn-gifts-back {

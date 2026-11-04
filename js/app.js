@@ -85,6 +85,8 @@
   let giftPicked = [];
   let giftClaimed = false;
   let giftsReturnView = "quiz";
+  let giftShelfMode = "shelf"; // "shelf" 收纳 / "list" 记录
+  const GIFT_MODE_KEY = "early-literacy-gift-mode";
 
   function show(name) {
     Object.values(views).forEach((v) => v.classList.add("hidden"));
@@ -1135,8 +1137,9 @@
 
   // 本组星星数决定挑选次数：6 颗及以上 1 件，10 颗及以上 2 件
   function giftQuotaFor(stars) {
-    if (stars >= 10) return 2;
-    if (stars >= 6) return 1;
+    if (stars >= 10) return 3;
+    if (stars >= 6) return 2;
+    if (stars >= 5) return 1;
     return 0;
   }
 
@@ -1153,43 +1156,142 @@
     }
     box.classList.remove("hidden");
     if (giftClaimed) {
-      $("#gift-reward-tip").textContent = `已放入礼物展柜：${giftPicked.map(giftLabel).join("、")}`;
-      $("#btn-gift-open").textContent = "查看礼物展柜 🎁";
+      // 已领取：展示成果；放弃机会（一件没选就关闭）：整个入口隐藏
+      if (giftPicked.length === 0) {
+        box.classList.add("hidden");
+        return;
+      }
+      $("#gift-reward-tip").textContent = `已放入礼物橱窗：${giftPicked.map(giftLabel).join("、")}`;
+      $("#btn-gift-open").textContent = "查看我的礼物 🎁";
     } else {
       $("#gift-reward-tip").textContent = `本组可以挑选 ${giftQuota} 件礼物！`;
       $("#btn-gift-open").textContent = "打开礼物清单 🎁";
     }
   }
 
-  // 展柜只显示已经拥有的礼物，按礼物清单顺序排列并显示数量
+  // 橱窗：两种模式切换（橱窗 / 记录），按 localStorage 记忆偏好
+  // giftItems 是当前橱窗的礼物实例数组（拖拽排序时就地改它，松手后持久化）
+  let giftItems = [];
+  let giftDragId = null; // 正在拖拽的礼物实例 id
+  let giftDragMoved = false; // 本次拖拽是否发生过移动（用来区分点击与拖拽）
+
   function renderGiftShelf() {
     const user = Storage.currentUser();
-    const data = Storage.gifts(user ? user.id : "");
     const catalog = giftCatalog();
-    const order = Object.keys(catalog);
-    const owned = Object.keys(data)
-      .filter((name) => data[name] > 0)
-      .sort((a, b) => {
-        const ia = order.indexOf(a);
-        const ib = order.indexOf(b);
-        return (ia < 0 ? order.length : ia) - (ib < 0 ? order.length : ib);
-      });
-    const total = owned.reduce((sum, name) => sum + data[name], 0);
+    const uid = user ? user.id : "";
+    giftItems = Storage.gifts(uid);
+    const total = giftItems.length;
     $("#gifts-owner").textContent = user
-      ? `${user.name} 的礼物展柜 · 共 ${total} 件`
-      : `礼物展柜 · 共 ${total} 件`;
-    $("#gift-shelf").innerHTML = owned
-      .map(
-        (name) => `<div class="gift-shelf-item">
-          <span class="gift-shelf-icon">${catalog[name] || "🎁"}</span>
-          <span class="gift-shelf-name">${name}</span>
-          <span class="gift-shelf-count">×${data[name]}</span>
-        </div>`
-      )
-      .join("");
-    $("#gift-empty").classList.toggle("hidden", owned.length > 0);
-    $("#gift-shelf").classList.toggle("hidden", owned.length === 0);
+      ? `${user.name} 的礼物 · 共 ${total} 件`
+      : `我的礼物 · 共 ${total} 件`;
+
+    // 模式按钮 active 状态
+    giftShelfMode = localStorage.getItem(GIFT_MODE_KEY) === "list" ? "list" : "shelf";
+    document.querySelectorAll(".gift-mode-btn").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.mode === giftShelfMode);
+    });
+    const hasGifts = total > 0;
+    $("#gift-shelf").classList.toggle("hidden", giftShelfMode !== "shelf" || !hasGifts);
+    $("#gift-list").classList.toggle("hidden", giftShelfMode !== "list" || !hasGifts);
+    // 垃圾篓只在橱窗模式且拖拽时才需要可见；平时常驻提示也可以，这里只在橱窗模式显示
+    $("#gift-trash").classList.toggle("hidden", giftShelfMode !== "shelf" || !hasGifts);
+    $("#gift-empty").classList.toggle("hidden", hasGifts);
+
+    if (hasGifts && giftShelfMode === "shelf") {
+      // 每件礼物实例一张卡片：同名礼物就是并列的多张卡片，可分别拖拽/删除
+      $("#gift-shelf").innerHTML = giftItems
+        .map(
+          (g) => `<div class="gift-shelf-item${g.fresh ? " fresh" : ""}" draggable="true" data-id="${g.id}">
+            <span class="gift-shelf-icon">${catalog[g.name] || "🎁"}</span>
+            <span class="gift-shelf-name">${g.name}</span>
+          </div>`
+        )
+        .join("");
+    }
+
+    if (hasGifts && giftShelfMode === "list") {
+      const log = Storage.giftLog(uid);
+      // 倒序展示，最新在最上面
+      const rows = [...log].reverse().map((rec) => {
+        const icon = catalog[rec.name] || "🎁";
+        const d = new Date(rec.time);
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        const hh = String(d.getHours()).padStart(2, "0");
+        const mi = String(d.getMinutes()).padStart(2, "0");
+        const timeStr = `${d.getFullYear()}/${mm}/${dd} ${hh}:${mi}`;
+        return `<div class="gift-list-row">
+          <span class="gift-list-icon">${icon}</span>
+          <span class="gift-list-name">${rec.name}</span>
+          <span class="gift-list-stars">⭐ ${rec.stars}</span>
+          <span class="gift-list-time">${timeStr}</span>
+        </div>`;
+      });
+      $("#gift-list").innerHTML = rows.join("");
+    }
+
     show("gifts");
+  }
+
+  // FLIP 动画：记录现有卡片位置 → 执行 DOM 变更 → 让受影响的卡片从旧位置平滑滑到新位置
+  function flipShelf(mutate, skipEl) {
+    const shelf = $("#gift-shelf");
+    const cards = [...shelf.querySelectorAll(".gift-shelf-item")];
+    const first = new Map(cards.map((el) => [el, el.getBoundingClientRect()]));
+    mutate();
+    cards.forEach((el) => {
+      if (el === skipEl) return;
+      const f = first.get(el);
+      const l = el.getBoundingClientRect();
+      const dx = f.left - l.left;
+      const dy = f.top - l.top;
+      if (dx || dy) {
+        el.style.transition = "none";
+        el.style.transform = `translate(${dx}px, ${dy}px)`;
+        requestAnimationFrame(() => {
+          el.style.transition = "transform 0.25s ease";
+          el.style.transform = "";
+        });
+      }
+    });
+  }
+
+  // 点橱窗礼物：清除「新」标记（边框闪烁消失）并放大展示
+  // 放大动画从被点卡片的位置开始：先平移+缩小到卡片处，再飞到屏幕中央变大；
+  // giftZoomFrom 记住起飞偏移，关闭时缩回卡片位置，与展开相呼应
+  let giftZoomFrom = null;
+
+  function zoomGift(name, fromEl) {
+    const catalog = giftCatalog();
+    const count = giftItems.filter((g) => g.name === name).length;
+    $("#gift-zoom-icon").textContent = catalog[name] || "🎁";
+    $("#gift-zoom-name").textContent = name;
+    $("#gift-zoom-count").textContent = count > 1 ? `共 ${count} 件` : "";
+    const overlay = $("#gift-zoom");
+    const inner = overlay.querySelector(".gift-zoom-inner");
+    overlay.classList.remove("hidden");
+    // 起始状态：定位到卡片中心（视口中心为原点计算偏移），缩小、半透明
+    giftZoomFrom = null;
+    inner.style.transition = "none";
+    if (fromEl) {
+      const r = fromEl.getBoundingClientRect();
+      giftZoomFrom = {
+        dx: r.left + r.width / 2 - window.innerWidth / 2,
+        dy: r.top + r.height / 2 - window.innerHeight / 2,
+      };
+      inner.style.transform = `translate(${giftZoomFrom.dx}px, ${giftZoomFrom.dy}px) scale(0.3)`;
+      inner.style.opacity = "0.4";
+    } else {
+      inner.style.transform = "scale(0.6)";
+      inner.style.opacity = "0";
+    }
+    // 等一帧后清掉内联起始值并加 active，CSS 过渡接管：飞到中央并放大
+    requestAnimationFrame(() => {
+      inner.style.transition = "";
+      inner.style.transform = "";
+      inner.style.opacity = "";
+      overlay.classList.add("active");
+    });
   }
 
   function updateGiftPickState() {
@@ -1206,7 +1308,11 @@
   function openGiftPicker() {
     if (giftClaimed || giftQuota <= 0) return;
     giftPicked = [];
-    const owned = Storage.gifts(session.userId);
+    // 统计各礼物已有数量（实例数组按名字聚合计数）
+    const owned = {};
+    Storage.gifts(session.userId).forEach((g) => {
+      owned[g.name] = (owned[g.name] || 0) + 1;
+    });
     $("#gift-grid").innerHTML = Object.entries(giftCatalog())
       .map(([name, icon]) => {
         const count = owned[name] || 0;
@@ -1532,6 +1638,136 @@
     show(giftsReturnView);
     if (giftsReturnView === "quiz") applyGridLayout();
   });
+  // 展柜模式切换（收纳 / 记录）：偏好存 localStorage
+  document.querySelectorAll(".gift-mode-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      giftShelfMode = btn.dataset.mode;
+      localStorage.setItem(GIFT_MODE_KEY, giftShelfMode);
+      renderGiftShelf();
+    });
+  });
+  // 橱窗：点礼物卡片 → 清除「新」标记（边框闪烁消失）+ 居中放大
+  $("#gift-shelf").addEventListener("click", (e) => {
+    const item = e.target.closest(".gift-shelf-item");
+    if (!item || giftDragMoved) return; // 刚结束拖拽时不触发点击
+    const gift = giftItems.find((g) => g.id === item.dataset.id);
+    if (!gift) return;
+    if (gift.fresh) {
+      gift.fresh = false;
+      Storage.markGiftSeen(gift.id);
+      item.classList.remove("fresh");
+    }
+    zoomGift(gift.name, item);
+  });
+  // 放大 overlay：点任意位置恢复——沿原路飞回卡片位置并缩小淡出，再隐藏遮罩
+  $("#gift-zoom").addEventListener("click", (e) => {
+    const overlay = e.currentTarget;
+    const inner = overlay.querySelector(".gift-zoom-inner");
+    overlay.classList.remove("active"); // 背景遮罩淡出
+    if (giftZoomFrom) {
+      // 回到起飞时的卡片中心位置
+      inner.style.transform = `translate(${giftZoomFrom.dx}px, ${giftZoomFrom.dy}px) scale(0.3)`;
+      inner.style.opacity = "0";
+      giftZoomFrom = null;
+    }
+    setTimeout(() => overlay.classList.add("hidden"), 320);
+  });
+
+  /* ---------- 橱窗拖拽排序 + 垃圾篓删除 ---------- */
+  const giftShelf = $("#gift-shelf");
+  const giftTrash = $("#gift-trash");
+
+  giftShelf.addEventListener("dragstart", (e) => {
+    const item = e.target.closest(".gift-shelf-item");
+    if (!item) return;
+    giftDragId = item.dataset.id;
+    giftDragMoved = false;
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", giftDragId);
+    // 让浏览器用半透明卡片做拖拽影像
+    requestAnimationFrame(() => item.classList.add("dragging"));
+    giftTrash.classList.add("ready");
+  });
+
+  giftShelf.addEventListener("dragover", (e) => {
+    if (!giftDragId) return;
+    e.preventDefault(); // 允许 drop
+    e.dataTransfer.dropEffect = "move";
+    const shelf = giftShelf;
+    const cards = [...shelf.querySelectorAll(".gift-shelf-item")];
+    const dragEl = cards.find((c) => c.dataset.id === giftDragId);
+    if (!dragEl) return;
+    // 计算光标应插入的位置：按阅读顺序逐卡片比较
+    let targetIdx = cards.length;
+    for (let i = 0; i < cards.length; i++) {
+      const r = cards[i].getBoundingClientRect();
+      if (e.clientY < r.top + r.height / 2) { targetIdx = i; break; }
+      if (e.clientY < r.bottom && e.clientX < r.left + r.width / 2) { targetIdx = i; break; }
+    }
+    const curIdx = cards.indexOf(dragEl);
+    // 目标位置恰好是自己或相邻时无需移动
+    if (targetIdx === curIdx || targetIdx === curIdx + 1) return;
+    giftDragMoved = true;
+    flipShelf(() => {
+      if (targetIdx >= cards.length) shelf.appendChild(dragEl);
+      else shelf.insertBefore(dragEl, cards[targetIdx]);
+    }, dragEl);
+  });
+
+  giftShelf.addEventListener("drop", (e) => {
+    e.preventDefault();
+    persistGiftOrder();
+  });
+
+  giftShelf.addEventListener("dragend", () => {
+    persistGiftOrder();
+    const dragEl = giftShelf.querySelector(".gift-shelf-item.dragging");
+    if (dragEl) dragEl.classList.remove("dragging");
+    giftTrash.classList.remove("ready", "hover");
+    giftDragId = null;
+    // 稍后复位标记，避免拖拽结束的 click 误触发放大
+    setTimeout(() => { giftDragMoved = false; }, 50);
+  });
+
+  // 按当前 DOM 顺序回写 giftItems 并持久化
+  function persistGiftOrder() {
+    if (!giftDragId) return;
+    const ids = [...giftShelf.querySelectorAll(".gift-shelf-item")].map((c) => c.dataset.id);
+    giftItems.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+    Storage.saveGifts(giftItems);
+  }
+
+  // 垃圾篓：拖入变大，松手删除并抖动恢复
+  giftTrash.addEventListener("dragover", (e) => {
+    if (!giftDragId) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    giftTrash.classList.add("hover");
+  });
+  giftTrash.addEventListener("dragleave", () => giftTrash.classList.remove("hover"));
+  giftTrash.addEventListener("drop", (e) => {
+    e.preventDefault();
+    if (!giftDragId) return;
+    const id = giftDragId;
+    giftDragId = null;
+    // 垃圾篓变大抖动特效
+    giftTrash.classList.remove("hover", "gulp");
+    void giftTrash.offsetWidth; // 重新触发动画
+    giftTrash.classList.add("gulp");
+    // 卡片缩小消失后重渲染
+    const el = giftShelf.querySelector(`.gift-shelf-item[data-id="${id}"]`);
+    if (el) {
+      el.style.transition = "transform 0.25s ease, opacity 0.25s ease";
+      el.style.transform = "scale(0.3)";
+      el.style.opacity = "0";
+    }
+    setTimeout(() => {
+      giftItems = giftItems.filter((g) => g.id !== id);
+      Storage.removeGiftItem(id);
+      giftTrash.classList.remove("ready", "gulp");
+      renderGiftShelf();
+    }, 260);
+  });
   // 礼物清单：点一下选中，再点一下取消；超过可挑数量时提示先取消一件
   $("#gift-grid").addEventListener("click", (e) => {
     const item = e.target.closest(".gift-item");
@@ -1548,21 +1784,29 @@
     }
     updateGiftPickState();
   });
-  // 收下礼物：写入该小朋友的礼物展柜，本组不能重复领取
+  // 收下礼物：写入计数 + 领取日志；本组不能重复领取
   $("#btn-gift-ok").addEventListener("click", (e) => {
     e.stopPropagation();
     if (giftClaimed || giftPicked.length === 0) return;
     Storage.addGifts(giftPicked, session.userId);
+    Storage.addGiftLog(giftPicked, session.stars, session.userId);
     giftClaimed = true;
     $("#gift-dialog").classList.add("hidden");
     Sound.play("correct");
     renderGiftReward();
   });
-  $("#btn-gift-cancel").addEventListener("click", () => {
+  // 关闭礼物弹窗：每组只有一次挑选机会，关闭即视为放弃未确认的选择
+  function closeGiftPicker() {
     $("#gift-dialog").classList.add("hidden");
-  });
+    if (!giftClaimed) {
+      giftClaimed = true;
+      giftPicked = [];
+      renderGiftReward();
+    }
+  }
+  $("#btn-gift-cancel").addEventListener("click", closeGiftPicker);
   $("#gift-dialog").addEventListener("click", (e) => {
-    if (e.target === $("#gift-dialog")) $("#gift-dialog").classList.add("hidden");
+    if (e.target === $("#gift-dialog")) closeGiftPicker();
   });
   // 应用设置入口（首页左下角小齿轮）
   $("#btn-admin").addEventListener("click", renderAdmin);

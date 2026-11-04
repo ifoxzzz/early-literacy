@@ -85,6 +85,7 @@ const Storage = {
     localStorage.removeItem(this.quizCountKey(id));
     localStorage.removeItem(this.lastVolumeKey(id));
     localStorage.removeItem(this.giftsKey(id));
+    localStorage.removeItem(this.giftLogKey(id));
     // 拼音、注解开关也按小朋友保存，删除时一并清理
     this.USER_PREF_KEYS.forEach((k) => localStorage.removeItem(this.prefKey(k, id)));
     if (this.currentId() === id) localStorage.removeItem(this.CURRENT_KEY);
@@ -116,19 +117,73 @@ const Storage = {
     return `early-literacy-gifts:${id || this.currentId()}`;
   },
 
-  // ---------- 礼物展柜（按小朋友独立保存） ----------
-  // 数据结构：{ "礼物名称": 数量 }，名称与 data/gifts.js 的清单对应
+  // ---------- 礼物橱窗（按小朋友独立保存） ----------
+  // 数据结构：[{ id, name, fresh }]
+  //   id    每件礼物实例的唯一标识（同名礼物是两件独立物品，可分别排序/删除）
+  //   name  与 data/gifts.js 清单对应的礼物名
+  //   fresh 新获得标记：true 时橱窗卡片带边框闪烁，点击后清除
   gifts(id) {
-    const data = this.readJSON(this.giftsKey(id), {});
-    return data && typeof data === "object" && !Array.isArray(data) ? data : {};
+    const raw = this.readJSON(this.giftsKey(id), []);
+    return Array.isArray(raw) ? raw : [];
+  },
+
+  _giftItem(name, fresh) {
+    return {
+      id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+      name,
+      fresh: !!fresh,
+    };
   },
 
   addGifts(names, id) {
-    const data = this.gifts(id);
+    const arr = this.gifts(id);
+    (names || []).forEach((name) => arr.push(this._giftItem(name, true)));
+    this.writeJSON(this.giftsKey(id), arr);
+  },
+
+  // 整体保存顺序（拖拽排序后用）
+  saveGifts(arr, id) {
+    this.writeJSON(this.giftsKey(id), Array.isArray(arr) ? arr : []);
+  },
+
+  // 删除某一件礼物（拖进垃圾篓）
+  removeGiftItem(giftId, id) {
+    const arr = this.gifts(id).filter((g) => g.id !== giftId);
+    this.writeJSON(this.giftsKey(id), arr);
+  },
+
+  // 清除某件礼物的「新」标记（点击后边框闪烁消失）
+  markGiftSeen(giftId, id) {
+    const arr = this.gifts(id);
+    const item = arr.find((g) => g.id === giftId);
+    if (item && item.fresh) {
+      item.fresh = false;
+      this.writeJSON(this.giftsKey(id), arr);
+    }
+  },
+
+  // ---------- 礼物领取日志（按小朋友独立保存） ----------
+  // 记录每次领取时的星星数和时间戳，用于展柜的"列表模式"展示
+  // 数据结构：[{ name, stars, time }]，按时间升序
+  giftLogKey(id) {
+    return `early-literacy-gift-log:${id || this.currentId()}`;
+  },
+
+  giftLog(id) {
+    const data = this.readJSON(this.giftLogKey(id), []);
+    return Array.isArray(data) ? data : [];
+  },
+
+  // 追加一组领取记录：names 是礼物名数组，stars 是本组星星数
+  addGiftLog(names, stars, id) {
+    const list = this.giftLog(id);
+    const now = Date.now();
     (names || []).forEach((name) => {
-      data[name] = (data[name] || 0) + 1;
+      list.push({ name, stars: stars || 0, time: now });
     });
-    this.writeJSON(this.giftsKey(id), data);
+    // 限制最多 500 条（约每天 2 组可用一年半）
+    const trimmed = list.slice(-500);
+    this.writeJSON(this.giftLogKey(id), trimmed);
   },
 
   // ---------- 最近选中的册（按小朋友独立保存） ----------

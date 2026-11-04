@@ -1833,14 +1833,14 @@ body.hide-pinyin .card .pinyin {
   100% { transform: translate(var(--dx), var(--dy)) scale(0.3); opacity: 0; }
 }
 
-/* 连续首次答对：星星绕着烟花炸点旋转 */
+/* 连续首次答对：星星绕着烟花炸点旋转；烟花结束后继续转约 2 秒再淡出 */
 .fw-orbit {
   position: fixed;
   z-index: 31;
   width: 0;
   height: 0;
   pointer-events: none;
-  animation: fwOrbit 1.5s linear forwards;
+  animation: fwOrbit 4s linear forwards;
 }
 
 .fw-orbit-star {
@@ -1854,10 +1854,10 @@ body.hide-pinyin .card .pinyin {
 
 @keyframes fwOrbit {
   0% { transform: rotate(var(--start)) translateX(0); opacity: 0; }
-  12% { opacity: 1; }
-  30% { transform: rotate(calc(var(--start) + 110deg)) translateX(var(--r)); opacity: 1; }
-  80% { opacity: 1; }
-  100% { transform: rotate(calc(var(--start) + 340deg)) translateX(var(--r)); opacity: 0; }
+  5% { opacity: 1; }
+  18% { transform: rotate(calc(var(--start) + 80deg)) translateX(var(--r)); opacity: 1; }
+  90% { transform: rotate(calc(var(--start) + 760deg)) translateX(var(--r)); opacity: 1; }
+  100% { transform: rotate(calc(var(--start) + 800deg)) translateX(var(--r)); opacity: 0; }
 }
 
 /* 练习页底部区域：整体贴底（提示条即使隐藏，用户名也不会跑到顶部） */

@@ -795,6 +795,8 @@
 
   // 连续首次答对时，让 N 颗星星绕着烟花炸点旋转（N = 连续次数，连续第 1 次不显示，从第 2 次起为 2 颗）
   function spawnOrbitStars(cx, cy, count) {
+    // 新一次烟花开始前清掉上一组残留的环绕星星
+    document.querySelectorAll(".fw-orbit").forEach((el) => el.remove());
     if (!count) return;
     for (let i = 0; i < count; i++) {
       const orbit = document.createElement("span");
@@ -809,7 +811,8 @@
       star.textContent = "⭐";
       orbit.appendChild(star);
       document.body.appendChild(orbit);
-      setTimeout(() => orbit.remove(), 2400);
+      // 烟花约 2 秒结束，之后星星再绕转约 2 秒才消失（含出场错开的时间）
+      setTimeout(() => orbit.remove(), 4200 + i * 50);
     }
   }
 

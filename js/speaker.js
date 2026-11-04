@@ -236,10 +236,10 @@ const Speaker = {
     return entry ? entry.promise : Promise.resolve(url);
   },
 
-  // 为一组练习预热：提示语、星星播报、全部题目涉及的单字、组词与注解音频。
-  // onProgress(done, total) 用于进入练习页前的进度条
-  preloadSession(name, targets, onProgress) {
-    // 「请找出」始终用通用提示语，名字语音里没有这个文件
+  // 进入选册页前的全局预热：提示语、名字语音、30 条夸奖语、星星播报、礼物提示，
+  // 以及内置楷体字体文件。全部就绪后才放行，避免练习/结算页边下边播。
+  // 题目相关的单字/组词/注解语音不在这里加载（由 app.js 按首题阻塞 + 后台滑窗预取）
+  preloadGlobal(name, onProgress) {
     const phrases = ["welcome", "done", "cheer", "gift"];
     for (let level = 1; level <= 5; level++) {
       for (let n = 1; n <= 6; n++) phrases.push(`praise${level}_${n}`);
@@ -248,15 +248,15 @@ const Speaker = {
     urls.push(this.audioUrl("phrases/find.mp3"));
     urls.push(this.audioUrl("phrases/help.mp3"));
     for (let i = 0; i <= 20; i++) urls.push(this.audioUrl(`phrases/stars${i}.mp3`));
-    (targets || []).forEach((t) => {
-      const syl = this.syllableAudio(t.pinyin);
-      if (syl) urls.push(syl);
-      const word = this.wordAudio(t);
-      if (word) urls.push(word);
-      const note = this.noteAudio(t);
-      if (note) urls.push(note);
-    });
-    return this.preloadAll(urls, onProgress);
+    // 字体与语音并行加载；不支持 Font Loading API 或超时都不阻塞进入
+    const fontReady =
+      "fonts" in document && document.fonts.load
+        ? Promise.race([
+            document.fonts.load('32px "Kaiti Web"', "字").catch(() => {}),
+            new Promise((resolve) => setTimeout(resolve, 8000)),
+          ])
+        : Promise.resolve();
+    return Promise.all([this.preloadAll(urls, onProgress), fontReady]);
   },
 
   // ---------- 播放 ----------

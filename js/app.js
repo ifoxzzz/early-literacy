@@ -477,7 +477,8 @@
     $("#loading-mask").classList.add("hidden");
   }
 
-  // 点册后先组好题、预加载本组全部语音，进度条走完再进入练习页
+  // 点册后只预加载第一题的语音，就绪即进入练习页；
+  // 后续题目在答题过程中由 prefetchUpcoming 后台滑窗预取（答题时间足够下载）
   function enterVolume(user, volume) {
     if (enteringVolume) return;
     // 该小朋友自己配置的候选字数 / 每组题数
@@ -493,11 +494,7 @@
       showLoading(`正在准备「${volume.title}」`);
     }, 150);
     // 失败或超过 8 秒的文件会退回原始地址，同样计入进度，不会卡在加载页
-    Speaker.preloadSession(
-      user ? user.name : "",
-      questions.map((q) => q.target),
-      updateLoading
-    ).then(() => {
+    Speaker.preloadAll(Speaker.entryUrls(questions[0].target), updateLoading).then(() => {
       clearTimeout(showTimer);
       enteringVolume = false;
       if (loadingShown) hideLoading();
@@ -529,7 +526,7 @@
     });
     show("quiz");
     refreshQuizTools(); // 恢复该小朋友上次的顶部按钮展开状态
-    nextQuestion(); // 语音已由 enterVolume 预热，直接渲染第一题的组词/注解文字
+    nextQuestion(); // 第一题语音已由 enterVolume 预加载；后续题目由滑窗预取接力
     // 首次进入必须量一次尺寸；下一帧再量一次，避开手机浏览器地址栏/字体回流的时序差
     applyGridLayout();
     requestAnimationFrame(() => {
@@ -553,6 +550,16 @@
     session.timer = session.delayTimer = session.guardTimer = null;
   }
 
+  // 后台预取接下来 5 题的语音（单字/组词/注解）：
+  // 孩子答一题的时间足够下载好几题，滑到对应题目时基本已就绪
+  function prefetchUpcoming() {
+    const urls = [];
+    session.queue.slice(0, 5).forEach((q) => {
+      urls.push(...Speaker.entryUrls(q.target));
+    });
+    Speaker.preload(urls);
+  }
+
   function nextQuestion() {
     if (session.queue.length === 0) {
       // 本组结束：清空当前题，避免已结算的旧题继续被延时回调当作“仍在作答”
@@ -561,6 +568,24 @@
       return;
     }
     const q = session.queue.shift();
+    const gen = session.gen; // 加载期间若退出/换组，作废旧回调
+    // 本题语音未就绪时显示加载进度，加载完才出题；
+    // 后台滑窗预取保证绝大多数情况瞬间完成、遮罩根本不出现
+    let loadingShown = false;
+    const showTimer = setTimeout(() => {
+      loadingShown = true;
+      showLoading("正在准备本题语音");
+    }, 150);
+    Speaker.preloadAll(Speaker.entryUrls(q.target), updateLoading).then(() => {
+      clearTimeout(showTimer);
+      if (gen !== session.gen) return;
+      if (loadingShown) hideLoading();
+      beginQuestion(q);
+      prefetchUpcoming();
+    });
+  }
+
+  function beginQuestion(q) {
     q.locked = false;
     session.current = q;
 
@@ -1439,14 +1464,27 @@
     if (q) markDone(q);
     nextQuestion();
   });
-  // 点击小朋友的名字，进入该小朋友的选册页
+  // 点击小朋友的名字：先加载全局资源（内置字体、提示语、名字语音、星星播报），
+  // 全部就绪后才进入选册页；题目语音留到点册/答题过程中按需加载
+  let enteringUser = false;
   $("#user-list").addEventListener("click", (e) => {
     const card = e.target.closest(".user-card");
-    if (!card) return;
+    if (!card || enteringUser) return;
     const user = Storage.users().find((u) => u.id === card.dataset.id);
     if (!user) return;
     Storage.setCurrent(user.id);
-    renderVolumes(user);
+    enteringUser = true;
+    let loadingShown = false;
+    const showTimer = setTimeout(() => {
+      loadingShown = true;
+      showLoading(`正在呼唤 ${user.name}`);
+    }, 150);
+    Speaker.preloadGlobal(user.name, updateLoading).then(() => {
+      clearTimeout(showTimer);
+      enteringUser = false;
+      if (loadingShown) hideLoading();
+      renderVolumes(user);
+    });
   });
   // 选择某一册，开始练习；点右侧图标则先查看该册汉字表
   $("#volume-list").addEventListener("click", (e) => {

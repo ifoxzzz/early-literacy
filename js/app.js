@@ -794,16 +794,16 @@
   let fwRaf = 0;
 
   // 连续首次答对时，让星星绕着烟花炸点旋转（连续第 1 次不显示，从第 2 次起为 2 颗）
-  // 数量按面额折算：10 颗星 = 1 颗太阳，5 颗星 = 1 颗月亮，余下仍是星星
+  // 数量按面额折算：3 颗星 = 1 颗月亮，3 颗月亮 = 1 颗太阳（即 9 颗星 = 1 颗太阳）
   function spawnOrbitStars(cx, cy, count) {
     // 新一次烟花开始前清掉上一组残留的环绕星星
     document.querySelectorAll(".fw-orbit").forEach((el) => el.remove());
     if (!count) return;
     const tokens = [];
-    for (let n = count; n >= 10; n -= 10) tokens.push("☀️");
-    count %= 10;
-    for (let n = count; n >= 5; n -= 5) tokens.push("🌙");
-    count %= 5;
+    for (let n = count; n >= 9; n -= 9) tokens.push("☀️");
+    count %= 9;
+    for (let n = count; n >= 3; n -= 3) tokens.push("🌙");
+    count %= 3;
     for (let i = 0; i < count; i++) tokens.push("⭐");
     tokens.forEach((text, i) => {
       const orbit = document.createElement("span");

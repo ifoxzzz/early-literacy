@@ -1206,6 +1206,10 @@
     const uid = user ? user.id : "";
     giftItems = Storage.gifts(uid);
     const total = giftItems.length;
+    // 后台预取已拥有礼物的名称音频（通常只有几件），放大时即可秒播
+    Speaker.preload(
+      [...new Set(giftItems.map((g) => g.name))].map((n) => Speaker.giftAudio(n))
+    );
     $("#gifts-owner").textContent = user
       ? `${user.name} 的礼物 · 共 ${total} 件`
       : `我的礼物 · 共 ${total} 件`;
@@ -1292,6 +1296,8 @@
     $("#gift-zoom-icon").textContent = catalog[name] || "🎁";
     $("#gift-zoom-name").textContent = name;
     $("#gift-zoom-count").textContent = count > 1 ? `共 ${count} 件` : "";
+    Sound.play("correct"); // 先播音效，再播礼物名称
+    Speaker.playGiftName(name);
     const overlay = $("#gift-zoom");
     const inner = overlay.querySelector(".gift-zoom-inner");
     overlay.classList.remove("hidden");
@@ -1816,6 +1822,7 @@
       giftPicked.splice(idx, 1);
     } else if (giftPicked.length < giftQuota) {
       giftPicked.push(name);
+      Speaker.playGiftPick(name); // 勾选时播报「你选择了：<礼物名称>」
     } else {
       $("#gift-pick-tip").textContent = `最多选 ${giftQuota} 件，可以先取消一件`;
       return;

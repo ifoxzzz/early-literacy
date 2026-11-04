@@ -153,6 +153,27 @@ const Speaker = {
     return this.audioUrl(`note/${encodeURIComponent(key)}.mp3`);
   },
 
+  // 礼物名称语音路径：gifts/<名称>.mp3（清单见 assets/audio/gifts/index.js）
+  giftAudio(name) {
+    if (!this.giftSet) this.giftSet = new Set(window.GIFT_AUDIO || []);
+    if (!this.giftSet.has(name)) return null;
+    return this.audioUrl(`gifts/${encodeURIComponent(name)}.mp3`);
+  },
+
+  // 勾选礼物：播报「你选择了：<礼物名称>」；名称语音缺失时只播前缀
+  playGiftPick(name) {
+    const list = [this.audioUrl("phrases/chose.mp3")];
+    const url = this.giftAudio(name);
+    if (url) list.push(url);
+    this.play(list);
+  },
+
+  // 橱窗放大礼物：只播礼物名称（音效由 Sound 负责）
+  playGiftName(name) {
+    const url = this.giftAudio(name);
+    if (url) this.play([url]);
+  },
+
   // 去掉字库里的「汉字(拼音)」读音标注，只留汉字（标注只给语音生成脚本用）
   // 界面展示（app.js 的 displayText）与系统语音兜底都复用这里，保证清洗规则一致
   stripAnnotation(text) {
@@ -247,6 +268,7 @@ const Speaker = {
     const urls = phrases.map((k) => this.phraseFile(k, name));
     urls.push(this.audioUrl("phrases/find.mp3"));
     urls.push(this.audioUrl("phrases/help.mp3"));
+    urls.push(this.audioUrl("phrases/chose.mp3")); // 勾选礼物时的「你选择了：」前缀
     for (let i = 0; i <= 20; i++) urls.push(this.audioUrl(`phrases/stars${i}.mp3`));
     // 字体与语音并行加载；不支持 Font Loading API 或超时都不阻塞进入
     const fontReady =

@@ -6,7 +6,7 @@
   <title>宝贝趣味识字</title>
   <script>
     // 全局唯一缓存版本：改动任何 css/js/音频后，只需把这个值 +1，即可让全部缓存失效
-    var CACHE_VERSION = "122";
+    var CACHE_VERSION = "126";
     window.APP_VERSION = CACHE_VERSION;
     document.write('<link rel="stylesheet" href="css/style.css?v=' + CACHE_VERSION + '">');
     // 内置楷体（Windows 楷体 SimKai 子集）：只用于田字格、汉字表与练习记录里的汉字
@@ -319,7 +319,7 @@
         </div>
       </div>
       <div class="quiz-status">
-        <span id="quiz-stars"></span>
+        <span id="quiz-stars" data-count="0"><span class="qs-icon">⭐</span><span class="qs-num" id="quiz-star-num">0</span></span>
         <button class="btn-tools-show" id="btn-tools-show"
           aria-expanded="false" aria-controls="quiz-tools" aria-label="显示顶部按钮">
           <span class="dot"></span><span class="dot"></span><span class="dot"></span>

@@ -52,6 +52,7 @@
     total: 0, // 本组题数
     done: 0, // 已完成题数（答对、跳过、求助后点对都算完成）
     stars: 0,
+    streak: 0, // 连续首次答对的题数（决定烟花周围绕转的星星数量）
     firstTryCorrect: 0, // 首答正确题数
     newLearned: [], // 本次新学会的字
     answers: [], // 本组每个字的首次作答结果 [{ c, pinyin, words, note, ok }]
@@ -493,6 +494,7 @@
       total: questions.length,
       done: 0,
       stars: 0,
+      streak: 0,
       firstTryCorrect: 0,
       newLearned: [],
       answers: [],
@@ -544,7 +546,7 @@
     // 题号并入底部信息行：小朋友 · 册名 · 第 x/x 题
     $("#quiz-user").textContent =
       `${session.userName} · ${session.volume} · 第 ${Math.min(session.done + 1, session.total)}/${session.total} 题`;
-    $("#quiz-stars").textContent = `⭐ ${session.stars}`;
+    setStars(session.stars, false);
     // 第一行组词（用「」包起来），第二行注解；拼音标注只给语音脚本，展示时去掉
     const words = displayText(q.target.words);
     $("#hint-words").textContent = words ? `「${words}」` : "";
@@ -589,6 +591,7 @@
     const q = session.current;
     if (!q || q.locked || q.helped) return; // 已作答或已求助过，忽略
     q.helped = true;
+    session.streak = 0; // 求助后本题不算首次答对，连续链中断
     clearSessionTimers();
     $("#btn-help").classList.add("used");
     Sound.play("help");
@@ -661,6 +664,7 @@
     // 选错：这张卡片晃动几下后变淡并禁用，本题继续；每次选错都计入复习权重
     if (!isCorrect) {
       q.wrongPicks = (q.wrongPicks || 0) + 1;
+      session.streak = 0; // 选错即中断「连续首次答对」
       Storage.recordAnswer(targetKey, false);
       Sound.play("wrong");
       card.classList.add("wrong");
@@ -678,7 +682,6 @@
       .forEach((c) => {
         if (c !== card) c.classList.add("dimmed");
       });
-    popStar(card);
     Sound.play("correct");
 
     // 首答计分：本题出现过错选就不再加星，但答对时仍播放语音、冒出星星
@@ -686,6 +689,7 @@
     if (firstTry) {
       Storage.recordAnswer(targetKey, true);
       session.stars += 1;
+      session.streak += 1;
       session.firstTryCorrect += 1;
       if (isNewChar(targetKey)) session.newLearned.push(q.target.char);
       // 烟花从孩子刚才点/摸的位置炸开；键盘触发（坐标 0）时退回卡片中心
@@ -694,7 +698,10 @@
         evt && (evt.clientX || evt.clientY)
           ? { x: evt.clientX, y: evt.clientY }
           : { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-      playFireworks(origin);
+      // 环绕星星从连续第 2 次首答正确才开始显示：第 1 次不显示，第 2 次 2 颗，之后随连对次数增加
+      playFireworks(origin, session.streak >= 2 ? session.streak : 0);
+      // 田字格里的星星飞到左上角计数处，抵达时才让数字滚动并弹一下星星图标
+      popStar(card, () => setStars(session.stars, true));
     }
     if (!q.counted) {
       session.answers.push({
@@ -706,9 +713,11 @@
       });
       markDone(q);
     }
-    $("#quiz-stars").textContent = `⭐ ${session.stars}`;
 
-    // 夸奖语音播完再进入下一题，避免被切断；若语音中途被打断（如关闭声音、
+    // 非首次答对（先选错过）：仍在卡片位置弹一下星星，但不计入左上角
+    if (!firstTry) popStar(card);
+
+    // 夸奖语音播完再进入下一题；若语音中途被打断（如关闭声音、
     // 播放异常）导致回调不触发，用兜底定时器保证流程不会卡在本页。
     // 所有延时都登记在 session 上，并由会话代次校验：跳题/退出后立即作废，
     // 不会再出现“退出后仍自动出题”或“结束页重复写入记录”
@@ -729,15 +738,54 @@
     }, 400);
   }
 
-  function popStar(card) {
+  // 左上角星星计数：数量增加时星星图标弹一下，新数字从下往上把旧数字顶掉
+  function setStars(next, animate) {
+    const wrap = $("#quiz-stars");
+    const num = $("#quiz-star-num");
+    const icon = wrap.querySelector(".qs-icon");
+    const prev = Number(wrap.dataset.count || 0);
+    wrap.dataset.count = String(next);
+    if (!animate || next <= prev) {
+      num.textContent = String(next);
+      return;
+    }
+    icon.classList.remove("bump");
+    void icon.offsetWidth; // 强制回流，让弹跳动画重新开始
+    icon.classList.add("bump");
+    num.innerHTML =
+      `<span class="qs-num-out">${prev}</span><span class="qs-num-in">${next}</span>`;
+    setTimeout(() => {
+      if (wrap.dataset.count === String(next)) num.textContent = String(next);
+    }, 320);
+  }
+
+  // 答对时田字格冒出星星：首次答对时飞向左上角计数处，抵达后触发数字滚动；
+  // 非首次答对仍在原位弹一下后淡出
+  function popStar(card, onArrive) {
     const rect = card.getBoundingClientRect();
+    const fromX = rect.left + rect.width / 2;
+    const fromY = rect.top + rect.height / 2;
     const star = document.createElement("div");
-    star.className = "star-pop";
+    star.className = onArrive ? "star-pop star-fly" : "star-pop";
     star.textContent = "⭐";
-    star.style.left = rect.left + rect.width / 2 - 32 + "px";
-    star.style.top = rect.top + rect.height / 2 - 32 + "px";
+    star.style.left = fromX - 32 + "px";
+    star.style.top = fromY - 32 + "px";
+    if (onArrive) {
+      // 目标：左上角计数里的星星图标
+      const target = $("#quiz-stars .qs-icon");
+      const tRect = target.getBoundingClientRect();
+      star.style.setProperty("--dx", `${tRect.left + tRect.width / 2 - fromX}px`);
+      star.style.setProperty("--dy", `${tRect.top + tRect.height / 2 - fromY}px`);
+    }
     document.body.appendChild(star);
-    setTimeout(() => star.remove(), 1000);
+    if (onArrive) {
+      star.addEventListener("animationend", () => {
+        star.remove();
+        onArrive();
+      });
+    } else {
+      setTimeout(() => star.remove(), 1000);
+    }
   }
 
   /* ---------- 烟花特效：首次选对时从点击位置连续绽放 ---------- */
@@ -745,7 +793,27 @@
   let fwGeneration = 0;
   let fwRaf = 0;
 
-  function playFireworks(at) {
+  // 连续首次答对时，让 N 颗星星绕着烟花炸点旋转（N = 连续次数，连续第 1 次不显示，从第 2 次起为 2 颗）
+  function spawnOrbitStars(cx, cy, count) {
+    if (!count) return;
+    for (let i = 0; i < count; i++) {
+      const orbit = document.createElement("span");
+      orbit.className = "fw-orbit";
+      orbit.style.left = `${cx}px`;
+      orbit.style.top = `${cy}px`;
+      orbit.style.setProperty("--r", `${68 + (i % 2) * 16}px`);
+      orbit.style.setProperty("--start", `${(360 / count) * i}deg`);
+      orbit.style.animationDelay = `${i * 0.05}s`;
+      const star = document.createElement("span");
+      star.className = "fw-orbit-star";
+      star.textContent = "⭐";
+      orbit.appendChild(star);
+      document.body.appendChild(orbit);
+      setTimeout(() => orbit.remove(), 2400);
+    }
+  }
+
+  function playFireworks(at, orbitCount) {
     const canvas = $("#fx-canvas");
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -766,6 +834,7 @@
     const colors = FIREWORK_COLORS;
     const cx = at ? at.x : w / 2;
     const cy = at ? at.y : h / 2;
+    spawnOrbitStars(cx, cy, orbitCount);
     // 点击位置连放三朵，颜色与力度略有差异，像真的烟花一簇簇炸开
     const bursts = [
       { at: 0, count: 46, min: 220, max: 430, color: 0 },
@@ -1037,6 +1106,7 @@
   $("#btn-skip").addEventListener("click", () => {
     clearSessionTimers(); // 取消上一题未走完的“夸奖后进入下一题”流程
     Speaker.stop();
+    session.streak = 0; // 跳过不算首次答对，连续链中断
     const q = session.current;
     if (q) markDone(q);
     nextQuestion();

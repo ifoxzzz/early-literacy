@@ -7,6 +7,7 @@ const Speaker = {
   AUDIO_EPOCH_KEY: "early-literacy-audio-cache", // 音频缓存标记：清理后更换，迫使浏览器重新下载
   current: null, // 当前播放的 Audio 实例
   tokens: 0, // 播放序列版本号，用于打断旧序列
+  lastPraise: "", // 上一次播放的夸奖语键，避免连续两次抽到同一条
 
   // 运行时生成 0.08 秒静音 wav（iOS 上 volume 只读，不能靠调音量静音）
   silenceUri() {
@@ -239,9 +240,11 @@ const Speaker = {
   // onProgress(done, total) 用于进入练习页前的进度条
   preloadSession(name, targets, onProgress) {
     // 「请找出」始终用通用提示语，名字语音里没有这个文件
-    const urls = ["welcome", "praise1", "praise2", "praise3", "done", "cheer"].map((k) =>
-      this.phraseFile(k, name)
-    );
+    const phrases = ["welcome", "done", "cheer"];
+    for (let level = 1; level <= 5; level++) {
+      for (let n = 1; n <= 6; n++) phrases.push(`praise${level}_${n}`);
+    }
+    const urls = phrases.map((k) => this.phraseFile(k, name));
     urls.push(this.audioUrl("phrases/find.mp3"));
     urls.push(this.audioUrl("phrases/help.mp3"));
     for (let i = 0; i <= 20; i++) urls.push(this.audioUrl(`phrases/stars${i}.mp3`));
@@ -328,7 +331,7 @@ const Speaker = {
   },
 
   // 提示语路径：优先用"带名字"的真人语音，否则用通用提示语
-  // key：welcome / praise1~3 / done / cheer
+  // key：welcome / praise1_1~praise5_6 / done / cheer
   phraseFile(key, name) {
     return this.hasUserAudio(name)
       ? this.audioUrl(`${this.userDir(name)}${key}.mp3`)
@@ -393,10 +396,19 @@ const Speaker = {
     this.play(list, after);
   },
 
-  // 答对：随机夸奖（播完回调 onDone，用于安排下一题）
-  correct(onDone, name) {
-    const n = 1 + Math.floor(Math.random() * 3); // 1 ~ 3
-    this.play([this.phraseFile(`praise${n}`, name)], onDone);
+  // 答对：按连续首答正确次数选等级（1~2 / 3~4 / 5~6 / 7~8 / 9+ 次），
+  // 每级 6 条随机播放；播完回调 onDone，用于安排下一题
+  correct(onDone, name, streak) {
+    const level = streak >= 9 ? 5 : streak >= 7 ? 4 : streak >= 5 ? 3 : streak >= 3 ? 2 : 1;
+    let n = 1 + Math.floor(Math.random() * 6); // 1 ~ 6
+    let key = `praise${level}_${n}`;
+    if (key === this.lastPraise) {
+      // 与上一次重复时顺延到下一条，保证连续两次不会播放同一句
+      n = (n % 6) + 1;
+      key = `praise${level}_${n}`;
+    }
+    this.lastPraise = key;
+    this.play([this.phraseFile(key, name)], onDone);
   },
 
   // 帮帮我：提示语（动画由 app.js 负责）

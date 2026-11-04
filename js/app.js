@@ -744,7 +744,7 @@
         session.timer = setTimeout(nextQuestion, 600);
       };
       session.guardTimer = setTimeout(go, 6000);
-      Speaker.correct(go, session.userName);
+      Speaker.correct(go, session.userName, session.streak);
     }, 400);
   }
 

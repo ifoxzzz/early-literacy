@@ -335,6 +335,15 @@ const Speaker = {
       : this.audioUrl(`phrases/${key}.mp3`);
   },
 
+  // 一个字的全部真人语音：单字、组词、注解（没有预生成文件的项目直接忽略）
+  entryUrls(entry) {
+    return [
+      this.syllableAudio(entry.pinyin),
+      this.wordAudio(entry),
+      this.noteAudio(entry),
+    ].filter((u, i, arr) => u && arr.indexOf(u) === i);
+  },
+
   // 单字详情页：先读汉字发音，再读组词讲解，最后读注解
   readEntry(entry) {
     const charSrc = this.syllableAudio(entry.pinyin);

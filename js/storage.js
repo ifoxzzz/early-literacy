@@ -208,10 +208,15 @@ const Storage = {
   },
 
   // ---------- 练习设置（按小朋友独立保存） ----------
-  // 每题候选字数：只支持 2 / 3 / 4 / 6 / 8 / 9，非法值回落到 4
+  // 每题候选字数：只支持 2 / 3 / 4 / 6 / 8 / 9；未设置时默认 4，值非法时直接报错
   quizOptions(id) {
-    const v = parseInt(localStorage.getItem(this.quizOptionsKey(id)), 10);
-    return this.OPTION_VALUES.includes(v) ? v : 4;
+    const raw = localStorage.getItem(this.quizOptionsKey(id));
+    if (raw == null) return 4;
+    const v = parseInt(raw, 10);
+    if (!this.OPTION_VALUES.includes(v)) {
+      throw new Error(`练习设置（候选字数）值非法：${raw}`);
+    }
+    return v;
   },
 
   setQuizOptions(v, id) {
@@ -220,15 +225,33 @@ const Storage = {
     return n;
   },
 
-  // 每组题数：5 ~ 20，非法值回落到 10
+  // 每组题数：5 ~ 20；未设置时默认 10，值非法时直接报错
   quizCount(id) {
-    const v = parseInt(localStorage.getItem(this.quizCountKey(id)), 10);
-    return v >= 5 && v <= 20 ? v : 10;
+    const raw = localStorage.getItem(this.quizCountKey(id));
+    if (raw == null) return 10;
+    const v = parseInt(raw, 10);
+    if (!(v >= 5 && v <= 20)) {
+      throw new Error(`练习设置（每组题数）值非法：${raw}`);
+    }
+    return v;
   },
 
   setQuizCount(v, id) {
     const n = Math.max(5, Math.min(20, parseInt(v, 10) || 10));
     localStorage.setItem(this.quizCountKey(id), String(n));
     return n;
+  },
+
+  // ---------- 清空全部数据 ----------
+  // 删除本应用写入 localStorage 的所有键（前缀 early-literacy-），
+  // 用于「应用设置 - 清空所有数据」。调用方需自行刷新页面以重建内存状态
+  clearAll() {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith("early-literacy-")) keys.push(k);
+    }
+    keys.forEach((k) => localStorage.removeItem(k));
+    return keys.length;
   },
 };

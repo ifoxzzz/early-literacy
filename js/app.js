@@ -303,7 +303,7 @@
           <span class="word-pinyin">${e.pinyin}</span>
           <span class="word-words">${displayText(e.words)}</span>
           <span class="word-note">${displayText(e.note)}</span>
-          <span class="word-level">${e.level || ""}</span>
+          <span class="word-level">${e.level}</span>
         </div>`
         )
         .join("");
@@ -381,28 +381,10 @@
   /* ---------- 练习记录 ---------- */
   // 当前记录页里每个可点击汉字对应的字库条目
   let historyEntries = [];
-  let charEntryMap = null;
 
-  // 新记录自带拼音、组词与注解；旧记录缺字段时按字库首次出现补齐
+  // 每条作答记录自带拼音、组词与注解，直接取出展示
   function entryOfAnswer(a) {
-    if (a.pinyin && a.words && a.note) {
-      return { char: a.c, pinyin: a.pinyin, words: a.words, note: a.note };
-    }
-    if (!charEntryMap) {
-      charEntryMap = new Map();
-      VOLUMES.forEach((v) =>
-        v.entries.forEach((e) => {
-          if (!charEntryMap.has(e.char)) charEntryMap.set(e.char, e);
-        })
-      );
-    }
-    const e = charEntryMap.get(a.c);
-    return {
-      char: a.c,
-      pinyin: a.pinyin || (e && e.pinyin) || "",
-      words: a.words || (e && e.words) || "",
-      note: a.note || (e && e.note) || "",
-    };
+    return { char: a.c, pinyin: a.pinyin, words: a.words, note: a.note };
   }
 
   function renderHistory() {
@@ -428,7 +410,7 @@
               ? `<span class="history-stars">${"⭐".repeat(r.stars)}</span>`
               : `<span class="history-stars none">还没有星星</span>`;
           // 本组学过的字：绿色答对、红色答错；每个字都可点击查看详情
-          const chars = (r.chars || [])
+          const chars = r.chars
             .map((a) => {
               const idx = historyEntries.length;
               historyEntries.push(entryOfAnswer(a));
@@ -456,20 +438,20 @@
   /* ---------- 练习 ---------- */
   let enteringVolume = false; // 加载遮罩显示期间忽略重复点册
 
-  function showVolumeLoading(volume) {
-    $("#loading-title").textContent = `正在准备「${volume.title}」`;
+  function showLoading(title) {
+    $("#loading-title").textContent = title;
     $("#loading-fill").style.width = "0%";
     $("#loading-count").textContent = "0 / 0";
     $("#loading-mask").classList.remove("hidden");
   }
 
-  function updateVolumeLoading(done, total) {
+  function updateLoading(done, total) {
     const pct = total ? Math.round((done / total) * 100) : 100;
     $("#loading-fill").style.width = `${pct}%`;
     $("#loading-count").textContent = `${done} / ${total}`;
   }
 
-  function hideVolumeLoading() {
+  function hideLoading() {
     $("#loading-mask").classList.add("hidden");
   }
 
@@ -486,17 +468,17 @@
     let loadingShown = false;
     const showTimer = setTimeout(() => {
       loadingShown = true;
-      showVolumeLoading(volume);
+      showLoading(`正在准备「${volume.title}」`);
     }, 150);
     // 失败或超过 8 秒的文件会退回原始地址，同样计入进度，不会卡在加载页
     Speaker.preloadSession(
       user ? user.name : "",
       questions.map((q) => q.target),
-      updateVolumeLoading
+      updateLoading
     ).then(() => {
       clearTimeout(showTimer);
       enteringVolume = false;
-      if (loadingShown) hideVolumeLoading();
+      if (loadingShown) hideLoading();
       startSession(user, volume, questions, optionCount);
     });
   }
@@ -1091,6 +1073,37 @@
     updateScrollFade($("#word-list"), $("#word-sheet"));
     updateScrollFade($("#history-list"));
   });
+  // 汉字表小喇叭：先加载该字的语音（未缓存时显示进度条），就绪后再播放
+  let loadingWordAudio = false;
+
+  function playEntryAudio(entry) {
+    if (loadingWordAudio) return;
+    const urls = Speaker.entryUrls(entry);
+    // 全部已缓存时直接播放，不弹加载框
+    if (urls.every((u) => Speaker.cache.has(u))) {
+      Speaker.readEntry(entry);
+      return;
+    }
+    loadingWordAudio = true;
+    let shown = false;
+    let progress = [0, urls.length];
+    // 与进入练习页一致：加载很快时不闪进度条，超过 150ms 才显示
+    const showTimer = setTimeout(() => {
+      shown = true;
+      showLoading(`正在加载「${entry.char}」的语音`);
+      updateLoading(progress[0], progress[1]);
+    }, 150);
+    Speaker.preloadAll(urls, (done, total) => {
+      progress = [done, total];
+      if (shown) updateLoading(done, total);
+    }).then(() => {
+      clearTimeout(showTimer);
+      loadingWordAudio = false;
+      if (shown) hideLoading();
+      Speaker.readEntry(entry);
+    });
+  }
+
   // 汉字表：点小喇叭播放读音、组词和注解，点整行进入通用单字详情页
   $("#word-list").addEventListener("click", (e) => {
     const row = e.target.closest(".word-item");
@@ -1098,7 +1111,7 @@
     const entry = volumeWordVolume && volumeWordVolume.entries[Number(row.dataset.idx)];
     if (!entry) return;
     if (e.target.closest(".word-play")) {
-      Speaker.readEntry(entry);
+      playEntryAudio(entry);
       return;
     }
     openCharCard(entry, { onBack: () => renderVolumeWords(volumeWordVolume) });
@@ -1217,6 +1230,18 @@
       btn.textContent = "清理音频缓存";
       btn.disabled = false;
     }, 1200);
+  });
+  // 清空所有数据（应用设置）：需二次确认，删除全部小朋友、进度、记录、设置与缓存后刷新
+  $("#btn-clear-all-data").addEventListener("click", () => {
+    if (
+      !confirm(
+        "确定要清空所有数据吗？\n这将删除全部小朋友、学习进度、练习记录、设置与缓存，且不可恢复。"
+      )
+    )
+      return;
+    Speaker.clearAudioCache();
+    Storage.clearAll();
+    location.reload();
   });
   $("#btn-admin-back").addEventListener("click", renderHome);
   $("#admin-users").addEventListener("click", (e) => {

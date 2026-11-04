@@ -10,6 +10,16 @@
   // 禁用鼠标右键菜单，避免小朋友误触后不知道如何处理
   document.addEventListener("contextmenu", (e) => e.preventDefault());
 
+  /* ---------- 关闭页面确认 ---------- */
+  // 浏览器不允许在页面卸载时展示自定义 DOM，只能通过 beforeunload 触发原生的
+  // 「离开此网站？」确认框（文案由浏览器固定）；手机浏览器/微信 WebView 多数会忽略。
+  let allowUnload = false;
+  window.addEventListener("beforeunload", (e) => {
+    if (allowUnload) return;
+    e.preventDefault();
+    e.returnValue = ""; // 兼容旧版浏览器，触发原生确认
+  });
+
   /* ---------- 鼠标气泡特效：光标移动时冒出小气泡，帮助孩子找到箭头 ---------- */
   let bubbleTime = 0;
   let bubbleX = 0;
@@ -1330,6 +1340,7 @@
       return;
     Speaker.clearAudioCache();
     Storage.clearAll();
+    allowUnload = true; // 这是应用内的主动刷新，不再弹离站确认
     location.reload();
   });
   $("#btn-admin-back").addEventListener("click", renderHome);

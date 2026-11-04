@@ -1434,12 +1434,62 @@ body.hide-pinyin #view-card .card .pinyin {
 
 /* 顶部第二行：星星靠左，右侧是展开面板的三个点 */
 .quiz-status {
+  position: relative;
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
   min-height: 34px;
+}
+
+/* 顶部中间：礼物展柜入口，先放大晃动再恢复，吸引小朋友注意 */
+.btn-gift {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.gift-icon {
+  display: inline-block;
+  font-size: clamp(22px, 5vmin, 30px);
+  line-height: 1;
+  transform-origin: 50% 60%;
+  animation: gift-wiggle 2.6s ease-in-out infinite;
+}
+
+@keyframes gift-wiggle {
+  0%, 55%, 100% {
+    transform: scale(1) rotate(0deg);
+  }
+  62% {
+    transform: scale(1.28) rotate(-10deg);
+  }
+  69% {
+    transform: scale(1.28) rotate(9deg);
+  }
+  76% {
+    transform: scale(1.24) rotate(-7deg);
+  }
+  83% {
+    transform: scale(1.12) rotate(5deg);
+  }
+  90% {
+    transform: scale(1.02) rotate(-2deg);
+  }
 }
 
 /* 无背景框的三个点，逐个放大再恢复形成波浪动画 */
@@ -1940,29 +1990,29 @@ body.hide-note .hint-bar {
   width: 6px;
   height: 9px;
   transform: translate(-50%, -50%);
-  animation: confetti-burst 0.95s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+  animation: confetti-burst 1.2s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
   will-change: transform, opacity;
 }
 
 /* 星星中心的扩散光环，作为礼花的第一下"炸开" */
 .confetti-ring {
   position: absolute;
-  width: 26px;
-  height: 26px;
+  width: 52px;
+  height: 52px;
   border: 3px solid #ffd34d;
   border-radius: 50%;
   transform: translate(-50%, -50%);
-  animation: confetti-ring 0.55s ease-out forwards;
+  animation: confetti-ring 0.7s ease-out forwards;
   will-change: transform, opacity;
 }
 
 @keyframes confetti-ring {
   0% {
-    transform: translate(-50%, -50%) scale(0.3);
+    transform: translate(-50%, -50%) scale(0.2);
     opacity: 0.95;
   }
   100% {
-    transform: translate(-50%, -50%) scale(3);
+    transform: translate(-50%, -50%) scale(3.5);
     opacity: 0;
   }
 }
@@ -1988,8 +2038,368 @@ body.hide-note .hint-bar {
   color: #6b5b45;
 }
 
+/* 新学会的字：小田字格横排，楷体十字线 + 绿色底，参考练习记录的 .hchar.ok */
+.result-new-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  min-height: 0;
+}
+
+.result-new-label {
+  font-size: clamp(16px, 3.4vmin, 22px);
+  color: #6b5b45;
+}
+
+.new-learned-item {
+  width: clamp(32px, 7.5vmin, 44px);
+  height: clamp(32px, 7.5vmin, 44px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--kaiti);
+  font-size: clamp(20px, 5vmin, 30px);
+  line-height: 1;
+  color: #3b7a3e;
+  background-color: #eaf7e6;
+  border: 1px solid rgba(87, 166, 90, 0.4);
+  border-radius: 6px;
+  /* 淡十字线，与田字格风格一致 */
+  background-image: linear-gradient(
+      to right,
+      transparent calc(50% - 0.5px),
+      rgba(87, 166, 90, 0.25) calc(50% - 0.5px),
+      rgba(87, 166, 90, 0.25) calc(50% + 0.5px),
+      transparent calc(50% + 0.5px)
+    ),
+    linear-gradient(
+      to bottom,
+      transparent calc(50% - 0.5px),
+      rgba(87, 166, 90, 0.25) calc(50% - 0.5px),
+      rgba(87, 166, 90, 0.25) calc(50% + 0.5px),
+      transparent calc(50% + 0.5px)
+    );
+}
+
+/* 结束页底部：用户名 · 册名 */
+.result-footer {
+  font-size: clamp(13px, 3vmin, 17px);
+  color: #b09a7d;
+  margin: 14px 0 2px;
+}
+
+/* 礼物提示小手：固定层，从屏幕底部往上滑到按钮中心，循环"滑上来→轻点→停留→滑下" */
+.gift-hand {
+  position: fixed;
+  left: var(--start-left);
+  top: var(--start-top);
+  z-index: 9100;
+  width: var(--size, 56px);
+  pointer-events: none;
+  transform-origin: 50% 3.75%;
+  /* 从起点位置 translate 到终点位置，全程在屏幕内可见 */
+  animation: gift-hand-finger 2.4s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+.gift-hand svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.18));
+}
+
+/* translate 差值：让元素从 viewport 底边（CSS 初始位置）滑到按钮中心 */
+@keyframes gift-hand-finger {
+  0% {
+    opacity: 0.95;
+    transform: translate(0, 0) scale(0.92);
+  }
+  55% {
+    opacity: 1;
+    transform: translate(
+      calc(var(--ex) - var(--start-left)),
+      calc(var(--ey) - var(--start-top))
+    ) scale(1);
+  }
+  63% {
+    transform: translate(
+      calc(var(--ex) - var(--start-left)),
+      calc(var(--ey) - var(--start-top))
+    ) scale(0.86);
+  }
+  72% {
+    transform: translate(
+      calc(var(--ex) - var(--start-left)),
+      calc(var(--ey) - var(--start-top))
+    ) scale(1);
+  }
+  88% {
+    opacity: 1;
+    transform: translate(
+      calc(var(--ex) - var(--start-left)),
+      calc(var(--ey) - var(--start-top))
+    ) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(
+      calc(var(--ex) - var(--start-left)),
+      calc(var(--ey) - var(--start-top) + 24%)
+    ) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gift-hand {
+    display: none;
+  }
+
+  .gift-ripple-layer {
+    display: none;
+  }
+}
+
+/* 礼物按钮上的循环水波纹：每 900ms 冒出一圈，从中心向外扩散并淡出 */
+.gift-ripple-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 9050;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.gift-ripple {
+  position: absolute;
+  left: var(--rx);
+  top: var(--ry);
+  width: 36px;
+  height: 36px;
+  margin-left: -18px;
+  margin-top: -18px;
+  border-radius: 50%;
+  border: 3px solid rgba(242, 165, 65, 0.85);
+  background: rgba(242, 165, 65, 0.18);
+  transform: scale(0.35);
+  animation: gift-ripple-burst 1.5s ease-out forwards;
+  will-change: transform, opacity;
+}
+
+@keyframes gift-ripple-burst {
+  0% {
+    transform: scale(0.35);
+    opacity: 0.92;
+  }
+  100% {
+    transform: scale(4.5);
+    opacity: 0;
+  }
+}
+
 #view-result .btn {
   margin-top: 20px;
+}
+
+/* ---------- 礼物兑换与展柜 ---------- */
+.gift-reward {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: min(86vw, 460px);
+  margin: 2px 0 4px;
+  padding: 12px 18px;
+  background: #fff7df;
+  border: 2px dashed #f2c76e;
+  border-radius: 16px;
+  text-align: center;
+}
+
+.gift-reward-tip {
+  color: #b0782e;
+  font-size: clamp(15px, 3.4vmin, 19px);
+  line-height: 1.5;
+}
+
+#view-result .gift-reward .btn {
+  margin-top: 0;
+  padding: 10px 26px;
+  font-size: clamp(16px, 3.5vmin, 20px);
+}
+
+/* 展柜页：内容多时可滚动，礼物按屏幕宽度自动换行 */
+#view-gifts {
+  justify-content: flex-start;
+  overflow-y: auto;
+  padding-top: clamp(18px, 4vmin, 36px);
+  padding-bottom: 24px;
+}
+
+#view-gifts .app-title {
+  margin-bottom: 6px;
+  font-size: clamp(30px, 7vmin, 52px);
+}
+
+.gift-owner {
+  color: #b09a7d;
+  font-size: clamp(14px, 3vmin, 18px);
+  margin-bottom: 16px;
+}
+
+.gift-shelf {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.gift-shelf-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 12px 6px 9px;
+  background: #fffdf5;
+  border: 2px solid #e8dcc6;
+  border-radius: 16px;
+  box-shadow: 0 4px 0 #eadfcb;
+}
+
+.gift-shelf-icon {
+  font-size: clamp(30px, 7vmin, 46px);
+  line-height: 1.1;
+}
+
+.gift-shelf-name {
+  color: #6b5b45;
+  font-size: clamp(13px, 3vmin, 16px);
+}
+
+.gift-shelf-count {
+  color: #b09a7d;
+  font-size: clamp(12px, 2.6vmin, 14px);
+}
+
+.gift-empty {
+  color: #b09a7d;
+  font-size: clamp(16px, 3.6vmin, 20px);
+  text-align: center;
+  line-height: 1.6;
+  margin: 10px 0 22px;
+}
+
+#btn-gifts-back {
+  margin-top: 6px;
+}
+
+/* 挑选礼物的弹窗：固定高度内滚动，不把按钮挤出屏幕 */
+.gift-dialog {
+  width: min(92vw, 600px);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.gift-pick-tip {
+  color: #8c7a63;
+  font-size: clamp(14px, 3vmin, 17px);
+  margin-bottom: 10px;
+}
+
+.gift-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 2px 8px;
+}
+
+.gift-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  background: #fff;
+  border: 2px solid #e4d8c2;
+  border-radius: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.gift-item:active {
+  transform: scale(0.94);
+}
+
+.gift-emoji {
+  font-size: clamp(26px, 6vmin, 36px);
+  line-height: 1.1;
+}
+
+.gift-name {
+  color: #6b5b45;
+  font-size: clamp(12px, 2.8vmin, 15px);
+  line-height: 1.3;
+}
+
+.gift-owned {
+  color: #b09a7d;
+  font-size: clamp(10px, 2.4vmin, 12px);
+}
+
+.gift-item.selected {
+  border-color: #f2a541;
+  background: #fff3d6;
+  transform: scale(1.04);
+  box-shadow: 0 0 0 3px rgba(242, 165, 65, 0.22);
+}
+
+.gift-item.selected::after {
+  content: "✓";
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #f2a541;
+  color: #fff;
+  font-size: 13px;
+  line-height: 20px;
+  text-align: center;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+@media (max-width: 560px) {
+  .gift-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 400px) {
+  .gift-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gift-icon {
+    animation: none;
+  }
 }
 
 /* ---------- 鼠标气泡特效 ---------- */

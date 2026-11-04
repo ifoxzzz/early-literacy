@@ -84,6 +84,7 @@ const Storage = {
     localStorage.removeItem(this.quizOptionsKey(id));
     localStorage.removeItem(this.quizCountKey(id));
     localStorage.removeItem(this.lastVolumeKey(id));
+    localStorage.removeItem(this.giftsKey(id));
     // 拼音、注解开关也按小朋友保存，删除时一并清理
     this.USER_PREF_KEYS.forEach((k) => localStorage.removeItem(this.prefKey(k, id)));
     if (this.currentId() === id) localStorage.removeItem(this.CURRENT_KEY);
@@ -109,6 +110,25 @@ const Storage = {
 
   lastVolumeKey(id) {
     return `early-literacy-last-volume:${id || this.currentId()}`;
+  },
+
+  giftsKey(id) {
+    return `early-literacy-gifts:${id || this.currentId()}`;
+  },
+
+  // ---------- 礼物展柜（按小朋友独立保存） ----------
+  // 数据结构：{ "礼物名称": 数量 }，名称与 data/gifts.js 的清单对应
+  gifts(id) {
+    const data = this.readJSON(this.giftsKey(id), {});
+    return data && typeof data === "object" && !Array.isArray(data) ? data : {};
+  },
+
+  addGifts(names, id) {
+    const data = this.gifts(id);
+    (names || []).forEach((name) => {
+      data[name] = (data[name] || 0) + 1;
+    });
+    this.writeJSON(this.giftsKey(id), data);
   },
 
   // ---------- 最近选中的册（按小朋友独立保存） ----------

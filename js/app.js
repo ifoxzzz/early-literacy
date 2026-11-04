@@ -54,6 +54,7 @@
     volumeWords: $("#view-volume-words"),
     quiz: $("#view-quiz"),
     result: $("#view-result"),
+    gifts: $("#view-gifts"),
   };
 
   // 本次练习状态
@@ -79,9 +80,17 @@
     guardTimer: null, // 夸奖语音结束回调的 6 秒兜底
   };
 
+  // 礼物兑换状态：本组可挑选数量、已选礼物、是否已领取；giftsReturnView 记录展柜返回去向
+  let giftQuota = 0;
+  let giftPicked = [];
+  let giftClaimed = false;
+  let giftsReturnView = "quiz";
+
   function show(name) {
     Object.values(views).forEach((v) => v.classList.add("hidden"));
     views[name].classList.remove("hidden");
+    // 离开结束页时清理小手和水波纹
+    if (name !== "result") cleanupResultFx();
     // 练习页保持屏幕常亮，离开练习页立即释放
     if (name === "quiz") WakeLock.enable();
     else WakeLock.disable();
@@ -957,29 +966,30 @@
     const layer = ensureResultFx();
     const cx = rect.left + rect.width / 2;
     const cy = rect.top + rect.height / 2;
-    // 先来一圈快速扩散的光环，再接彩色纸屑，像一朵小礼花炸开
+    // 先一圈扩散光环，再彩色纸屑——范围加大，围绕每颗星星炸开一小团烟花
     const ring = document.createElement("span");
     ring.className = "confetti-ring";
     ring.style.left = `${cx}px`;
     ring.style.top = `${cy}px`;
     layer.appendChild(ring);
-    setTimeout(() => ring.remove(), 700);
-    for (let i = 0; i < 16; i++) {
+    setTimeout(() => ring.remove(), 900);
+    const count = 26;
+    for (let i = 0; i < count; i++) {
       const piece = document.createElement("span");
-      const angle = (Math.PI * 2 * i) / 16 + Math.random() * 0.45;
-      const dist = 28 + Math.random() * 34;
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.4;
+      const dist = 80 + Math.random() * 90;
       piece.className = "confetti-piece";
       piece.style.left = `${cx}px`;
       piece.style.top = `${cy}px`;
-      piece.style.width = `${5 + Math.random() * 3}px`;
-      piece.style.height = `${7 + Math.random() * 5}px`;
+      piece.style.width = `${6 + Math.random() * 4}px`;
+      piece.style.height = `${9 + Math.random() * 6}px`;
       piece.style.background = FIREWORK_COLORS[i % FIREWORK_COLORS.length];
       if (i % 3 === 0) piece.style.borderRadius = "50%";
       piece.style.setProperty("--dx", `${Math.cos(angle) * dist}px`);
-      piece.style.setProperty("--dy", `${Math.sin(angle) * dist + 18}px`);
-      piece.style.setProperty("--rot", `${(Math.random() - 0.5) * 320}deg`);
+      piece.style.setProperty("--dy", `${Math.sin(angle) * dist + 28}px`);
+      piece.style.setProperty("--rot", `${(Math.random() - 0.5) * 360}deg`);
       layer.appendChild(piece);
-      setTimeout(() => piece.remove(), 1000);
+      setTimeout(() => piece.remove(), 1200);
     }
   }
 
@@ -991,7 +1001,20 @@
   }
 
   /* ---------- 结束页 ---------- */
+  let resultHandEl = null;
+  let resultRippleEl = null;
+  let resultRippleInterval = null;
+  let resultResizeFn = null;
+
+  function cleanupResultFx() {
+    if (resultHandEl) { resultHandEl.remove(); resultHandEl = null; }
+    if (resultRippleEl) { resultRippleEl.remove(); resultRippleEl = null; }
+    if (resultRippleInterval) { clearInterval(resultRippleInterval); resultRippleInterval = null; }
+    if (resultResizeFn) { window.removeEventListener("resize", resultResizeFn); resultResizeFn = null; }
+  }
+
   function renderResult() {
+    cleanupResultFx();
     Storage.addHistory({
       stars: session.stars,
       total: session.total,
@@ -1010,13 +1033,192 @@
     } else {
       $("#result-stars").textContent = "这一组还没有星星，下次加油！";
     }
-    $("#result-accuracy").textContent = `${session.volume} · 答对 ${session.firstTryCorrect} / ${session.total} 题`;
-    $("#result-new").textContent =
-      session.newLearned.length > 0 ? `新学会：${session.newLearned.join("、")}` : "";
-    Speaker.result(session.stars, session.userName);
+    // 新学会的字：小田字格样式，绿色底
+    const newWrap = $("#result-new");
+    if (session.newLearned.length > 0) {
+      newWrap.innerHTML =
+        `<span class="result-new-label">新学会：</span>` +
+        session.newLearned
+          .map((c) => `<span class="new-learned-item">${c}</span>`)
+          .join("");
+    } else {
+      newWrap.innerHTML = "";
+    }
+    // 底部：用户名 · 册名（参考练习页底部信息行）
+    $("#result-footer").textContent =
+      session.userName && session.volume ? `${session.userName} · ${session.volume}` : "";
+    // 本组星星数决定礼物挑选次数：6 颗及以上 1 次，10 颗及以上 2 次
+    giftQuota = giftQuotaFor(session.stars);
+    giftPicked = [];
+    giftClaimed = false;
+    renderGiftReward();
     show("result");
     // 星星渲染完成后再取位置放礼花，避免量到 0 尺寸
-    if (session.stars > 0) queueStarConfetti();
+    if (session.stars > 0) {
+      queueStarConfetti();
+      // 每颗星的 confetti 持续 1.2s，最后一颗起点 (n-1)*90+260ms，再加 200ms 缓冲
+      // 烟花全部结束后立即启动小手（语音还在后台播，两者并行）
+      const delay = (session.stars - 1) * 90 + 260 + 1400;
+      setTimeout(() => {
+        if (giftQuota > 0 && giftQuotaFor(session.stars) > 0 && !document.getElementById("view-result").classList.contains("hidden")) {
+          showGiftHand();
+        }
+      }, delay);
+    }
+    // 语音播放链：done → starsN → [gift] → cheer（独立播，不阻塞小手启动）
+    Speaker.result(session.stars, session.userName, { gift: giftQuota > 0 });
+  }
+
+  // 礼物提示小手：固定层 SVG 小手指向 #btn-gift-open，循环"滑上来→轻点→停留→滑下"；
+  // 目标按钮中心还会循环冒水波纹冒泡，引导点击。切页后 cleanupResultFx 统一清理。
+  function showGiftHand() {
+    const target = document.getElementById("btn-gift-open");
+    if (!target) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    // 先清理上一轮残留
+    cleanupResultFx();
+
+    // 小手
+    resultHandEl = document.createElement("span");
+    resultHandEl.className = "gift-hand";
+    resultHandEl.setAttribute("aria-hidden", "true");
+    resultHandEl.innerHTML =
+      '<svg viewBox="0 0 64 80" aria-hidden="true">' +
+      '<rect x="26" y="3" width="14" height="44" rx="7" fill="#f5ad63"/>' +
+      '<rect x="5" y="37" width="14" height="22" rx="7" transform="rotate(-22 12 48)" fill="#f5ad63"/>' +
+      '<rect x="13" y="33" width="38" height="33" rx="15" fill="#f5ad63"/>' +
+      '<rect x="16" y="63" width="32" height="9" rx="4.5" fill="#8ecfe0"/>' +
+      "</svg>";
+    document.body.appendChild(resultHandEl);
+
+    // 水波纹层（固定铺满视口，pointer-events: none）
+    resultRippleEl = document.createElement("div");
+    resultRippleEl.className = "gift-ripple-layer";
+    document.body.appendChild(resultRippleEl);
+
+    const updatePos = () => {
+      const t = target.getBoundingClientRect();
+      if (!t.width) return;
+      const cx = t.left + t.width / 2;
+      const cy = t.top + t.height / 2;
+      const size = Math.max(64, Math.min(t.width, 110) * 0.45);
+      // 起点：按钮中心往下一半的位置（原先从 viewport 底边，现在减半）
+      const startTopY = cy + (window.innerHeight - cy) / 2;
+      resultHandEl.style.setProperty("--start-top", `${startTopY - size * 0.0375}px`);
+      resultHandEl.style.setProperty("--start-left", `${cx - size * 0.5}px`);
+      // 终点：指尖在按钮中心
+      resultHandEl.style.setProperty("--ex", `${cx - size * 0.5}px`);
+      resultHandEl.style.setProperty("--ey", `${cy - size * 0.0375}px`);
+      resultHandEl.style.setProperty("--size", `${size}px`);
+      resultRippleEl.style.setProperty("--rx", `${cx}px`);
+      resultRippleEl.style.setProperty("--ry", `${cy}px`);
+    };
+    updatePos();
+    resultResizeFn = updatePos;
+    window.addEventListener("resize", resultResizeFn);
+
+    // 水波纹冒泡：每 900ms 生成一圈小圈，循环直到 cleanupResultFx
+    const spawnRipple = () => {
+      if (!resultRippleEl) return;
+      if (document.getElementById("view-result").classList.contains("hidden")) return;
+      const r = document.createElement("span");
+      r.className = "gift-ripple";
+      resultRippleEl.appendChild(r);
+      setTimeout(() => r.remove(), 1500);
+    };
+    resultRippleInterval = setInterval(spawnRipple, 900);
+    spawnRipple(); // 立即来一圈
+  }
+
+  /* ---------- 礼物兑换与展柜 ---------- */
+  const giftCatalog = () => window.GIFTS || {};
+
+  // 本组星星数决定挑选次数：6 颗及以上 1 件，10 颗及以上 2 件
+  function giftQuotaFor(stars) {
+    if (stars >= 10) return 2;
+    if (stars >= 6) return 1;
+    return 0;
+  }
+
+  function giftLabel(name) {
+    return `${giftCatalog()[name] || "🎁"} ${name}`;
+  }
+
+  // 结束页的礼物入口：未领取显示挑选按钮，已领取显示放入展柜的礼物
+  function renderGiftReward() {
+    const box = $("#gift-reward");
+    if (giftQuota <= 0 || Object.keys(giftCatalog()).length === 0) {
+      box.classList.add("hidden");
+      return;
+    }
+    box.classList.remove("hidden");
+    if (giftClaimed) {
+      $("#gift-reward-tip").textContent = `已放入礼物展柜：${giftPicked.map(giftLabel).join("、")}`;
+      $("#btn-gift-open").textContent = "查看礼物展柜 🎁";
+    } else {
+      $("#gift-reward-tip").textContent = `本组可以挑选 ${giftQuota} 件礼物！`;
+      $("#btn-gift-open").textContent = "打开礼物清单 🎁";
+    }
+  }
+
+  // 展柜只显示已经拥有的礼物，按礼物清单顺序排列并显示数量
+  function renderGiftShelf() {
+    const user = Storage.currentUser();
+    const data = Storage.gifts(user ? user.id : "");
+    const catalog = giftCatalog();
+    const order = Object.keys(catalog);
+    const owned = Object.keys(data)
+      .filter((name) => data[name] > 0)
+      .sort((a, b) => {
+        const ia = order.indexOf(a);
+        const ib = order.indexOf(b);
+        return (ia < 0 ? order.length : ia) - (ib < 0 ? order.length : ib);
+      });
+    const total = owned.reduce((sum, name) => sum + data[name], 0);
+    $("#gifts-owner").textContent = user
+      ? `${user.name} 的礼物展柜 · 共 ${total} 件`
+      : `礼物展柜 · 共 ${total} 件`;
+    $("#gift-shelf").innerHTML = owned
+      .map(
+        (name) => `<div class="gift-shelf-item">
+          <span class="gift-shelf-icon">${catalog[name] || "🎁"}</span>
+          <span class="gift-shelf-name">${name}</span>
+          <span class="gift-shelf-count">×${data[name]}</span>
+        </div>`
+      )
+      .join("");
+    $("#gift-empty").classList.toggle("hidden", owned.length > 0);
+    $("#gift-shelf").classList.toggle("hidden", owned.length === 0);
+    show("gifts");
+  }
+
+  function updateGiftPickState() {
+    $("#gift-pick-tip").textContent =
+      giftPicked.length > 0
+        ? `已选 ${giftPicked.length} / ${giftQuota} 件`
+        : `可以挑 ${giftQuota} 件礼物，点一下图标选中`;
+    document.querySelectorAll("#gift-grid .gift-item").forEach((el) => {
+      el.classList.toggle("selected", giftPicked.includes(el.dataset.name));
+    });
+    $("#btn-gift-ok").disabled = giftPicked.length === 0;
+  }
+
+  function openGiftPicker() {
+    if (giftClaimed || giftQuota <= 0) return;
+    giftPicked = [];
+    const owned = Storage.gifts(session.userId);
+    $("#gift-grid").innerHTML = Object.entries(giftCatalog())
+      .map(([name, icon]) => {
+        const count = owned[name] || 0;
+        return `<button type="button" class="gift-item" data-name="${name}">
+          <span class="gift-emoji">${icon}</span>
+          <span class="gift-name">${name}</span>
+          ${count > 0 ? `<span class="gift-owned">已有 ${count}</span>` : ""}
+        </button>`;
+      })
+      .join("");
+    updateGiftPickState();
+    $("#gift-dialog").classList.remove("hidden");
   }
 
   /* ---------- 事件绑定 ---------- */
@@ -1310,6 +1512,57 @@
     }
     const user = Storage.users().find((u) => u.id === session.userId) || Storage.currentUser();
     enterVolume(user, volume);
+  });
+  // 练习页顶部的礼物图标：进入当前小朋友的礼物展柜，返回时回到练习页
+  $("#btn-gift").addEventListener("click", () => {
+    giftsReturnView = "quiz";
+    renderGiftShelf();
+  });
+  // 结束页礼物入口：未领取时打开礼物清单，已领取时直接查看展柜
+  $("#btn-gift-open").addEventListener("click", () => {
+    cleanupResultFx(); // 点击后立即隐藏小手和水波纹，避免挡住礼物弹窗/展柜
+    if (giftClaimed) {
+      giftsReturnView = "result";
+      renderGiftShelf();
+    } else {
+      openGiftPicker();
+    }
+  });
+  $("#btn-gifts-back").addEventListener("click", () => {
+    show(giftsReturnView);
+    if (giftsReturnView === "quiz") applyGridLayout();
+  });
+  // 礼物清单：点一下选中，再点一下取消；超过可挑数量时提示先取消一件
+  $("#gift-grid").addEventListener("click", (e) => {
+    const item = e.target.closest(".gift-item");
+    if (!item) return;
+    const name = item.dataset.name;
+    const idx = giftPicked.indexOf(name);
+    if (idx >= 0) {
+      giftPicked.splice(idx, 1);
+    } else if (giftPicked.length < giftQuota) {
+      giftPicked.push(name);
+    } else {
+      $("#gift-pick-tip").textContent = `最多选 ${giftQuota} 件，可以先取消一件`;
+      return;
+    }
+    updateGiftPickState();
+  });
+  // 收下礼物：写入该小朋友的礼物展柜，本组不能重复领取
+  $("#btn-gift-ok").addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (giftClaimed || giftPicked.length === 0) return;
+    Storage.addGifts(giftPicked, session.userId);
+    giftClaimed = true;
+    $("#gift-dialog").classList.add("hidden");
+    Sound.play("correct");
+    renderGiftReward();
+  });
+  $("#btn-gift-cancel").addEventListener("click", () => {
+    $("#gift-dialog").classList.add("hidden");
+  });
+  $("#gift-dialog").addEventListener("click", (e) => {
+    if (e.target === $("#gift-dialog")) $("#gift-dialog").classList.add("hidden");
   });
   // 应用设置入口（首页左下角小齿轮）
   $("#btn-admin").addEventListener("click", renderAdmin);

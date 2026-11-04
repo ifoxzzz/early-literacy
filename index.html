@@ -6,7 +6,7 @@
   <title>宝贝趣味识字</title>
   <script>
     // 全局唯一缓存版本：改动任何 css/js/音频后，只需把这个值 +1，即可让全部缓存失效
-    var CACHE_VERSION = "134";
+    var CACHE_VERSION = "143";
     window.APP_VERSION = CACHE_VERSION;
     document.write('<link rel="stylesheet" href="css/style.css?v=' + CACHE_VERSION + '">');
     // 内置楷体（Windows 楷体 SimKai 子集）：只用于田字格、汉字表与练习记录里的汉字
@@ -260,6 +260,19 @@
     </div>
   </div>
 
+  <!-- 挑选礼物：结束页按星星数量给出挑选次数，点礼物选中，再点「收下礼物」放入展柜 -->
+  <div class="dialog-mask hidden" id="gift-dialog">
+    <div class="dialog gift-dialog">
+      <p class="dialog-title">挑选礼物</p>
+      <p class="gift-pick-tip" id="gift-pick-tip"></p>
+      <div class="gift-grid" id="gift-grid"></div>
+      <div class="dialog-btns">
+        <button class="btn btn-ghost" id="btn-gift-cancel">取消</button>
+        <button class="btn btn-primary" id="btn-gift-ok" disabled>收下礼物</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 进入练习前的资源加载遮罩：语音全部就绪后再进入答题 -->
   <div class="dialog-mask hidden" id="loading-mask" role="status" aria-live="polite">
     <div class="dialog loading-dialog">
@@ -320,6 +333,9 @@
       </div>
       <div class="quiz-status">
         <span id="quiz-stars" data-count="0"><span class="qs-icon">⭐</span><span class="qs-num" id="quiz-star-num">0</span></span>
+        <button class="btn-gift" id="btn-gift" aria-label="礼物展柜">
+          <span class="gift-icon">🎁</span>
+        </button>
         <button class="btn-tools-show" id="btn-tools-show"
           aria-expanded="false" aria-controls="quiz-tools" aria-label="显示顶部按钮">
           <span class="dot"></span><span class="dot"></span><span class="dot"></span>
@@ -347,10 +363,23 @@
     <h1 class="app-title">完成啦！</h1>
     <p class="result-user" id="result-user"></p>
     <p class="result-line" id="result-stars"></p>
-    <p class="result-line" id="result-accuracy"></p>
-    <p class="result-line" id="result-new"></p>
+    <div class="result-new-wrap" id="result-new"></div>
+    <div class="gift-reward hidden" id="gift-reward">
+      <p class="gift-reward-tip" id="gift-reward-tip"></p>
+      <button class="btn btn-primary" id="btn-gift-open">打开礼物清单 🎁</button>
+    </div>
+    <p class="result-footer" id="result-footer"></p>
     <button class="btn btn-primary" id="btn-continue">继续答题</button>
     <button class="btn btn-ghost" id="btn-again">返回</button>
+  </section>
+
+  <!-- 礼物展柜：展示当前小朋友收集到的全部礼物 -->
+  <section id="view-gifts" class="view hidden">
+    <h1 class="app-title">礼物展柜</h1>
+    <p class="gift-owner" id="gifts-owner"></p>
+    <div class="gift-shelf" id="gift-shelf"></div>
+    <p class="gift-empty hidden" id="gift-empty">还没有礼物，答对 6 题及以上就能挑选礼物啦！</p>
+    <button class="btn btn-primary" id="btn-gifts-back">返回</button>
   </section>
 
   <!-- 烟花特效画布：首次答对时从点击/触摸位置绽放，不拦截任何点击 -->
@@ -361,6 +390,7 @@
     // 每个脚本加载完成（或失败）都推进首屏进度条，app.js 初始化结束再收起遮罩
     var bootScripts = [
       "data/volumes.js",
+      "data/gifts.js",
       "js/memory.js",
       "js/storage.js",
       "js/quiz.js",

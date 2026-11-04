@@ -240,7 +240,7 @@ const Speaker = {
   // onProgress(done, total) 用于进入练习页前的进度条
   preloadSession(name, targets, onProgress) {
     // 「请找出」始终用通用提示语，名字语音里没有这个文件
-    const phrases = ["welcome", "done", "cheer"];
+    const phrases = ["welcome", "done", "cheer", "gift"];
     for (let level = 1; level <= 5; level++) {
       for (let n = 1; n <= 6; n++) phrases.push(`praise${level}_${n}`);
     }
@@ -416,15 +416,19 @@ const Speaker = {
     this.play([this.audioUrl("phrases/help.mp3")]);
   },
 
-  // 结束页：完成 + 星星数 + 鼓励
+  // 结束页：完成 + 星星数 + [有礼物时]礼物提示 + 鼓励
   // 星星数最多等于每组题数（练习设置可配 5~20），故音频上限为 20
-  result(stars, name) {
+  // opts.gift: 是否需要插入礼物提示；opts.onDone: 所有语音播完后回调
+  result(stars, name, opts) {
+    const { gift = false, onDone = null } = opts || {};
     const n = Math.max(0, Math.min(20, Math.round(stars)));
-    this.play([
+    const list = [
       this.phraseFile("done", name),
       this.audioUrl(`phrases/stars${n}.mp3`),
-      this.phraseFile("cheer", name),
-    ]);
+    ];
+    if (gift) list.push(this.audioUrl("phrases/gift.mp3"));
+    list.push(this.phraseFile("cheer", name));
+    this.play(list, onDone);
   },
 };
 

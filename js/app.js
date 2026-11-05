@@ -617,6 +617,75 @@
     return r && r.correct === 1 && r.wrong === 0;
   }
 
+  /* ---------- 通用「手指引导 + 水波」特效 ---------- */
+  // 手指 SVG：指尖位于顶部，宽度由调用方决定
+  const HAND_SVG =
+    '<svg viewBox="0 0 64 80" aria-hidden="true">' +
+    '<rect x="26" y="3" width="14" height="44" rx="7" fill="#f5ad63"/>' +
+    '<rect x="5" y="37" width="14" height="22" rx="7" transform="rotate(-22 12 48)" fill="#f5ad63"/>' +
+    '<rect x="13" y="33" width="38" height="33" rx="15" fill="#f5ad63"/>' +
+    '<rect x="16" y="63" width="32" height="9" rx="4.5" fill="#8ecfe0"/>' +
+    "</svg>";
+
+  let fingerGuideLayer = null;
+
+  function hideFingerGuide() {
+    if (fingerGuideLayer) {
+      fingerGuideLayer.remove();
+      fingerGuideLayer = null;
+    }
+  }
+
+  // 通用接口：传入起点坐标、终点坐标、水波直径、手指宽度，即可在任意位置播放引导特效
+  // container 默认 document.body（坐标为视口坐标）；传入元素时坐标相对该元素，特效随元素一起移动
+  function showFingerGuide({
+    from,
+    to,
+    rippleSize,
+    fingerSize,
+    container = document.body,
+    color = "87, 166, 90",
+  } = {}) {
+    hideFingerGuide();
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return null;
+
+    const layer = document.createElement("div");
+    layer.className = "finger-guide-layer";
+    if (container === document.body) layer.classList.add("is-fixed");
+    layer.setAttribute("aria-hidden", "true");
+    layer.style.setProperty("--guide-color", color);
+    layer.style.setProperty("--ripple-size", `${rippleSize}px`);
+    layer.style.setProperty("--finger-size", `${fingerSize}px`);
+    layer.style.setProperty("--hand-left", `${to.x - fingerSize / 2}px`);
+    // 让食指（手指区域）的中心对准终点，而不是用指尖对准，视觉上整体略微上移
+    // 0.20 = 食指中心在 SVG 中的高度占比
+    layer.style.setProperty("--hand-top", `${to.y - fingerSize * 0.20}px`);
+    layer.style.setProperty("--from-dx", `${from.x - to.x}px`);
+    layer.style.setProperty("--from-dy", `${from.y - to.y}px`);
+
+    const ripple = document.createElement("span");
+    ripple.className = "finger-guide-ripple";
+    ripple.style.left = `${to.x}px`;
+    ripple.style.top = `${to.y}px`;
+    for (let i = 0; i < 3; i++) {
+      const ring = document.createElement("span");
+      ring.className = "finger-guide-ring";
+      ripple.appendChild(ring);
+    }
+    layer.appendChild(ripple);
+
+    const hand = document.createElement("span");
+    hand.className = "finger-guide-hand";
+    hand.innerHTML = HAND_SVG;
+    layer.appendChild(hand);
+
+    container.appendChild(layer);
+    fingerGuideLayer = layer;
+    return layer;
+  }
+
+  window.FingerGuide = { show: showFingerGuide, hide: hideFingerGuide };
+
   // 「帮帮我」：正确答案移到屏幕中央并放大，其余卡片淡出，同时播放提示语
   // 揭示后必须由孩子自己点中正确卡片才进入下一题（本题不计分）
   function useHelp() {
@@ -642,28 +711,16 @@
       }
     });
     if (!targetCard) return;
-    // 指尖点中田字格中心后，中心向外扩散三层同心水波（动画见 style.css 的 water-ripple）
-    const ripple = document.createElement("span");
-    ripple.className = "help-ripple";
-    ripple.setAttribute("aria-hidden", "true");
-    for (let i = 0; i < 3; i++) {
-      const ring = document.createElement("span");
-      ring.className = "ripple-ring";
-      ripple.appendChild(ring);
-    }
-    targetCard.appendChild(ripple);
-    // 小手提示：从田字格下方的外部滑上来，指尖点中中心后轻点一下再淡出，循环提示孩子点这张卡片
-    const hand = document.createElement("span");
-    hand.className = "help-hand";
-    hand.setAttribute("aria-hidden", "true");
-    hand.innerHTML =
-      '<svg viewBox="0 0 64 80" aria-hidden="true">' +
-      '<rect x="26" y="3" width="14" height="44" rx="7" fill="#f5ad63"/>' +
-      '<rect x="5" y="37" width="14" height="22" rx="7" transform="rotate(-22 12 48)" fill="#f5ad63"/>' +
-      '<rect x="13" y="33" width="38" height="33" rx="15" fill="#f5ad63"/>' +
-      '<rect x="16" y="63" width="32" height="9" rx="4.5" fill="#8ecfe0"/>' +
-      "</svg>";
-    targetCard.appendChild(hand);
+    // 小手从田字格下方滑上来，指尖点中中心后轻点，同时中心向外扩散三层同心水波
+    const cardW = targetCard.offsetWidth;
+    const cardH = targetCard.offsetHeight;
+    showFingerGuide({
+      container: targetCard,
+      from: { x: cardW / 2, y: cardH / 2 + cardW * 0.64 },
+      to: { x: cardW / 2, y: cardH / 2 },
+      rippleSize: cardW * 0.36,
+      fingerSize: cardW * 0.24,
+    });
     // 读取一次位置会强制提交上面的初始状态，再写入位移，动画才会从原位平滑开始
     const rect = targetCard.getBoundingClientRect();
     // 移到田字格舞台的中心（而不是整个视口中心），与新的居中布局保持一致
@@ -979,13 +1036,7 @@
     const layer = ensureResultFx();
     const cx = rect.left + rect.width / 2;
     const cy = rect.top + rect.height / 2;
-    // 先一圈扩散光环，再彩色纸屑——范围加大，围绕每颗星星炸开一小团烟花
-    const ring = document.createElement("span");
-    ring.className = "confetti-ring";
-    ring.style.left = `${cx}px`;
-    ring.style.top = `${cy}px`;
-    layer.appendChild(ring);
-    setTimeout(() => ring.remove(), 900);
+    // 彩色纸屑围绕每颗星星炸开一小团烟花
     const count = 26;
     for (let i = 0; i < count; i++) {
       const piece = document.createElement("span");
@@ -1014,15 +1065,10 @@
   }
 
   /* ---------- 结束页 ---------- */
-  let resultHandEl = null;
-  let resultRippleEl = null;
-  let resultRippleInterval = null;
   let resultResizeFn = null;
 
   function cleanupResultFx() {
-    if (resultHandEl) { resultHandEl.remove(); resultHandEl = null; }
-    if (resultRippleEl) { resultRippleEl.remove(); resultRippleEl = null; }
-    if (resultRippleInterval) { clearInterval(resultRippleInterval); resultRippleInterval = null; }
+    FingerGuide.hide();
     if (resultResizeFn) { window.removeEventListener("resize", resultResizeFn); resultResizeFn = null; }
   }
 
@@ -1082,65 +1128,31 @@
     Speaker.result(session.stars, session.userName, { gift: giftQuota > 0 });
   }
 
-  // 礼物提示小手：固定层 SVG 小手指向 #btn-gift-open，循环"滑上来→轻点→停留→滑下"；
-  // 目标按钮中心还会循环冒水波纹冒泡，引导点击。切页后 cleanupResultFx 统一清理。
+  // 礼物提示小手：用通用 FingerGuide 指向 #btn-gift-open，循环滑动 + 水波引导点击。
+  // 切页或点击礼物按钮后由 cleanupResultFx 统一清理。
   function showGiftHand() {
     const target = document.getElementById("btn-gift-open");
     if (!target) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    // 先清理上一轮残留
     cleanupResultFx();
 
-    // 小手
-    resultHandEl = document.createElement("span");
-    resultHandEl.className = "gift-hand";
-    resultHandEl.setAttribute("aria-hidden", "true");
-    resultHandEl.innerHTML =
-      '<svg viewBox="0 0 64 80" aria-hidden="true">' +
-      '<rect x="26" y="3" width="14" height="44" rx="7" fill="#f5ad63"/>' +
-      '<rect x="5" y="37" width="14" height="22" rx="7" transform="rotate(-22 12 48)" fill="#f5ad63"/>' +
-      '<rect x="13" y="33" width="38" height="33" rx="15" fill="#f5ad63"/>' +
-      '<rect x="16" y="63" width="32" height="9" rx="4.5" fill="#8ecfe0"/>' +
-      "</svg>";
-    document.body.appendChild(resultHandEl);
+    const t = target.getBoundingClientRect();
+    if (!t.width) return;
+    const cx = t.left + t.width / 2;
+    const cy = t.top + t.height / 2;
+    const size = Math.max(64, Math.min(t.width, 110) * 0.45);
+    FingerGuide.show({
+      color: "242, 165, 65",
+      from: { x: cx, y: cy + (window.innerHeight - cy) / 2 },
+      to: { x: cx, y: cy },
+      rippleSize: size * 1.05,
+      fingerSize: size,
+    });
 
-    // 水波纹层（固定铺满视口，pointer-events: none）
-    resultRippleEl = document.createElement("div");
-    resultRippleEl.className = "gift-ripple-layer";
-    document.body.appendChild(resultRippleEl);
-
-    const updatePos = () => {
-      const t = target.getBoundingClientRect();
-      if (!t.width) return;
-      const cx = t.left + t.width / 2;
-      const cy = t.top + t.height / 2;
-      const size = Math.max(64, Math.min(t.width, 110) * 0.45);
-      // 起点：按钮中心往下一半的位置（原先从 viewport 底边，现在减半）
-      const startTopY = cy + (window.innerHeight - cy) / 2;
-      resultHandEl.style.setProperty("--start-top", `${startTopY - size * 0.0375}px`);
-      resultHandEl.style.setProperty("--start-left", `${cx - size * 0.5}px`);
-      // 终点：指尖在按钮中心
-      resultHandEl.style.setProperty("--ex", `${cx - size * 0.5}px`);
-      resultHandEl.style.setProperty("--ey", `${cy - size * 0.0375}px`);
-      resultHandEl.style.setProperty("--size", `${size}px`);
-      resultRippleEl.style.setProperty("--rx", `${cx}px`);
-      resultRippleEl.style.setProperty("--ry", `${cy}px`);
+    resultResizeFn = () => {
+      if (!document.getElementById("view-result").classList.contains("hidden")) showGiftHand();
     };
-    updatePos();
-    resultResizeFn = updatePos;
     window.addEventListener("resize", resultResizeFn);
-
-    // 水波纹冒泡：每 900ms 生成一圈小圈，循环直到 cleanupResultFx
-    const spawnRipple = () => {
-      if (!resultRippleEl) return;
-      if (document.getElementById("view-result").classList.contains("hidden")) return;
-      const r = document.createElement("span");
-      r.className = "gift-ripple";
-      resultRippleEl.appendChild(r);
-      setTimeout(() => r.remove(), 1500);
-    };
-    resultRippleInterval = setInterval(spawnRipple, 900);
-    spawnRipple(); // 立即来一圈
   }
 
   /* ---------- 礼物兑换与展柜 ---------- */
@@ -1220,6 +1232,9 @@
     const uid = user ? user.id : "";
     giftItems = Storage.gifts(uid);
     const total = giftItems.length;
+    // 新礼物的闪烁只在本次首次进入橱窗时展示：拿到 fresh 状态后立即标记为已看，
+    // 本次渲染保留闪烁，后续再次进入页面或切换模式都不会再闪
+    giftItems.filter((g) => g.fresh).forEach((g) => Storage.markGiftSeen(g.id));
     // 后台预取已拥有礼物的名称音频（通常只有几件），放大时即可秒播
     Speaker.preload(
       [...new Set(giftItems.map((g) => g.name))].map((n) => Speaker.giftAudio(n))
@@ -1234,7 +1249,7 @@
       btn.classList.toggle("active", btn.dataset.mode === giftShelfMode);
     });
     const hasGifts = total > 0;
-    $("#gift-shelf").classList.toggle("hidden", giftShelfMode !== "shelf" || !hasGifts);
+    $("#gift-shelf-frame").classList.toggle("hidden", giftShelfMode !== "shelf" || !hasGifts);
     $("#gift-list").classList.toggle("hidden", giftShelfMode !== "list" || !hasGifts);
     // 垃圾篓只在橱窗模式且拖拽时才需要可见；平时常驻提示也可以，这里只在橱窗模式显示
     $("#gift-trash").classList.toggle("hidden", giftShelfMode !== "shelf" || !hasGifts);
@@ -1274,6 +1289,10 @@
     }
 
     show("gifts");
+    // 视图显示后再计算橱窗是否需要上下渐隐（礼物少时两侧都不显示）
+    requestAnimationFrame(() => {
+      if (giftShelfMode === "shelf" && hasGifts) updateScrollFade($("#gift-shelf"));
+    });
   }
 
   // 交换两张卡片在 DOM 中的位置，并用 FLIP 动画让被交换的非拖拽卡片平滑滑到新位置
@@ -1544,14 +1563,16 @@
     }
     enterVolume(Storage.currentUser(), volume);
   });
-  // 册目列表、汉字表、练习记录滚动时更新边缘淡出与滚动条显隐；窗口尺寸变化时重新计算
+  // 册目列表、汉字表、练习记录、礼物橱窗滚动时更新边缘淡出与滚动条显隐；窗口尺寸变化时重新计算
   bindScrollFx($("#volume-list"));
   bindScrollFx($("#word-list"), $("#word-sheet"));
   bindScrollFx($("#history-list"));
+  bindScrollFx($("#gift-shelf"));
   window.addEventListener("resize", () => {
     updateScrollFade($("#volume-list"));
     updateScrollFade($("#word-list"), $("#word-sheet"));
     updateScrollFade($("#history-list"));
+    updateScrollFade($("#gift-shelf"));
   });
   // 汉字表小喇叭：先加载该字的语音（未缓存时显示进度条），就绪后再播放
   let loadingWordAudio = false;
@@ -1728,21 +1749,29 @@
       renderGiftShelf();
     });
   });
-  // 橱窗：点礼物卡片 → 清除「新」标记（边框闪烁消失）+ 居中放大
+  // 橱窗：点礼物卡片 → 居中放大
   $("#gift-shelf").addEventListener("click", (e) => {
     const item = e.target.closest(".gift-shelf-item");
     if (!item || giftDragMoved) return; // 刚结束拖拽时不触发点击
     const gift = giftItems.find((g) => g.id === item.dataset.id);
     if (!gift) return;
-    if (gift.fresh) {
-      gift.fresh = false;
-      Storage.markGiftSeen(gift.id);
-      item.classList.remove("fresh");
-    }
     zoomGift(gift.name, item);
   });
-  // 放大 overlay：点任意位置恢复——沿原路飞回卡片位置并缩小淡出，再隐藏遮罩
+  // 点击大图上的礼物图标：左右晃动 + 点击音效（不会关闭大图）
+  $("#gift-zoom-icon").addEventListener("click", (e) => {
+    e.stopPropagation();
+    const icon = e.currentTarget;
+    Sound.play("click");
+    icon.classList.remove("shaking");
+    void icon.offsetWidth; // 强制重排以重启动画
+    icon.classList.add("shaking");
+  });
+  $("#gift-zoom-icon").addEventListener("animationend", (e) => {
+    if (e.animationName === "gift-icon-shake") e.currentTarget.classList.remove("shaking");
+  });
+  // 放大 overlay：只有点卡片外区域才恢复——沿原路飞回卡片位置并缩小淡出，再隐藏遮罩
   $("#gift-zoom").addEventListener("click", (e) => {
+    if (e.target.closest(".gift-zoom-inner")) return; // 点大图卡片内部不关闭
     const overlay = e.currentTarget;
     const inner = overlay.querySelector(".gift-zoom-inner");
     overlay.classList.remove("active"); // 背景遮罩淡出
@@ -1923,9 +1952,9 @@
     }
     updateGiftPickState();
   });
-  // 收下礼物：写入计数 + 领取日志；本组不能重复领取
-  $("#btn-gift-ok").addEventListener("click", (e) => {
-    e.stopPropagation();
+  // 收下礼物：写入计数 + 领取日志；每组只有一次挑选机会，
+  // 没有取消按钮，点其他区域也不会关闭，只有选中礼物后点此按钮才关闭弹窗
+  $("#btn-gift-ok").addEventListener("click", () => {
     if (giftClaimed || giftPicked.length === 0) return;
     Storage.addGifts(giftPicked, session.userId);
     Storage.addGiftLog(giftPicked, session.stars, session.userId);
@@ -1933,19 +1962,6 @@
     $("#gift-dialog").classList.add("hidden");
     Sound.play("correct");
     renderGiftReward();
-  });
-  // 关闭礼物弹窗：每组只有一次挑选机会，关闭即视为放弃未确认的选择
-  function closeGiftPicker() {
-    $("#gift-dialog").classList.add("hidden");
-    if (!giftClaimed) {
-      giftClaimed = true;
-      giftPicked = [];
-      renderGiftReward();
-    }
-  }
-  $("#btn-gift-cancel").addEventListener("click", closeGiftPicker);
-  $("#gift-dialog").addEventListener("click", (e) => {
-    if (e.target === $("#gift-dialog")) closeGiftPicker();
   });
   // 应用设置入口（首页左下角小齿轮）
   $("#btn-admin").addEventListener("click", renderAdmin);

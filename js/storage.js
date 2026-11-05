@@ -121,7 +121,7 @@ const Storage = {
   // 数据结构：[{ id, name, fresh }]
   //   id    每件礼物实例的唯一标识（同名礼物是两件独立物品，可分别排序/删除）
   //   name  与 data/gifts.js 清单对应的礼物名
-  //   fresh 新获得标记：true 时橱窗卡片带边框闪烁，点击后清除
+  //   fresh 新获得标记：true 时橱窗卡片带边框闪烁，首次展示后立即清除
   gifts(id) {
     const raw = this.readJSON(this.giftsKey(id), []);
     return Array.isArray(raw) ? raw : [];
@@ -152,7 +152,7 @@ const Storage = {
     this.writeJSON(this.giftsKey(id), arr);
   },
 
-  // 清除某件礼物的「新」标记（点击后边框闪烁消失）
+  // 清除某件礼物的「新」标记（首次展示后边框闪烁不再出现）
   markGiftSeen(giftId, id) {
     const arr = this.gifts(id);
     const item = arr.find((g) => g.id === giftId);

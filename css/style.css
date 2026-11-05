@@ -1648,116 +1648,120 @@ body.hide-pinyin #view-card .card .pinyin {
   box-shadow: 0 0 0 8px rgba(87, 166, 90, 0.18), 0 18px 40px rgba(0, 0, 0, 0.16);
 }
 
-/* 指尖点中后，从田字格中心向外扩散的层层水波 */
-.help-ripple {
+/* ---------- 通用「手指引导 + 水波」特效（window.FingerGuide） ---------- */
+.finger-guide-layer {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 0;
-  height: 0;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* 挂到 document.body 时铺满视口，盖在其他界面之上 */
+.finger-guide-layer.is-fixed {
+  position: fixed;
+  z-index: 9000;
+  overflow: hidden;
+}
+
+/* 以终点为圆心向外扩散的三层水波，尺寸由 --ripple-size 决定 */
+.finger-guide-ripple {
+  position: absolute;
+  width: var(--ripple-size);
+  height: var(--ripple-size);
+  margin-left: calc(var(--ripple-size) / -2);
+  margin-top: calc(var(--ripple-size) / -2);
   z-index: 0;
   pointer-events: none;
 }
 
-/* 三圈波纹都以同一个锚点为中心，动画里统一带 translate(-50%, -50%)，
-   缩放时圆心不会漂移 */
-.help-ripple .ripple-ring {
+.finger-guide-ring {
   position: absolute;
-  left: 0;
-  top: 0;
-  width: calc(var(--card-size) * 0.36);
-  height: calc(var(--card-size) * 0.36);
-  border: 2px solid rgba(87, 166, 90, 0.72);
+  inset: 0;
+  border: 2px solid rgba(var(--guide-color), 0.72);
   border-radius: 50%;
   pointer-events: none;
   opacity: 0;
-  transform: translate(-50%, -50%) scale(0.2);
-  animation: water-ripple 2.2s cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
+  transform: scale(0.2);
+  animation: finger-guide-ripple 2.2s cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
   animation-delay: 0.5s;
 }
 
-.help-ripple .ripple-ring:nth-child(2) {
-  border-color: rgba(87, 166, 90, 0.55);
+.finger-guide-ring:nth-child(2) {
+  border-color: rgba(var(--guide-color), 0.55);
   animation-delay: 0.68s;
 }
 
-.help-ripple .ripple-ring:nth-child(3) {
-  border-color: rgba(87, 166, 90, 0.4);
+.finger-guide-ring:nth-child(3) {
+  border-color: rgba(var(--guide-color), 0.4);
   animation-delay: 0.86s;
 }
 
-@keyframes water-ripple {
+@keyframes finger-guide-ripple {
   0%,
   54% {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0.2);
+    transform: scale(0.2);
   }
   58% {
     opacity: 0.9;
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(2.4);
+    transform: scale(2.4);
   }
 }
 
-/* 「帮帮我」的小手：从田字格下方的外部滑上来，指尖点中田字格中心 */
-.help-hand {
+/* 小手：从起点滑到终点，食指（手指区域）中心始终对准 --hand-left / --hand-top 指定的落点 */
+.finger-guide-hand {
   position: absolute;
-  left: 50%;
-  top: 50%;
+  left: var(--hand-left);
+  top: var(--hand-top);
   z-index: 2;
-  width: calc(var(--card-size) * 0.24);
+  width: var(--finger-size);
   pointer-events: none;
   opacity: 0;
-  /* 以指尖为缩放原点，按下时指尖仍停在田字格中心 */
+  /* 以指尖为缩放原点，按下时指尖仍停在终点 */
   transform-origin: 50% 3.75%;
-  animation: help-hand 2.2s ease-in-out infinite;
+  animation: finger-guide-hand 2.2s ease-in-out infinite;
   animation-delay: 0.5s;
 }
 
-.help-hand svg {
+.finger-guide-hand svg {
   display: block;
   width: 100%;
   height: auto;
   filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.18));
 }
 
-@keyframes help-hand {
+@keyframes finger-guide-hand {
   0% {
     opacity: 0;
-    transform: translate(-50%, -50%) translateY(calc(var(--card-size) * 0.78)) scale(0.92);
+    transform: translate(var(--from-dx), var(--from-dy)) scale(0.92);
   }
   18% {
     opacity: 1;
   }
   55% {
     opacity: 1;
-    transform: translate(-50%, -50%) translateY(calc(var(--card-size) * 0.14)) scale(1);
+    transform: translate(0, 0) scale(1);
   }
   63% {
-    transform: translate(-50%, -50%) translateY(calc(var(--card-size) * 0.14)) scale(0.86);
+    transform: translate(0, 0) scale(0.86);
   }
   72% {
-    transform: translate(-50%, -50%) translateY(calc(var(--card-size) * 0.14)) scale(1);
+    transform: translate(0, 0) scale(1);
   }
   88% {
     opacity: 1;
-    transform: translate(-50%, -50%) translateY(calc(var(--card-size) * 0.14)) scale(1);
+    transform: translate(0, 0) scale(1);
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, -50%) translateY(calc(var(--card-size) * 0.14)) scale(1);
+    transform: translate(0, 0) scale(1);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .help-ripple .ripple-ring {
-    animation: none;
-    opacity: 0;
-  }
-
-  .help-hand {
+  .finger-guide-layer {
     display: none;
   }
 }
@@ -1994,29 +1998,6 @@ body.hide-note .hint-bar {
   will-change: transform, opacity;
 }
 
-/* 星星中心的扩散光环，作为礼花的第一下"炸开" */
-.confetti-ring {
-  position: absolute;
-  width: 52px;
-  height: 52px;
-  border: 3px solid #ffd34d;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  animation: confetti-ring 0.7s ease-out forwards;
-  will-change: transform, opacity;
-}
-
-@keyframes confetti-ring {
-  0% {
-    transform: translate(-50%, -50%) scale(0.2);
-    opacity: 0.95;
-  }
-  100% {
-    transform: translate(-50%, -50%) scale(3.5);
-    opacity: 0;
-  }
-}
-
 @keyframes confetti-burst {
   0% {
     transform: translate(-50%, -50%) scale(0.5);
@@ -2091,114 +2072,6 @@ body.hide-note .hint-bar {
   margin: 14px 0 2px;
 }
 
-/* 礼物提示小手：固定层，从屏幕底部往上滑到按钮中心，循环"滑上来→轻点→停留→滑下" */
-.gift-hand {
-  position: fixed;
-  left: var(--start-left);
-  top: var(--start-top);
-  z-index: 9100;
-  width: var(--size, 56px);
-  pointer-events: none;
-  transform-origin: 50% 3.75%;
-  /* 从起点位置 translate 到终点位置，全程在屏幕内可见 */
-  animation: gift-hand-finger 2.4s ease-in-out infinite;
-  will-change: transform, opacity;
-}
-
-.gift-hand svg {
-  display: block;
-  width: 100%;
-  height: auto;
-  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.18));
-}
-
-/* translate 差值：让元素从 viewport 底边（CSS 初始位置）滑到按钮中心 */
-@keyframes gift-hand-finger {
-  0% {
-    opacity: 0.95;
-    transform: translate(0, 0) scale(0.92);
-  }
-  55% {
-    opacity: 1;
-    transform: translate(
-      calc(var(--ex) - var(--start-left)),
-      calc(var(--ey) - var(--start-top))
-    ) scale(1);
-  }
-  63% {
-    transform: translate(
-      calc(var(--ex) - var(--start-left)),
-      calc(var(--ey) - var(--start-top))
-    ) scale(0.86);
-  }
-  72% {
-    transform: translate(
-      calc(var(--ex) - var(--start-left)),
-      calc(var(--ey) - var(--start-top))
-    ) scale(1);
-  }
-  88% {
-    opacity: 1;
-    transform: translate(
-      calc(var(--ex) - var(--start-left)),
-      calc(var(--ey) - var(--start-top))
-    ) scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(
-      calc(var(--ex) - var(--start-left)),
-      calc(var(--ey) - var(--start-top) + 24%)
-    ) scale(1);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .gift-hand {
-    display: none;
-  }
-
-  .gift-ripple-layer {
-    display: none;
-  }
-}
-
-/* 礼物按钮上的循环水波纹：每 900ms 冒出一圈，从中心向外扩散并淡出 */
-.gift-ripple-layer {
-  position: fixed;
-  inset: 0;
-  z-index: 9050;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.gift-ripple {
-  position: absolute;
-  left: var(--rx);
-  top: var(--ry);
-  width: 36px;
-  height: 36px;
-  margin-left: -18px;
-  margin-top: -18px;
-  border-radius: 50%;
-  border: 3px solid rgba(242, 165, 65, 0.85);
-  background: rgba(242, 165, 65, 0.18);
-  transform: scale(0.35);
-  animation: gift-ripple-burst 1.5s ease-out forwards;
-  will-change: transform, opacity;
-}
-
-@keyframes gift-ripple-burst {
-  0% {
-    transform: scale(0.35);
-    opacity: 0.92;
-  }
-  100% {
-    transform: scale(4.5);
-    opacity: 0;
-  }
-}
-
 #view-result .btn {
   margin-top: 20px;
 }
@@ -2230,12 +2103,20 @@ body.hide-note .hint-bar {
   font-size: clamp(16px, 3.5vmin, 20px);
 }
 
-/* 展柜页：内容多时可滚动，礼物按屏幕宽度自动换行 */
+/* 展柜页：页面本身不滚动，橱窗内容过多时在内部滚动，垃圾篓与返回按钮固定在底部 */
 #view-gifts {
   justify-content: flex-start;
-  overflow-y: auto;
+  overflow: hidden;
   padding-top: clamp(18px, 4vmin, 36px);
   padding-bottom: 24px;
+}
+
+#view-gifts > .app-title,
+#view-gifts > .gift-owner,
+#view-gifts > .gift-mode-bar,
+#view-gifts > .gift-empty,
+#view-gifts > .gift-actions {
+  flex: 0 0 auto;
 }
 
 #view-gifts .app-title {
@@ -2249,17 +2130,19 @@ body.hide-note .hint-bar {
   margin-bottom: 16px;
 }
 
-/* 橱窗：奶油色展柜——柔和边框 + 顶部聚光 + 细腻玻璃反光 + 轻微纵深阴影 */
-.gift-shelf {
+/* 橱窗展柜：奶油色边框 + 顶部聚光 + 玻璃反光固定在展柜上，内部礼物区独立滚动 */
+.gift-shelf-frame {
   position: relative;
   width: 100%;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 100%;
   margin-bottom: 18px;
-  padding: 18px;
   border: 3px solid #e6d2ab;
   border-radius: 22px;
+  overflow: hidden;
   /* 内衬：顶部一团柔光，向下过渡到暖奶油色 */
   background:
     radial-gradient(ellipse 90% 55% at 50% 0%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 70%),
@@ -2271,11 +2154,12 @@ body.hide-note .hint-bar {
     0 10px 22px rgba(160, 120, 70, 0.12);
 }
 
-/* 玻璃反光：一道宽而淡的斜向柔光，模拟橱窗玻璃，不抢眼 */
-.gift-shelf::before {
+/* 玻璃反光：一道宽而淡的斜向柔光，模拟橱窗玻璃，固定在展柜上不随礼物滚动 */
+.gift-shelf-frame::before {
   content: "";
   position: absolute;
   inset: 0;
+  z-index: 2;
   border-radius: 19px;
   pointer-events: none;
   background: linear-gradient(
@@ -2285,6 +2169,59 @@ body.hide-note .hint-bar {
     rgba(255, 255, 255, 0.05) 54%,
     transparent 62%
   );
+}
+
+/* 礼物网格：内容过多时出现滚动条，上下边缘由 fade-top / fade-bottom 渐隐 */
+.gift-shelf {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  align-content: start;
+  gap: 10px;
+  padding: 18px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.gift-shelf.scrolling {
+  scrollbar-color: #e0cba8 transparent;
+}
+
+.gift-shelf::-webkit-scrollbar {
+  width: 8px;
+}
+
+.gift-shelf::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.gift-shelf::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+}
+
+.gift-shelf.scrolling::-webkit-scrollbar-thumb {
+  background: #e0cba8;
+}
+
+.gift-shelf.fade-top {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 20px);
+  mask-image: linear-gradient(to bottom, transparent, #000 20px);
+}
+
+.gift-shelf.fade-bottom {
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 20px);
+  mask-image: linear-gradient(to top, transparent, #000 20px);
+}
+
+.gift-shelf.fade-top.fade-bottom {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 20px, #000 calc(100% - 20px), transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 20px, #000 calc(100% - 20px), transparent);
 }
 
 .gift-shelf-item {
@@ -2458,10 +2395,11 @@ body.hide-note .hint-bar {
   box-shadow: 0 2px 0 #d18a2e;
 }
 
-/* 记录模式：每行一条，最新在上 */
+/* 记录模式：按内容高度展示，内容多时收缩并内部滚动，每行一条，最新在上 */
 .gift-list {
   width: 100%;
-  max-height: 56vh;
+  flex: 0 1 auto;
+  min-height: 0;
   overflow-y: auto;
   padding-right: 4px;
   margin-bottom: 14px;
@@ -2496,7 +2434,7 @@ body.hide-note .hint-bar {
   font-size: clamp(12px, 2.5vmin, 14px);
 }
 
-/* 礼物放大 overlay：全屏暗遮罩 + 居中礼物，点任意位置恢复 */
+/* 礼物放大 overlay：全屏暗遮罩 + 居中礼物，只有点卡片外区域才关闭 */
 .gift-zoom-overlay {
   position: fixed;
   inset: 0;
@@ -2505,7 +2443,6 @@ body.hide-note .hint-bar {
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
   transition: background 0.28s ease;
 }
 .gift-zoom-overlay.active {
@@ -2528,9 +2465,48 @@ body.hide-note .hint-bar {
   transform: scale(1);
   opacity: 1;
 }
+/* 大图礼物图标：外层缓慢缩放呼吸，内层负责点击晃动，互不干扰 */
+.gift-zoom-icon-wrap {
+  display: inline-flex;
+  animation: gift-zoom-breathe 3.2s ease-in-out infinite;
+}
+
 .gift-zoom-icon {
+  display: inline-block;
   font-size: clamp(90px, 24vmin, 180px);
   line-height: 1;
+  transform-origin: center;
+}
+
+@keyframes gift-zoom-breathe {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.gift-zoom-icon.shaking {
+  animation: gift-icon-shake 0.5s ease-in-out;
+}
+
+@keyframes gift-icon-shake {
+  0%, 100% {
+    transform: translateX(0) rotate(0);
+  }
+  20% {
+    transform: translateX(-8px) rotate(-3deg);
+  }
+  40% {
+    transform: translateX(7px) rotate(3deg);
+  }
+  60% {
+    transform: translateX(-5px) rotate(-2deg);
+  }
+  80% {
+    transform: translateX(3px) rotate(1deg);
+  }
 }
 .gift-zoom-name {
   color: #d1603d;
@@ -2544,6 +2520,11 @@ body.hide-note .hint-bar {
 @media (prefers-reduced-motion: reduce) {
   .gift-zoom-inner {
     transition: none;
+  }
+
+  .gift-zoom-icon-wrap,
+  .gift-zoom-icon.shaking {
+    animation: none;
   }
 }
 

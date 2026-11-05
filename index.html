@@ -6,7 +6,7 @@
   <title>宝贝趣味识字</title>
   <script>
     // 全局唯一缓存版本：改动任何 css/js/音频后，只需把这个值 +1，即可让全部缓存失效
-    var CACHE_VERSION = "169";
+    var CACHE_VERSION = "177";
     window.APP_VERSION = CACHE_VERSION;
     document.write('<link rel="stylesheet" href="css/style.css?v=' + CACHE_VERSION + '">');
     // 内置楷体（Windows 楷体 SimKai 子集）：只用于田字格、汉字表与练习记录里的汉字
@@ -267,7 +267,6 @@
       <p class="gift-pick-tip" id="gift-pick-tip"></p>
       <div class="gift-grid" id="gift-grid"></div>
       <div class="dialog-btns">
-        <button class="btn btn-ghost" id="btn-gift-cancel">取消</button>
         <button class="btn btn-primary" id="btn-gift-ok" disabled>收下礼物</button>
       </div>
     </div>
@@ -381,7 +380,9 @@
       <button class="gift-mode-btn active" data-mode="shelf">橱窗</button>
       <button class="gift-mode-btn" data-mode="list">记录</button>
     </div>
-    <div class="gift-shelf" id="gift-shelf"></div>
+    <div class="gift-shelf-frame hidden" id="gift-shelf-frame">
+      <div class="gift-shelf" id="gift-shelf"></div>
+    </div>
     <div class="gift-list hidden" id="gift-list"></div>
     <p class="gift-empty hidden" id="gift-empty">还没有礼物，答对 5 题及以上就能挑选礼物啦！</p>
     <div class="gift-actions">
@@ -390,10 +391,10 @@
     </div>
   </section>
 
-  <!-- 礼物放大展示 overlay：点展柜里的礼物触发，点任意位置恢复 -->
+  <!-- 礼物放大展示 overlay：点展柜里的礼物触发，点卡片外区域恢复 -->
   <div class="gift-zoom-overlay hidden" id="gift-zoom">
     <div class="gift-zoom-inner">
-      <span class="gift-zoom-icon" id="gift-zoom-icon"></span>
+      <span class="gift-zoom-icon-wrap"><span class="gift-zoom-icon" id="gift-zoom-icon"></span></span>
       <span class="gift-zoom-name" id="gift-zoom-name"></span>
       <span class="gift-zoom-count" id="gift-zoom-count"></span>
     </div>

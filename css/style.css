@@ -2322,6 +2322,8 @@ body.hide-note .hint-bar {
   font-family: inherit;
   cursor: grab;
   user-select: none;
+  -webkit-user-drag: element;
+  touch-action: none; /* 移动端长按拖拽时不触发页面滚动 */
   transition: transform 0.15s, background 0.15s;
 }
 .gift-shelf-item:hover {
@@ -2335,6 +2337,22 @@ body.hide-note .hint-bar {
 .gift-shelf-item.dragging {
   opacity: 0.35;
   transform: none;
+}
+/* 拖拽时落点预览：被光标/手指悬停的目标卡片高亮描边 */
+.gift-shelf-item.drag-over {
+  border-color: #ff9d2e;
+  box-shadow: 0 0 0 3px rgba(255, 157, 46, 0.35);
+  transform: scale(1.04);
+}
+/* 移动端触摸拖拽时跟随手指的幽灵卡片 */
+.gift-touch-ghost {
+  position: fixed;
+  margin: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.88;
+  transform: scale(1.06);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
 }
 /* 新获得的礼物：边框闪烁，点击后移除 .fresh 类消失 */
 .gift-shelf-item.fresh {

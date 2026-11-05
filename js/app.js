@@ -1186,6 +1186,7 @@
   let giftItems = [];
   let giftDragId = null; // 正在拖拽的礼物实例 id
   let giftDragMoved = false; // 本次拖拽是否发生过移动（用来区分点击与拖拽）
+  let giftDragOverId = null; // 最近一次交换的目标卡片 id，避免同一位置反复交换
 
   function renderGiftShelf() {
     const user = Storage.currentUser();
@@ -1249,15 +1250,23 @@
     show("gifts");
   }
 
-  // FLIP 动画：记录现有卡片位置 → 执行 DOM 变更 → 让受影响的卡片从旧位置平滑滑到新位置
-  function flipShelf(mutate, skipEl) {
+  // 交换两张卡片在 DOM 中的位置，并用 FLIP 动画让被交换的非拖拽卡片平滑滑到新位置
+  function swapShelf(a, b) {
+    Sound.play("swap"); // 互换音效
     const shelf = $("#gift-shelf");
     const cards = [...shelf.querySelectorAll(".gift-shelf-item")];
     const first = new Map(cards.map((el) => [el, el.getBoundingClientRect()]));
-    mutate();
+    // 用占位节点互换 a、b 的位置，避免相邻/不相邻两种情况分支判断
+    const ph = document.createElement("div");
+    a.parentNode.insertBefore(ph, a);
+    b.parentNode.insertBefore(a, b);
+    ph.parentNode.insertBefore(b, ph);
+    ph.remove();
+    // FLIP：非拖拽卡片从旧位置平滑滑到新位置（拖拽卡片本身跟随光标，不做动画）
     cards.forEach((el) => {
-      if (el === skipEl) return;
+      if (el === a) return;
       const f = first.get(el);
+      if (!f) return;
       const l = el.getBoundingClientRect();
       const dx = f.left - l.left;
       const dy = f.top - l.top;
@@ -1735,38 +1744,39 @@
     if (!giftDragId) return;
     e.preventDefault(); // 允许 drop
     e.dataTransfer.dropEffect = "move";
-    const shelf = giftShelf;
-    const cards = [...shelf.querySelectorAll(".gift-shelf-item")];
-    const dragEl = cards.find((c) => c.dataset.id === giftDragId);
+    const dragEl = giftShelf.querySelector(`.gift-shelf-item[data-id="${giftDragId}"]`);
     if (!dragEl) return;
-    // 计算光标应插入的位置：按阅读顺序逐卡片比较
-    let targetIdx = cards.length;
-    for (let i = 0; i < cards.length; i++) {
-      const r = cards[i].getBoundingClientRect();
-      if (e.clientY < r.top + r.height / 2) { targetIdx = i; break; }
-      if (e.clientY < r.bottom && e.clientX < r.left + r.width / 2) { targetIdx = i; break; }
+    // 找到光标正下方的卡片，高亮作为落点预览（不在途中交换，仅 drop 时才互换）
+    const targetEl = e.target.closest(".gift-shelf-item");
+    giftShelf.querySelectorAll(".gift-shelf-item.drag-over").forEach((c) => c.classList.remove("drag-over"));
+    if (targetEl && targetEl !== dragEl) {
+      targetEl.classList.add("drag-over");
+      giftDragOverId = targetEl.dataset.id;
+    } else {
+      giftDragOverId = null;
     }
-    const curIdx = cards.indexOf(dragEl);
-    // 目标位置恰好是自己或相邻时无需移动
-    if (targetIdx === curIdx || targetIdx === curIdx + 1) return;
-    giftDragMoved = true;
-    flipShelf(() => {
-      if (targetIdx >= cards.length) shelf.appendChild(dragEl);
-      else shelf.insertBefore(dragEl, cards[targetIdx]);
-    }, dragEl);
   });
 
   giftShelf.addEventListener("drop", (e) => {
     e.preventDefault();
+    // 只与最终落点的卡片互换（途中经过的卡片不动）
+    const dragEl = giftShelf.querySelector(`.gift-shelf-item[data-id="${giftDragId}"]`);
+    const targetEl = giftShelf.querySelector(".gift-shelf-item.drag-over");
+    giftShelf.querySelectorAll(".gift-shelf-item.drag-over").forEach((c) => c.classList.remove("drag-over"));
+    if (dragEl && targetEl && targetEl !== dragEl) {
+      giftDragMoved = true;
+      swapShelf(dragEl, targetEl);
+    }
     persistGiftOrder();
   });
 
   giftShelf.addEventListener("dragend", () => {
-    persistGiftOrder();
+    giftShelf.querySelectorAll(".gift-shelf-item.drag-over").forEach((c) => c.classList.remove("drag-over"));
     const dragEl = giftShelf.querySelector(".gift-shelf-item.dragging");
     if (dragEl) dragEl.classList.remove("dragging");
     giftTrash.classList.remove("ready", "hover");
     giftDragId = null;
+    giftDragOverId = null;
     // 稍后复位标记，避免拖拽结束的 click 误触发放大
     setTimeout(() => { giftDragMoved = false; }, 50);
   });
@@ -1777,6 +1787,27 @@
     const ids = [...giftShelf.querySelectorAll(".gift-shelf-item")].map((c) => c.dataset.id);
     giftItems.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
     Storage.saveGifts(giftItems);
+  }
+
+  // 删除指定礼物：垃圾篓抖动 + 卡片缩小消失后重渲染
+  function deleteGift(id) {
+    Sound.play("trash"); // 删除音效
+    // 垃圾篓变大抖动特效
+    giftTrash.classList.remove("hover", "gulp");
+    void giftTrash.offsetWidth; // 重新触发动画
+    giftTrash.classList.add("gulp");
+    const el = giftShelf.querySelector(`.gift-shelf-item[data-id="${id}"]`);
+    if (el) {
+      el.style.transition = "transform 0.25s ease, opacity 0.25s ease";
+      el.style.transform = "scale(0.3)";
+      el.style.opacity = "0";
+    }
+    setTimeout(() => {
+      giftItems = giftItems.filter((g) => g.id !== id);
+      Storage.removeGiftItem(id);
+      giftTrash.classList.remove("ready", "gulp");
+      renderGiftShelf();
+    }, 260);
   }
 
   // 垃圾篓：拖入变大，松手删除并抖动恢复
@@ -1792,24 +1823,108 @@
     if (!giftDragId) return;
     const id = giftDragId;
     giftDragId = null;
-    // 垃圾篓变大抖动特效
-    giftTrash.classList.remove("hover", "gulp");
-    void giftTrash.offsetWidth; // 重新触发动画
-    giftTrash.classList.add("gulp");
-    // 卡片缩小消失后重渲染
-    const el = giftShelf.querySelector(`.gift-shelf-item[data-id="${id}"]`);
-    if (el) {
-      el.style.transition = "transform 0.25s ease, opacity 0.25s ease";
-      el.style.transform = "scale(0.3)";
-      el.style.opacity = "0";
-    }
-    setTimeout(() => {
-      giftItems = giftItems.filter((g) => g.id !== id);
-      Storage.removeGiftItem(id);
-      giftTrash.classList.remove("ready", "gulp");
-      renderGiftShelf();
-    }, 260);
+    deleteGift(id);
   });
+
+  /* ---------- 移动端触摸拖拽（HTML5 DnD 在多数手机浏览器不触发） ---------- */
+  let touchDrag = null; // { id, ghost, offX, offY, lastTarget }
+
+  giftShelf.addEventListener("touchstart", (e) => {
+    if (giftShelfMode !== "shelf") return;
+    const item = e.target.closest(".gift-shelf-item");
+    if (!item) return;
+    const t = e.touches[0];
+    const rect = item.getBoundingClientRect();
+    // 创建跟随手指的幽灵卡片（不阻挡点击穿透）
+    const ghost = item.cloneNode(true);
+    ghost.classList.add("gift-touch-ghost");
+    ghost.style.width = rect.width + "px";
+    ghost.style.left = rect.left + "px";
+    ghost.style.top = rect.top + "px";
+    document.body.appendChild(ghost);
+    item.classList.add("dragging");
+    giftDragId = item.dataset.id;
+    giftDragMoved = false;
+    giftTrash.classList.add("ready");
+    touchDrag = {
+      id: item.dataset.id,
+      ghost,
+      offX: t.clientX - rect.left,
+      offY: t.clientY - rect.top,
+      lastTarget: null,
+    };
+  }, { passive: true });
+
+  giftShelf.addEventListener("touchmove", (e) => {
+    if (!touchDrag) return;
+    e.preventDefault(); // 阻止页面滚动
+    const t = e.touches[0];
+    const g = touchDrag.ghost;
+    g.style.left = (t.clientX - touchDrag.offX) + "px";
+    g.style.top = (t.clientY - touchDrag.offY) + "px";
+    // 临时隐藏幽灵与被拖卡片，让 elementFromPoint 穿透到下层元素
+    g.style.display = "none";
+    const dragEl = giftShelf.querySelector(`.gift-shelf-item[data-id="${touchDrag.id}"]`);
+    if (dragEl) { dragEl.style.visibility = "hidden"; dragEl.style.pointerEvents = "none"; }
+    // 手指会遮挡落点，向上偏移约 24px 做命中
+    const hit = document.elementFromPoint(t.clientX, t.clientY - 24);
+    if (dragEl) { dragEl.style.visibility = ""; dragEl.style.pointerEvents = ""; }
+    g.style.display = "";
+    // 清除旧高亮
+    giftShelf.querySelectorAll(".gift-shelf-item.drag-over").forEach((c) => c.classList.remove("drag-over"));
+    // 命中垃圾篓：高亮并记录
+    if (hit && giftTrash.contains(hit)) {
+      giftTrash.classList.add("hover");
+      touchDrag.lastTarget = "__trash__";
+      return;
+    }
+    giftTrash.classList.remove("hover");
+    // 命中其他卡片：仅高亮预览，松手时才互换
+    const targetCard = hit ? hit.closest(".gift-shelf-item") : null;
+    if (targetCard && targetCard.dataset.id !== touchDrag.id) {
+      targetCard.classList.add("drag-over");
+      touchDrag.lastTarget = targetCard.dataset.id;
+    } else {
+      touchDrag.lastTarget = null;
+    }
+  }, { passive: false });
+
+  function endTouchDrag(e) {
+    if (!touchDrag) return;
+    const td = touchDrag;
+    const t = e.changedTouches[0];
+    const g = td.ghost;
+    // 判定最终落点
+    g.style.display = "none";
+    const dragEl = giftShelf.querySelector(`.gift-shelf-item[data-id="${td.id}"]`);
+    if (dragEl) { dragEl.style.visibility = "hidden"; dragEl.style.pointerEvents = "none"; }
+    const hit = document.elementFromPoint(t.clientX, t.clientY - 24);
+    if (dragEl) { dragEl.style.visibility = ""; dragEl.style.pointerEvents = ""; dragEl.classList.remove("dragging"); }
+    g.style.display = "";
+    g.remove();
+    const targetEl = giftShelf.querySelector(".gift-shelf-item.drag-over");
+    giftShelf.querySelectorAll(".gift-shelf-item.drag-over").forEach((c) => c.classList.remove("drag-over"));
+    giftTrash.classList.remove("ready", "hover");
+    if (hit && giftTrash.contains(hit)) {
+      // 落入垃圾篓 → 删除
+      giftDragId = null;
+      deleteGift(td.id);
+    } else if (dragEl && targetEl && targetEl !== dragEl) {
+      // 与最终落点的卡片互换
+      giftDragMoved = true;
+      swapShelf(dragEl, targetEl);
+      persistGiftOrder();
+      giftDragId = null;
+    } else {
+      persistGiftOrder();
+      giftDragId = null;
+    }
+    giftDragOverId = null;
+    touchDrag = null;
+    setTimeout(() => { giftDragMoved = false; }, 50);
+  }
+  giftShelf.addEventListener("touchend", endTouchDrag);
+  giftShelf.addEventListener("touchcancel", endTouchDrag);
   // 礼物袋：点一下选中，再点一下取消；超过可挑数量时提示先取消一件
   $("#gift-grid").addEventListener("click", (e) => {
     const item = e.target.closest(".gift-item");

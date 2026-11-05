@@ -67,6 +67,15 @@ const Sound = {
       // 因此把音高抬到 349/262Hz 并略提高音量，保证手机上也能听见
       this.tone(349, 0, 0.16, "triangle", 0.22);
       this.tone(262, 0.13, 0.26, "triangle", 0.22);
+    } else if (name === "swap") {
+      // 礼物卡片互换：两声清脆的"叮-叮"，第二声略高，表示两张卡换位
+      this.tone(880, 0, 0.08, "sine", 0.14);
+      this.tone(1175, 0.09, 0.1, "sine", 0.14);
+    } else if (name === "trash") {
+      // 礼物删除（拖入垃圾篓）：下行"咻"声，从高到低表示东西被收走
+      this.tone(659, 0, 0.08, "triangle", 0.18);
+      this.tone(523, 0.07, 0.08, "triangle", 0.18);
+      this.tone(392, 0.14, 0.18, "triangle", 0.18);
     }
   },
 };

@@ -1146,7 +1146,7 @@
   /* ---------- 礼物兑换与展柜 ---------- */
   const giftCatalog = () => window.GIFTS || {};
 
-  // 本组星星数决定挑选次数：6 颗及以上 1 件，10 颗及以上 2 件
+  // 本组星星数决定挑选次数：5 颗 1 件，6~9 颗 2 件，10 颗及以上 3 件
   function giftQuotaFor(stars) {
     if (stars >= 10) return 3;
     if (stars >= 6) return 2;
@@ -1154,8 +1154,9 @@
     return 0;
   }
 
-  function giftLabel(name) {
-    return `${giftCatalog()[name] || "🎁"} ${name}`;
+  // 结束页「已放入礼物橱窗：」后只展示图标，不显示名字
+  function giftIconOnly(name) {
+    return giftCatalog()[name] || "🎁";
   }
 
   // 结束页的礼物入口：未领取显示挑选按钮，已领取显示放入展柜的礼物
@@ -1172,11 +1173,11 @@
         box.classList.add("hidden");
         return;
       }
-      $("#gift-reward-tip").textContent = `已放入礼物橱窗：${giftPicked.map(giftLabel).join("、")}`;
+      $("#gift-reward-tip").textContent = `已放入礼物橱窗：${giftPicked.map(giftIconOnly).join(" ")}`;
       $("#btn-gift-open").textContent = "查看我的礼物 🎁";
     } else {
       $("#gift-reward-tip").textContent = `本组可以挑选 ${giftQuota} 件礼物！`;
-      $("#btn-gift-open").textContent = "打开礼物清单 🎁";
+      $("#btn-gift-open").textContent = "打开礼物袋 🎁";
     }
   }
 
@@ -1325,13 +1326,23 @@
   function openGiftPicker() {
     if (giftClaimed || giftQuota <= 0) return;
     giftPicked = [];
+    // 从 200 件礼物中随机抽 50 件放入本次礼物袋，让挑选更有新鲜感
+    const all = Object.keys(giftCatalog());
+    const bag = [];
+    const pool = all.slice();
+    const bagSize = Math.min(50, pool.length);
+    for (let i = 0; i < bagSize; i++) {
+      const idx = Math.floor(Math.random() * pool.length);
+      bag.push(pool.splice(idx, 1)[0]);
+    }
     // 统计各礼物已有数量（实例数组按名字聚合计数）
     const owned = {};
     Storage.gifts(session.userId).forEach((g) => {
       owned[g.name] = (owned[g.name] || 0) + 1;
     });
-    $("#gift-grid").innerHTML = Object.entries(giftCatalog())
-      .map(([name, icon]) => {
+    $("#gift-grid").innerHTML = bag
+      .map((name) => {
+        const icon = giftCatalog()[name];
         const count = owned[name] || 0;
         return `<button type="button" class="gift-item" data-name="${name}">
           <span class="gift-emoji">${icon}</span>
@@ -1342,6 +1353,7 @@
       .join("");
     updateGiftPickState();
     $("#gift-dialog").classList.remove("hidden");
+    Speaker.playGiftBagOpen(giftQuota); // 打开礼物袋时播报可挑件数
   }
 
   /* ---------- 事件绑定 ---------- */
@@ -1654,7 +1666,7 @@
     giftsReturnView = "quiz";
     renderGiftShelf();
   });
-  // 结束页礼物入口：未领取时打开礼物清单，已领取时直接查看展柜
+  // 结束页礼物入口：未领取时打开礼物袋，已领取时直接查看展柜
   $("#btn-gift-open").addEventListener("click", () => {
     cleanupResultFx(); // 点击后立即隐藏小手和水波纹，避免挡住礼物弹窗/展柜
     if (giftClaimed) {
@@ -1798,7 +1810,7 @@
       renderGiftShelf();
     }, 260);
   });
-  // 礼物清单：点一下选中，再点一下取消；超过可挑数量时提示先取消一件
+  // 礼物袋：点一下选中，再点一下取消；超过可挑数量时提示先取消一件
   $("#gift-grid").addEventListener("click", (e) => {
     const item = e.target.closest(".gift-item");
     if (!item) return;
@@ -1808,7 +1820,8 @@
       giftPicked.splice(idx, 1);
     } else if (giftPicked.length < giftQuota) {
       giftPicked.push(name);
-      Speaker.playGiftPick(name); // 勾选时播报「你选择了：<礼物名称>」
+      Sound.play("pick"); // 先播选中音效，再播「你从礼物袋中挑选了：<礼物名称>」
+      Speaker.playGiftPick(name);
     } else {
       $("#gift-pick-tip").textContent = `最多选 ${giftQuota} 件，可以先取消一件`;
       return;

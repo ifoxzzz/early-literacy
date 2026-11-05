@@ -160,12 +160,18 @@ const Speaker = {
     return this.audioUrl(`gifts/${encodeURIComponent(name)}.mp3`);
   },
 
-  // 勾选礼物：播报「你选择了：<礼物名称>」；名称语音缺失时只播前缀
+  // 勾选礼物：播报「你挑选了：<礼物名称>」；名称语音缺失时只播前缀
   playGiftPick(name) {
     const list = [this.audioUrl("phrases/chose.mp3")];
     const url = this.giftAudio(name);
     if (url) list.push(url);
     this.play(list);
+  },
+
+  // 打开礼物袋时播报「你现在可以从礼物袋中挑选 N 件礼物」
+  playGiftBagOpen(quota) {
+    const url = this.audioUrl(`phrases/pickBag${quota}.mp3`);
+    if (url) this.play([url]);
   },
 
   // 橱窗放大礼物：只播礼物名称（音效由 Sound 负责）
@@ -304,7 +310,14 @@ const Speaker = {
     const urls = phrases.map((k) => this.phraseFile(k, name));
     urls.push(this.audioUrl("phrases/find.mp3"));
     urls.push(this.audioUrl("phrases/help.mp3"));
-    urls.push(this.audioUrl("phrases/chose.mp3")); // 勾选礼物时的「你选择了：」前缀
+    // 礼物相关语音：勾选前缀、礼物袋打开提示（1/2/3 件）、全部礼物名称
+    urls.push(this.audioUrl("phrases/chose.mp3"));
+    for (let q = 1; q <= 3; q++) urls.push(this.audioUrl(`phrases/pickBag${q}.mp3`));
+    const giftNames = window.GIFT_AUDIO || [];
+    giftNames.forEach((n) => {
+      const u = this.giftAudio(n);
+      if (u) urls.push(u);
+    });
     for (let i = 0; i <= 20; i++) urls.push(this.audioUrl(`phrases/stars${i}.mp3`));
     // 字体与语音并行加载；不支持 Font Loading API 或超时都不阻塞进入
     const fontReady =

@@ -6,7 +6,7 @@
   <title>宝贝趣味识字</title>
   <script>
     // 全局唯一缓存版本：改动任何 css/js/音频后，只需把这个值 +1，即可让全部缓存失效
-    var CACHE_VERSION = "160";
+    var CACHE_VERSION = "162";
     window.APP_VERSION = CACHE_VERSION;
     document.write('<link rel="stylesheet" href="css/style.css?v=' + CACHE_VERSION + '">');
     // 内置楷体（Windows 楷体 SimKai 子集）：只用于田字格、汉字表与练习记录里的汉字
@@ -260,10 +260,10 @@
     </div>
   </div>
 
-  <!-- 挑选礼物：结束页按星星数量给出挑选次数，点礼物选中，再点「收下礼物」放入展柜 -->
+  <!-- 礼物袋：结束页按星星数量给出挑选次数，随机放 50 件礼物供挑选 -->
   <div class="dialog-mask hidden" id="gift-dialog">
     <div class="dialog gift-dialog">
-      <p class="dialog-title">挑选礼物</p>
+      <p class="dialog-title">礼物袋</p>
       <p class="gift-pick-tip" id="gift-pick-tip"></p>
       <div class="gift-grid" id="gift-grid"></div>
       <div class="dialog-btns">
@@ -366,7 +366,7 @@
     <div class="result-new-wrap" id="result-new"></div>
     <div class="gift-reward hidden" id="gift-reward">
       <p class="gift-reward-tip" id="gift-reward-tip"></p>
-      <button class="btn btn-primary" id="btn-gift-open">打开礼物清单 🎁</button>
+      <button class="btn btn-primary" id="btn-gift-open">打开礼物袋 🎁</button>
     </div>
     <p class="result-footer" id="result-footer"></p>
     <button class="btn btn-primary" id="btn-continue">继续答题</button>

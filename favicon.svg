@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="宝贝趣味识字">
+  <rect width="64" height="64" rx="14" fill="#f2a541"/>
+  <rect x="9" y="9" width="46" height="46" rx="7" fill="#fff8e9" stroke="#d1603d" stroke-width="2.5"/>
+  <path d="M32 11v42M11 32h42" stroke="#f2c48a" stroke-width="2" stroke-dasharray="4 4"/>
+  <text x="32" y="43" text-anchor="middle" font-family="KaiTi, STKaiti, serif" font-size="30" fill="#d1603d">字</text>
+</svg>

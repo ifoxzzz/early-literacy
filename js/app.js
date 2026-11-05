@@ -1813,6 +1813,7 @@
       }
     }
     if (!pointerDrag || e.pointerId !== pointerDrag.pointerId) return;
+    giftDragMoved = true; // 已发生拖拽，阻止后续 click 触发放大
     const pd = pointerDrag;
     const g = pd.ghost;
     g.style.display = "none";
@@ -1830,7 +1831,6 @@
       giftDragId = null;
       deleteGift(pd.id);
     } else if (dragEl && targetEl && targetEl !== dragEl) {
-      giftDragMoved = true;
       swapShelf(dragEl, targetEl);
       persistGiftOrder();
       giftDragId = null;

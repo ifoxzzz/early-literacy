@@ -1060,7 +1060,7 @@
     // 底部：用户名 · 册名（参考练习页底部信息行）
     $("#result-footer").textContent =
       session.userName && session.volume ? `${session.userName} · ${session.volume}` : "";
-    // 本组星星数决定礼物挑选次数：6 颗及以上 1 次，10 颗及以上 2 次
+    // 本组星星数决定礼物挑选次数：5 颗 1 件，6~9 颗 2 件，10 颗及以上 3 件
     giftQuota = giftQuotaFor(session.stars);
     giftPicked = [];
     giftClaimed = false;
@@ -1145,6 +1145,32 @@
 
   /* ---------- 礼物兑换与展柜 ---------- */
   const giftCatalog = () => window.GIFTS || {};
+
+  // 礼物袋固定礼物：window.GIFTS_FIXED 里的图标每次打开都必须在袋中
+  // 图标按礼物清单反查名称；清单里没有该图标、或同一图标对应多个名称时直接报错
+  function fixedGiftNames() {
+    const raw = (window.GIFTS_FIXED || "").replace(/\s+/g, "");
+    if (!raw) return [];
+    const catalog = giftCatalog();
+    const byIcon = new Map();
+    Object.keys(catalog).forEach((name) => {
+      const icon = catalog[name];
+      if (byIcon.has(icon)) {
+        throw new Error(`礼物清单存在重复图标：${icon}（${byIcon.get(icon)} / ${name}）`);
+      }
+      byIcon.set(icon, name);
+    });
+    // 按字素切分，避免带变体选择符或多个码点的 emoji 被拆开
+    const icons =
+      typeof Intl !== "undefined" && Intl.Segmenter
+        ? [...new Intl.Segmenter("zh", { granularity: "grapheme" }).segment(raw)].map((s) => s.segment)
+        : Array.from(raw);
+    return icons.map((icon) => {
+      const name = byIcon.get(icon);
+      if (!name) throw new Error(`GIFTS_FIXED 中的图标不在礼物清单里：${icon}`);
+      return name;
+    });
+  }
 
   // 本组星星数决定挑选次数：5 颗 1 件，6~9 颗 2 件，10 颗及以上 3 件
   function giftQuotaFor(stars) {
@@ -1335,15 +1361,20 @@
   function openGiftPicker() {
     if (giftClaimed || giftQuota <= 0) return;
     giftPicked = [];
-    // 从 200 件礼物中随机抽 50 件放入本次礼物袋，让挑选更有新鲜感
+    // 礼物袋固定 50 件：GIFTS_FIXED 里的礼物必在（位置随机），剩余名额再从全部礼物中随机抽取
+    const fixed = fixedGiftNames();
     const all = Object.keys(giftCatalog());
-    const bag = [];
-    const pool = all.slice();
-    const bagSize = Math.min(50, pool.length);
-    for (let i = 0; i < bagSize; i++) {
-      const idx = Math.floor(Math.random() * pool.length);
-      bag.push(pool.splice(idx, 1)[0]);
+    const bagSize = Math.min(50, all.length);
+    if (fixed.length > bagSize) {
+      throw new Error(`GIFTS_FIXED 固定礼物有 ${fixed.length} 件，超过礼物袋容量 ${bagSize} 件`);
     }
+    if (new Set(fixed).size !== fixed.length) {
+      throw new Error("GIFTS_FIXED 中存在重复配置的礼物");
+    }
+    const pool = all.filter((name) => !fixed.includes(name));
+    const bag = Quiz.shuffle(
+      fixed.concat(Quiz.shuffle(pool).slice(0, bagSize - fixed.length))
+    );
     // 统计各礼物已有数量（实例数组按名字聚合计数）
     const owned = {};
     Storage.gifts(session.userId).forEach((g) => {

@@ -580,8 +580,7 @@
       clearTimeout(showTimer);
       if (gen !== session.gen) return;
       if (loadingShown) hideLoading();
-      beginQuestion(q);
-      prefetchUpcoming();
+      beginQuestion(q); // 讲解播完后由 onDone 启动后台预取
     });
   }
 
@@ -622,7 +621,12 @@
 
     const isFirst = session.firstQuestion;
     session.firstQuestion = false;
-    Speaker.readQuestion(q.target, { welcome: isFirst, name: session.userName });
+    Speaker.readQuestion(q.target, {
+      welcome: isFirst,
+      name: session.userName,
+      // 讲解播完后再后台预取下几题，避免和正在播放的语音抢带宽
+      onDone: prefetchUpcoming,
+    });
   }
 
   // 作答后记录已写入：correct==1 且 wrong==0 说明是第一次接触的新字

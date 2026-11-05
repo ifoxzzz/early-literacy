@@ -195,6 +195,12 @@ const Speaker = {
   // 这里提前 fetch 成 blob 存在内存里，播放时直接用本地 blob 地址。
   // file:// 下 fetch 会被浏览器拦截，失败时自动退回原始地址，不影响离线使用。
   cache: new Map(), // 原始地址 -> { promise, blobUrl }
+  // 下载队列：手机浏览器每个域名只允许 6 个并发连接，一次性发起几十个请求会让
+  // 后面的请求长时间排队——而 8 秒超时是从请求"真正开始"才算，否则排队的文件会
+  // 在没下载前就超时、永久退化成边下边播，首次进入因此卡顿。这里限制并发数。
+  MAX_PARALLEL: 4,
+  jobs: [], // 待下载队列 [{ url, entry }]
+  running: 0, // 当前正在下载的数量
 
   // 清理本地音频缓存：停止播放、释放内存中的 blob，并更换缓存标记，
   // 之后 audioUrl 会带上新的参数，浏览器与 audio 元素都会重新下载最新音频
@@ -204,6 +210,7 @@ const Speaker = {
       if (entry.blobUrl) URL.revokeObjectURL(entry.blobUrl);
     });
     this.cache.clear();
+    this.jobs.length = 0; // 排队中的任务一并作废
     try {
       localStorage.setItem(this.AUDIO_EPOCH_KEY, Date.now().toString(36));
     } catch (e) {}
@@ -212,25 +219,47 @@ const Speaker = {
   preload(urls) {
     (Array.isArray(urls) ? urls : [urls]).forEach((url) => {
       if (!url || this.cache.has(url)) return;
-      const entry = { promise: null, blobUrl: null };
-      // 8 秒内没下载完就先用原地址播放（Audio 自己会继续下载），避免卡住答题流程
-      const timeout = new Promise((resolve) => setTimeout(() => resolve(url), 8000));
-      // file:// 下 fetch 会被拦截；旧环境没有 fetch 时同样退回原地址，保证 Promise 不会同步抛错
-      const request =
-        typeof fetch === "function"
-          ? fetch(url)
-          : Promise.reject(new Error("fetch unavailable"));
-      entry.promise = Promise.race([
-        request
-          .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(r.status))))
-          .then((blob) => {
-            entry.blobUrl = URL.createObjectURL(blob);
-            return entry.blobUrl;
-          })
-          .catch(() => url),
-        timeout,
-      ]);
+      // 先把 promise 建好（preloadAll 与 resolveSrc 会立刻用到），再排队等下载
+      const entry = { blobUrl: null, promise: null };
+      entry.promise = new Promise((resolve) => {
+        entry.resolve = resolve;
+      });
       this.cache.set(url, entry);
+      this.jobs.push({ url, entry });
+    });
+    this.pump();
+  },
+
+  // 按并发上限依次启动下载任务
+  pump() {
+    while (this.running < this.MAX_PARALLEL && this.jobs.length > 0) {
+      const job = this.jobs.shift();
+      this.running += 1;
+      this.download(job.url, job.entry).then(() => {
+        this.running -= 1;
+        this.pump();
+      });
+    }
+  },
+
+  // 实际下载：超时从此刻开始计（而不是入队时），保证排队的文件不会"还没开始就超时"。
+  // 超时后请求仍在后台继续，晚到的文件照样换成 blob，之后播放直接用本地地址
+  download(url, entry) {
+    const request =
+      typeof fetch === "function"
+        ? fetch(url)
+            .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(r.status))))
+            .then((blob) => {
+              entry.blobUrl = URL.createObjectURL(blob);
+              return entry.blobUrl;
+            })
+            .catch(() => url)
+        : Promise.resolve(url);
+    entry.request = request; // resolveSrc 用它判断"还在下载"
+    const timeout = new Promise((resolve) => setTimeout(() => resolve(url), 8000));
+    return Promise.race([request, timeout]).then((src) => {
+      entry.resolve(src);
+      return src;
     });
   },
 
@@ -251,10 +280,17 @@ const Speaker = {
     );
   },
 
-  // 播放前取地址：已预下载的直接用 blob；还在下载就等它（最多 8 秒）
+  // 播放前取地址：已预下载的直接用 blob；还在下载就等一小会儿（最多 600ms），
+  // 拿不到就先播原始地址，避免两句语音之间出现长时间空白
   resolveSrc(url) {
     const entry = this.cache.get(url);
-    return entry ? entry.promise : Promise.resolve(url);
+    if (!entry) return Promise.resolve(url);
+    if (entry.blobUrl) return Promise.resolve(entry.blobUrl);
+    const wait = entry.request || entry.promise;
+    const fallback = new Promise((resolve) =>
+      setTimeout(() => resolve(entry.blobUrl || url), 600)
+    );
+    return Promise.race([wait, fallback]);
   },
 
   // 进入选册页前的全局预热：提示语、名字语音、30 条夸奖语、星星播报、礼物提示，
@@ -415,7 +451,13 @@ const Speaker = {
     // 注解音频缺失时用系统语音补读；没有预生成名字语音时，
     // phraseFile 会自动退回通用提示语，不再插入系统合成音
     const after = noteSrc || !note ? null : () => this.speak(note);
-    this.play(list, after);
+    // 讲解全部播完后才回调 onDone（app.js 用它启动后台预取，
+    // 避免下载抢带宽影响正在播放/边下边播的语音）
+    const done = opts && opts.onDone;
+    this.play(list, () => {
+      if (after) after();
+      if (done) done();
+    });
   },
 
   // 答对：按连续首答正确次数选等级（1~2 / 3~4 / 5~6 / 7~8 / 9+ 次），

@@ -1218,7 +1218,7 @@
       // 每件礼物实例一张卡片：同名礼物就是并列的多张卡片，可分别拖拽/删除
       $("#gift-shelf").innerHTML = giftItems
         .map(
-          (g) => `<div class="gift-shelf-item${g.fresh ? " fresh" : ""}" draggable="true" data-id="${g.id}">
+          (g) => `<div class="gift-shelf-item${g.fresh ? " fresh" : ""}" data-id="${g.id}">
             <span class="gift-shelf-icon">${catalog[g.name] || "🎁"}</span>
             <span class="gift-shelf-name">${g.name}</span>
           </div>`
@@ -1724,62 +1724,127 @@
     setTimeout(() => overlay.classList.add("hidden"), 320);
   });
 
-  /* ---------- 橱窗拖拽排序 + 垃圾篓删除 ---------- */
+  /* ---------- 橱窗拖拽排序 + 垃圾篓删除（统一用 Pointer Events，兼容鼠标/触摸/触控笔） ---------- */
   const giftShelf = $("#gift-shelf");
   const giftTrash = $("#gift-trash");
+  let pointerDrag = null; // { id, ghost, offX, offY, pointerId, lastTarget, started }
+  let pointerStart = null; // { id, x, y, pointerId } 记录按下位置，移动超过阈值才启动拖拽
 
-  giftShelf.addEventListener("dragstart", (e) => {
+  giftShelf.addEventListener("pointerdown", (e) => {
+    if (giftShelfMode !== "shelf") return;
+    if (e.button !== undefined && e.button !== 0) return;
     const item = e.target.closest(".gift-shelf-item");
     if (!item) return;
-    giftDragId = item.dataset.id;
-    giftDragMoved = false;
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", giftDragId);
-    // 让浏览器用半透明卡片做拖拽影像
-    requestAnimationFrame(() => item.classList.add("dragging"));
-    giftTrash.classList.add("ready");
+    // 不在 pointerdown 里 preventDefault，否则 click 事件会被吞掉，点击放大会失效；
+    // 只记录起始位置，等移动超过阈值再正式启动拖拽
+    pointerStart = { id: item.dataset.id, x: e.clientX, y: e.clientY, pointerId: e.pointerId };
   });
 
-  giftShelf.addEventListener("dragover", (e) => {
-    if (!giftDragId) return;
-    e.preventDefault(); // 允许 drop
-    e.dataTransfer.dropEffect = "move";
-    const dragEl = giftShelf.querySelector(`.gift-shelf-item[data-id="${giftDragId}"]`);
-    if (!dragEl) return;
-    // 找到光标正下方的卡片，高亮作为落点预览（不在途中交换，仅 drop 时才互换）
-    const targetEl = e.target.closest(".gift-shelf-item");
+  giftShelf.addEventListener("pointermove", (e) => {
+    // 还没按下，或已经启动了拖拽
+    if (!pointerStart) return;
+    if (e.pointerId !== pointerStart.pointerId) return;
+
+    if (!pointerDrag) {
+      // 尚未启动拖拽：判断移动距离是否超过阈值（5px），超过才视为拖拽而非点击
+      const dx = e.clientX - pointerStart.x;
+      const dy = e.clientY - pointerStart.y;
+      if (Math.hypot(dx, dy) < 5) return;
+      // 启动拖拽
+      const item = giftShelf.querySelector(`.gift-shelf-item[data-id="${pointerStart.id}"]`);
+      if (!item) { pointerStart = null; return; }
+      const rect = item.getBoundingClientRect();
+      const ghost = item.cloneNode(true);
+      ghost.classList.add("gift-touch-ghost");
+      ghost.style.width = rect.width + "px";
+      ghost.style.left = (e.clientX - (pointerStart.x - rect.left)) + "px";
+      ghost.style.top = (e.clientY - (pointerStart.y - rect.top)) + "px";
+      document.body.appendChild(ghost);
+      item.classList.add("dragging");
+      giftDragId = item.dataset.id;
+      giftDragMoved = false;
+      giftTrash.classList.add("ready");
+      pointerDrag = {
+        id: item.dataset.id,
+        ghost,
+        offX: pointerStart.x - rect.left,
+        offY: pointerStart.y - rect.top,
+        pointerId: e.pointerId,
+        lastTarget: null,
+        started: true,
+      };
+      try { item.setPointerCapture(e.pointerId); } catch (err) {}
+    }
+
+    // 已在拖拽中：移动幽灵 + 命中检测
+    e.preventDefault();
+    const g = pointerDrag.ghost;
+    g.style.left = (e.clientX - pointerDrag.offX) + "px";
+    g.style.top = (e.clientY - pointerDrag.offY) + "px";
+    g.style.display = "none";
+    const dragEl = giftShelf.querySelector(`.gift-shelf-item[data-id="${pointerDrag.id}"]`);
+    if (dragEl) { dragEl.style.visibility = "hidden"; dragEl.style.pointerEvents = "none"; }
+    const offset = e.pointerType === "touch" ? 24 : 0;
+    const hit = document.elementFromPoint(e.clientX, e.clientY - offset);
+    if (dragEl) { dragEl.style.visibility = ""; dragEl.style.pointerEvents = ""; }
+    g.style.display = "";
     giftShelf.querySelectorAll(".gift-shelf-item.drag-over").forEach((c) => c.classList.remove("drag-over"));
-    if (targetEl && targetEl !== dragEl) {
-      targetEl.classList.add("drag-over");
-      giftDragOverId = targetEl.dataset.id;
+    if (hit && giftTrash.contains(hit)) {
+      giftTrash.classList.add("hover");
+      pointerDrag.lastTarget = "__trash__";
+      return;
+    }
+    giftTrash.classList.remove("hover");
+    const targetCard = hit ? hit.closest(".gift-shelf-item") : null;
+    if (targetCard && targetCard.dataset.id !== pointerDrag.id) {
+      targetCard.classList.add("drag-over");
+      pointerDrag.lastTarget = targetCard.dataset.id;
     } else {
-      giftDragOverId = null;
+      pointerDrag.lastTarget = null;
     }
   });
 
-  giftShelf.addEventListener("drop", (e) => {
-    e.preventDefault();
-    // 只与最终落点的卡片互换（途中经过的卡片不动）
-    const dragEl = giftShelf.querySelector(`.gift-shelf-item[data-id="${giftDragId}"]`);
+  function endPointerDrag(e) {
+    if (pointerStart && e.pointerId === pointerStart.pointerId) {
+      // 如果没启动拖拽（点击），直接清理，让 click 事件正常触发放大
+      if (!pointerDrag) {
+        pointerStart = null;
+        return;
+      }
+    }
+    if (!pointerDrag || e.pointerId !== pointerDrag.pointerId) return;
+    const pd = pointerDrag;
+    const g = pd.ghost;
+    g.style.display = "none";
+    const dragEl = giftShelf.querySelector(`.gift-shelf-item[data-id="${pd.id}"]`);
+    if (dragEl) { dragEl.style.visibility = "hidden"; dragEl.style.pointerEvents = "none"; }
+    const offset = e.pointerType === "touch" ? 24 : 0;
+    const hit = document.elementFromPoint(e.clientX, e.clientY - offset);
+    if (dragEl) { dragEl.style.visibility = ""; dragEl.style.pointerEvents = ""; dragEl.classList.remove("dragging"); }
+    g.style.display = "";
+    g.remove();
     const targetEl = giftShelf.querySelector(".gift-shelf-item.drag-over");
     giftShelf.querySelectorAll(".gift-shelf-item.drag-over").forEach((c) => c.classList.remove("drag-over"));
-    if (dragEl && targetEl && targetEl !== dragEl) {
+    giftTrash.classList.remove("ready", "hover");
+    if (hit && giftTrash.contains(hit)) {
+      giftDragId = null;
+      deleteGift(pd.id);
+    } else if (dragEl && targetEl && targetEl !== dragEl) {
       giftDragMoved = true;
       swapShelf(dragEl, targetEl);
+      persistGiftOrder();
+      giftDragId = null;
+    } else {
+      persistGiftOrder();
+      giftDragId = null;
     }
-    persistGiftOrder();
-  });
-
-  giftShelf.addEventListener("dragend", () => {
-    giftShelf.querySelectorAll(".gift-shelf-item.drag-over").forEach((c) => c.classList.remove("drag-over"));
-    const dragEl = giftShelf.querySelector(".gift-shelf-item.dragging");
-    if (dragEl) dragEl.classList.remove("dragging");
-    giftTrash.classList.remove("ready", "hover");
-    giftDragId = null;
     giftDragOverId = null;
-    // 稍后复位标记，避免拖拽结束的 click 误触发放大
+    pointerDrag = null;
+    pointerStart = null;
     setTimeout(() => { giftDragMoved = false; }, 50);
-  });
+  }
+  giftShelf.addEventListener("pointerup", endPointerDrag);
+  giftShelf.addEventListener("pointercancel", endPointerDrag);
 
   // 按当前 DOM 顺序回写 giftItems 并持久化
   function persistGiftOrder() {
@@ -1809,122 +1874,6 @@
       renderGiftShelf();
     }, 260);
   }
-
-  // 垃圾篓：拖入变大，松手删除并抖动恢复
-  giftTrash.addEventListener("dragover", (e) => {
-    if (!giftDragId) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    giftTrash.classList.add("hover");
-  });
-  giftTrash.addEventListener("dragleave", () => giftTrash.classList.remove("hover"));
-  giftTrash.addEventListener("drop", (e) => {
-    e.preventDefault();
-    if (!giftDragId) return;
-    const id = giftDragId;
-    giftDragId = null;
-    deleteGift(id);
-  });
-
-  /* ---------- 移动端触摸拖拽（HTML5 DnD 在多数手机浏览器不触发） ---------- */
-  let touchDrag = null; // { id, ghost, offX, offY, lastTarget }
-
-  giftShelf.addEventListener("touchstart", (e) => {
-    if (giftShelfMode !== "shelf") return;
-    const item = e.target.closest(".gift-shelf-item");
-    if (!item) return;
-    const t = e.touches[0];
-    const rect = item.getBoundingClientRect();
-    // 创建跟随手指的幽灵卡片（不阻挡点击穿透）
-    const ghost = item.cloneNode(true);
-    ghost.classList.add("gift-touch-ghost");
-    ghost.style.width = rect.width + "px";
-    ghost.style.left = rect.left + "px";
-    ghost.style.top = rect.top + "px";
-    document.body.appendChild(ghost);
-    item.classList.add("dragging");
-    giftDragId = item.dataset.id;
-    giftDragMoved = false;
-    giftTrash.classList.add("ready");
-    touchDrag = {
-      id: item.dataset.id,
-      ghost,
-      offX: t.clientX - rect.left,
-      offY: t.clientY - rect.top,
-      lastTarget: null,
-    };
-  }, { passive: true });
-
-  giftShelf.addEventListener("touchmove", (e) => {
-    if (!touchDrag) return;
-    e.preventDefault(); // 阻止页面滚动
-    const t = e.touches[0];
-    const g = touchDrag.ghost;
-    g.style.left = (t.clientX - touchDrag.offX) + "px";
-    g.style.top = (t.clientY - touchDrag.offY) + "px";
-    // 临时隐藏幽灵与被拖卡片，让 elementFromPoint 穿透到下层元素
-    g.style.display = "none";
-    const dragEl = giftShelf.querySelector(`.gift-shelf-item[data-id="${touchDrag.id}"]`);
-    if (dragEl) { dragEl.style.visibility = "hidden"; dragEl.style.pointerEvents = "none"; }
-    // 手指会遮挡落点，向上偏移约 24px 做命中
-    const hit = document.elementFromPoint(t.clientX, t.clientY - 24);
-    if (dragEl) { dragEl.style.visibility = ""; dragEl.style.pointerEvents = ""; }
-    g.style.display = "";
-    // 清除旧高亮
-    giftShelf.querySelectorAll(".gift-shelf-item.drag-over").forEach((c) => c.classList.remove("drag-over"));
-    // 命中垃圾篓：高亮并记录
-    if (hit && giftTrash.contains(hit)) {
-      giftTrash.classList.add("hover");
-      touchDrag.lastTarget = "__trash__";
-      return;
-    }
-    giftTrash.classList.remove("hover");
-    // 命中其他卡片：仅高亮预览，松手时才互换
-    const targetCard = hit ? hit.closest(".gift-shelf-item") : null;
-    if (targetCard && targetCard.dataset.id !== touchDrag.id) {
-      targetCard.classList.add("drag-over");
-      touchDrag.lastTarget = targetCard.dataset.id;
-    } else {
-      touchDrag.lastTarget = null;
-    }
-  }, { passive: false });
-
-  function endTouchDrag(e) {
-    if (!touchDrag) return;
-    const td = touchDrag;
-    const t = e.changedTouches[0];
-    const g = td.ghost;
-    // 判定最终落点
-    g.style.display = "none";
-    const dragEl = giftShelf.querySelector(`.gift-shelf-item[data-id="${td.id}"]`);
-    if (dragEl) { dragEl.style.visibility = "hidden"; dragEl.style.pointerEvents = "none"; }
-    const hit = document.elementFromPoint(t.clientX, t.clientY - 24);
-    if (dragEl) { dragEl.style.visibility = ""; dragEl.style.pointerEvents = ""; dragEl.classList.remove("dragging"); }
-    g.style.display = "";
-    g.remove();
-    const targetEl = giftShelf.querySelector(".gift-shelf-item.drag-over");
-    giftShelf.querySelectorAll(".gift-shelf-item.drag-over").forEach((c) => c.classList.remove("drag-over"));
-    giftTrash.classList.remove("ready", "hover");
-    if (hit && giftTrash.contains(hit)) {
-      // 落入垃圾篓 → 删除
-      giftDragId = null;
-      deleteGift(td.id);
-    } else if (dragEl && targetEl && targetEl !== dragEl) {
-      // 与最终落点的卡片互换
-      giftDragMoved = true;
-      swapShelf(dragEl, targetEl);
-      persistGiftOrder();
-      giftDragId = null;
-    } else {
-      persistGiftOrder();
-      giftDragId = null;
-    }
-    giftDragOverId = null;
-    touchDrag = null;
-    setTimeout(() => { giftDragMoved = false; }, 50);
-  }
-  giftShelf.addEventListener("touchend", endTouchDrag);
-  giftShelf.addEventListener("touchcancel", endTouchDrag);
   // 礼物袋：点一下选中，再点一下取消；超过可挑数量时提示先取消一件
   $("#gift-grid").addEventListener("click", (e) => {
     const item = e.target.closest(".gift-item");

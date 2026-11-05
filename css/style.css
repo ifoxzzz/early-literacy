@@ -2322,8 +2322,7 @@ body.hide-note .hint-bar {
   font-family: inherit;
   cursor: grab;
   user-select: none;
-  -webkit-user-drag: element;
-  touch-action: none; /* 移动端长按拖拽时不触发页面滚动 */
+  touch-action: none; /* 拖拽时不触发页面滚动 */
   transition: transform 0.15s, background 0.15s;
 }
 .gift-shelf-item:hover {

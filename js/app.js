@@ -1289,9 +1289,10 @@
     }
 
     show("gifts");
-    // 视图显示后再计算橱窗是否需要上下渐隐（礼物少时两侧都不显示）
+    // 视图显示后再计算当前模式滚动区的上下渐隐（内容少时两侧都不显示）
     requestAnimationFrame(() => {
-      if (giftShelfMode === "shelf" && hasGifts) updateScrollFade($("#gift-shelf"));
+      if (!hasGifts) return;
+      updateScrollFade(giftShelfMode === "shelf" ? $("#gift-shelf") : $("#gift-list"));
     });
   }
 
@@ -1563,16 +1564,18 @@
     }
     enterVolume(Storage.currentUser(), volume);
   });
-  // 册目列表、汉字表、练习记录、礼物橱窗滚动时更新边缘淡出与滚动条显隐；窗口尺寸变化时重新计算
+  // 册目列表、汉字表、练习记录、礼物橱窗与礼物记录滚动时更新边缘淡出与滚动条显隐；窗口尺寸变化时重新计算
   bindScrollFx($("#volume-list"));
   bindScrollFx($("#word-list"), $("#word-sheet"));
   bindScrollFx($("#history-list"));
   bindScrollFx($("#gift-shelf"));
+  bindScrollFx($("#gift-list"));
   window.addEventListener("resize", () => {
     updateScrollFade($("#volume-list"));
     updateScrollFade($("#word-list"), $("#word-sheet"));
     updateScrollFade($("#history-list"));
     updateScrollFade($("#gift-shelf"));
+    updateScrollFade($("#gift-list"));
   });
   // 汉字表小喇叭：先加载该字的语音（未缓存时显示进度条），就绪后再播放
   let loadingWordAudio = false;

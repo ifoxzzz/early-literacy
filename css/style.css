@@ -133,60 +133,69 @@ body {
   margin-bottom: 16px;
 }
 
-/* 册目列表、汉字表、练习记录共用：滚动条默认隐藏，只在滚动/拖动时露出 */
+/* 册目列表、汉字表、练习记录、礼物记录共用：滚动条默认隐藏，只在滚动/拖动时露出 */
 .volume-list,
 .word-list,
-.history-list {
+.history-list,
+.gift-list {
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
 
 .volume-list.scrolling,
 .word-list.scrolling,
-.history-list.scrolling {
+.history-list.scrolling,
+.gift-list.scrolling {
   scrollbar-color: #e0cba8 transparent;
 }
 
 .volume-list::-webkit-scrollbar,
 .word-list::-webkit-scrollbar,
-.history-list::-webkit-scrollbar {
+.history-list::-webkit-scrollbar,
+.gift-list::-webkit-scrollbar {
   width: 8px;
 }
 
 .volume-list::-webkit-scrollbar-track,
 .word-list::-webkit-scrollbar-track,
-.history-list::-webkit-scrollbar-track {
+.history-list::-webkit-scrollbar-track,
+.gift-list::-webkit-scrollbar-track {
   background: transparent;
 }
 
 .volume-list::-webkit-scrollbar-thumb,
 .word-list::-webkit-scrollbar-thumb,
-.history-list::-webkit-scrollbar-thumb {
+.history-list::-webkit-scrollbar-thumb,
+.gift-list::-webkit-scrollbar-thumb {
   background: transparent;
   border-radius: 999px;
 }
 
 .volume-list.scrolling::-webkit-scrollbar-thumb,
 .word-list.scrolling::-webkit-scrollbar-thumb,
-.history-list.scrolling::-webkit-scrollbar-thumb {
+.history-list.scrolling::-webkit-scrollbar-thumb,
+.gift-list.scrolling::-webkit-scrollbar-thumb {
   background: #e0cba8;
 }
 
-/* 册目列表、练习记录：内容超出时把上下边缘淡出，避免被生硬切断（滚到顶/底时对应一侧自动取消） */
+/* 册目列表、练习记录、礼物记录：内容超出时把上下边缘淡出，避免被生硬切断（滚到顶/底时对应一侧自动取消） */
 .volume-list.fade-top,
-.history-list.fade-top {
+.history-list.fade-top,
+.gift-list.fade-top {
   -webkit-mask-image: linear-gradient(to bottom, transparent, #000 20px);
   mask-image: linear-gradient(to bottom, transparent, #000 20px);
 }
 
 .volume-list.fade-bottom,
-.history-list.fade-bottom {
+.history-list.fade-bottom,
+.gift-list.fade-bottom {
   -webkit-mask-image: linear-gradient(to top, transparent, #000 20px);
   mask-image: linear-gradient(to top, transparent, #000 20px);
 }
 
 .volume-list.fade-top.fade-bottom,
-.history-list.fade-top.fade-bottom {
+.history-list.fade-top.fade-bottom,
+.gift-list.fade-top.fade-bottom {
   -webkit-mask-image: linear-gradient(to bottom, transparent, #000 20px, #000 calc(100% - 20px), transparent);
   mask-image: linear-gradient(to bottom, transparent, #000 20px, #000 calc(100% - 20px), transparent);
 }
@@ -2400,10 +2409,10 @@ body.hide-note .hint-bar {
   width: 100%;
   flex: 0 1 auto;
   min-height: 0;
+  max-height: 100%;
   overflow-y: auto;
   padding-right: 4px;
   margin-bottom: 14px;
-  scrollbar-width: thin;
 }
 .gift-list-row {
   display: flex;

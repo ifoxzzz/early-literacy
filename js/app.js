@@ -1297,6 +1297,7 @@
   }
 
   // 交换两张卡片在 DOM 中的位置，并用 FLIP 动画让被交换的非拖拽卡片平滑滑到新位置
+  // 落位后拖拽卡片执行一次「变大 → 摇晃 → 恢复」的强调动画，确认交换完成
   function swapShelf(a, b) {
     Sound.play("swap"); // 互换音效
     const shelf = $("#gift-shelf");
@@ -1325,12 +1326,29 @@
         });
       }
     });
+    emphasizeGiftEl(a);
+  }
+
+  // 给元素加一次「变大 → 摇晃 → 恢复」强调动画，动画结束自动移除类
+  function emphasizeGiftEl(el) {
+    if (!el) return;
+    el.classList.remove("emph");
+    void el.offsetWidth; // 强制重排，连续触发时重启动画
+    el.classList.add("emph");
+    el.addEventListener(
+      "animationend",
+      (e) => {
+        if (e.animationName === "gift-card-emph") el.classList.remove("emph");
+      },
+      { once: true }
+    );
   }
 
   // 点橱窗礼物：清除「新」标记（边框闪烁消失）并放大展示
   // 放大动画从被点卡片的位置开始：先平移+缩小到卡片处，再飞到屏幕中央变大；
   // giftZoomFrom 记住起飞偏移，关闭时缩回卡片位置，与展开相呼应
   let giftZoomFrom = null;
+  let giftZoomEl = null; // 记录被放大的橱窗卡片，关闭大图后图标做一次强调动画
 
   function zoomGift(name, fromEl) {
     const catalog = giftCatalog();
@@ -1345,6 +1363,7 @@
     overlay.classList.remove("hidden");
     // 起始状态：定位到卡片中心（视口中心为原点计算偏移），缩小、半透明
     giftZoomFrom = null;
+    giftZoomEl = fromEl || null;
     inner.style.transition = "none";
     if (fromEl) {
       const r = fromEl.getBoundingClientRect();
@@ -1413,6 +1432,8 @@
       .join("");
     updateGiftPickState();
     $("#gift-dialog").classList.remove("hidden");
+    // 弹窗显示后再计算礼物网格的上下渐隐（未滚动时只显示底部淡出）
+    requestAnimationFrame(() => updateScrollFade($("#gift-grid")));
     Speaker.playGiftBagOpen(giftQuota); // 打开礼物袋时播报可挑件数
   }
 
@@ -1564,12 +1585,13 @@
     }
     enterVolume(Storage.currentUser(), volume);
   });
-  // 册目列表、汉字表、练习记录、礼物橱窗与礼物记录滚动时更新边缘淡出与滚动条显隐；窗口尺寸变化时重新计算
+  // 册目列表、汉字表、练习记录、礼物橱窗、礼物记录与礼物袋网格滚动时更新边缘淡出与滚动条显隐；窗口尺寸变化时重新计算
   bindScrollFx($("#volume-list"));
   bindScrollFx($("#word-list"), $("#word-sheet"));
   bindScrollFx($("#history-list"));
   bindScrollFx($("#gift-shelf"));
   bindScrollFx($("#gift-list"));
+  bindScrollFx($("#gift-grid"));
   window.addEventListener("resize", () => {
     updateScrollFade($("#volume-list"));
     updateScrollFade($("#word-list"), $("#word-sheet"));
@@ -1784,7 +1806,13 @@
       inner.style.opacity = "0";
       giftZoomFrom = null;
     }
-    setTimeout(() => overlay.classList.add("hidden"), 320);
+    // 大图飞回卡片后，卡片上的图标做一次「变大 → 摇晃 → 恢复」强调动画
+    const zoomedCard = giftZoomEl;
+    giftZoomEl = null;
+    setTimeout(() => {
+      overlay.classList.add("hidden");
+      if (zoomedCard) emphasizeGiftEl(zoomedCard.querySelector(".gift-shelf-icon"));
+    }, 320);
   });
 
   /* ---------- 橱窗拖拽排序 + 垃圾篓删除（统一用 Pointer Events，兼容鼠标/触摸/触控笔） ---------- */

@@ -2246,6 +2246,8 @@ body.hide-note .hint-bar {
 }
 
 .gift-shelf-icon {
+  display: inline-block;
+  transform-origin: 50% 60%;
   font-size: clamp(30px, 7vmin, 46px);
   line-height: 1.1;
 }
@@ -2319,6 +2321,40 @@ body.hide-note .hint-bar {
     animation: none;
     border-color: #ff9d2e;
     box-shadow: 0 4px 0 #eadfcb, 0 0 10px 2px rgba(255, 157, 46, 0.6);
+  }
+}
+
+/* 强调动画：变大 → 左右摇晃 → 恢复（卡片交换落位、大图关闭回到卡片时使用） */
+.gift-shelf-item.emph,
+.gift-shelf-icon.emph {
+  animation: gift-card-emph 0.55s ease-in-out;
+}
+
+@keyframes gift-card-emph {
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
+  25% {
+    transform: scale(1.18) rotate(-6deg);
+  }
+  45% {
+    transform: scale(1.18) rotate(5deg);
+  }
+  62% {
+    transform: scale(1.14) rotate(-4deg);
+  }
+  78% {
+    transform: scale(1.06) rotate(2deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gift-shelf-item.emph,
+  .gift-shelf-icon.emph {
+    animation: none;
   }
 }
 
@@ -2564,6 +2600,46 @@ body.hide-note .hint-bar {
   min-height: 0;
   overflow-y: auto;
   padding: 4px 2px 8px;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+/* 滚动条默认隐藏，只在滚动/拖动时露出（与其他滚动列表一致） */
+.gift-grid.scrolling {
+  scrollbar-color: #e0cba8 transparent;
+}
+
+.gift-grid::-webkit-scrollbar {
+  width: 8px;
+}
+
+.gift-grid::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.gift-grid::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+}
+
+.gift-grid.scrolling::-webkit-scrollbar-thumb {
+  background: #e0cba8;
+}
+
+/* 内容超出时把上下边缘淡出，避免被生硬切断（滚到顶/底时对应一侧自动取消） */
+.gift-grid.fade-top {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 20px);
+  mask-image: linear-gradient(to bottom, transparent, #000 20px);
+}
+
+.gift-grid.fade-bottom {
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 20px);
+  mask-image: linear-gradient(to top, transparent, #000 20px);
+}
+
+.gift-grid.fade-top.fade-bottom {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 20px, #000 calc(100% - 20px), transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 20px, #000 calc(100% - 20px), transparent);
 }
 
 .gift-item {

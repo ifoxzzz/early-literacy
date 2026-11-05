@@ -478,7 +478,7 @@
   }
 
   // 点册后只预加载第一题的语音，就绪即进入练习页；
-  // 后续题目在答题过程中由 prefetchUpcoming 后台滑窗预取（答题时间足够下载）
+  // 之后每出一题就后台预取下一题（prefetchUpcoming）
   function enterVolume(user, volume) {
     if (enteringVolume) return;
     // 该小朋友自己配置的候选字数 / 每组题数
@@ -550,14 +550,11 @@
     session.timer = session.delayTimer = session.guardTimer = null;
   }
 
-  // 后台预取接下来 5 题的语音（单字/组词/注解）：
-  // 孩子答一题的时间足够下载好几题，滑到对应题目时基本已就绪
+  // 后台预取下一题的语音（单字/组词/注解）：
+  // 本题讲解播完后孩子还要作答，这段时间足够把下一题下完，下一题通常不必等进度条
   function prefetchUpcoming() {
-    const urls = [];
-    session.queue.slice(0, 5).forEach((q) => {
-      urls.push(...Speaker.entryUrls(q.target));
-    });
-    Speaker.preload(urls);
+    const next = session.queue[0];
+    if (next) Speaker.preload(Speaker.entryUrls(next.target));
   }
 
   function nextQuestion() {
@@ -580,7 +577,8 @@
       clearTimeout(showTimer);
       if (gen !== session.gen) return;
       if (loadingShown) hideLoading();
-      beginQuestion(q); // 讲解播完后由 onDone 启动后台预取
+      beginQuestion(q);
+      prefetchUpcoming(); // 出题即预取下一题；本题音频已在 blob 里，不占网络
     });
   }
 
@@ -621,12 +619,7 @@
 
     const isFirst = session.firstQuestion;
     session.firstQuestion = false;
-    Speaker.readQuestion(q.target, {
-      welcome: isFirst,
-      name: session.userName,
-      // 讲解播完后再后台预取下几题，避免和正在播放的语音抢带宽
-      onDone: prefetchUpcoming,
-    });
+    Speaker.readQuestion(q.target, { welcome: isFirst, name: session.userName });
   }
 
   // 作答后记录已写入：correct==1 且 wrong==0 说明是第一次接触的新字

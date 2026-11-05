@@ -451,13 +451,7 @@ const Speaker = {
     // 注解音频缺失时用系统语音补读；没有预生成名字语音时，
     // phraseFile 会自动退回通用提示语，不再插入系统合成音
     const after = noteSrc || !note ? null : () => this.speak(note);
-    // 讲解全部播完后才回调 onDone（app.js 用它启动后台预取，
-    // 避免下载抢带宽影响正在播放/边下边播的语音）
-    const done = opts && opts.onDone;
-    this.play(list, () => {
-      if (after) after();
-      if (done) done();
-    });
+    this.play(list, after);
   },
 
   // 答对：按连续首答正确次数选等级（1~2 / 3~4 / 5~6 / 7~8 / 9+ 次），

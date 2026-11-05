@@ -10,16 +10,6 @@
   // 禁用鼠标右键菜单，避免小朋友误触后不知道如何处理
   document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  /* ---------- 关闭页面确认 ---------- */
-  // 浏览器不允许在页面卸载时展示自定义 DOM，只能通过 beforeunload 触发原生的
-  // 「离开此网站？」确认框（文案由浏览器固定）；手机浏览器/微信 WebView 多数会忽略。
-  let allowUnload = false;
-  window.addEventListener("beforeunload", (e) => {
-    if (allowUnload) return;
-    e.preventDefault();
-    e.returnValue = ""; // 兼容旧版浏览器，触发原生确认
-  });
-
   /* ---------- 鼠标气泡特效：光标移动时冒出小气泡，帮助孩子找到箭头 ---------- */
   let bubbleTime = 0;
   let bubbleX = 0;
@@ -566,12 +556,11 @@
     }
     const q = session.queue.shift();
     const gen = session.gen; // 加载期间若退出/换组，作废旧回调
-    // 本题语音未就绪时显示加载进度，加载完才出题；
-    // 后台滑窗预取保证绝大多数情况瞬间完成、遮罩根本不出现
+    // 本题资源未就绪时显示遮罩，加载完才出题；出题后已预取下一题，绝大多数情况瞬间完成、遮罩根本不出现
     let loadingShown = false;
     const showTimer = setTimeout(() => {
       loadingShown = true;
-      showLoading("正在准备本题语音");
+      showLoading("正在准备本题资源");
     }, 150);
     Speaker.preloadAll(Speaker.entryUrls(q.target), updateLoading).then(() => {
       clearTimeout(showTimer);
@@ -1480,7 +1469,7 @@
     let loadingShown = false;
     const showTimer = setTimeout(() => {
       loadingShown = true;
-      showLoading(`正在呼唤 ${user.name}`);
+      showLoading(`请稍后，正在为${user.name}加载所需资源`);
     }, 150);
     Speaker.preloadGlobal(user.name, updateLoading).then(() => {
       clearTimeout(showTimer);
@@ -1879,7 +1868,6 @@
       return;
     Speaker.clearAudioCache();
     Storage.clearAll();
-    allowUnload = true; // 这是应用内的主动刷新，不再弹离站确认
     location.reload();
   });
   $("#btn-admin-back").addEventListener("click", renderHome);

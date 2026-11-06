@@ -1562,7 +1562,7 @@
     let loadingShown = false;
     const showTimer = setTimeout(() => {
       loadingShown = true;
-      showLoading(`请稍后，正在为${user.name}加载所需资源`);
+      showLoading(`正在为${user.name}更新应用资源`);
     }, 150);
     Speaker.preloadGlobal(user.name, updateLoading).then(() => {
       clearTimeout(showTimer);
@@ -2034,6 +2034,20 @@
     if (!confirm(`确定删除「${user.name}」吗？该小朋友的练习记录会一并删除。`)) return;
     Storage.removeUser(user.id);
     renderAdmin();
+  });
+
+  // 首页右下角版本号：与 index.html 里的 CACHE_VERSION 保持一致
+  $("#home-version").textContent = "v" + (window.APP_VERSION || "");
+
+  // 作者信息浮层：点底部站点地址打开，点浮层以外区域关闭
+  const aboutMask = $("#about-mask");
+  const openAbout = () => aboutMask.classList.remove("hidden");
+  const closeAbout = () => aboutMask.classList.add("hidden");
+  $("#btn-about").addEventListener("click", openAbout);
+  $("#btn-about-close").addEventListener("click", closeAbout);
+  // 遮罩本身铺满全屏，只有点在遮罩上（即浮层以外区域）才关闭
+  aboutMask.addEventListener("click", (e) => {
+    if (e.target === aboutMask) closeAbout();
   });
 
   renderHome();

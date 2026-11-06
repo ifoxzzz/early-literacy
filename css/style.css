@@ -713,7 +713,9 @@ body {
   font-size: 24px;
   line-height: 1;
   white-space: nowrap;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
   transition: left 0.18s ease;
   filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.18));
   transform-origin: 50% 100%; /* 以"接触地面"的点为轴，压扁时更像踩在地上 */
@@ -737,6 +739,42 @@ body {
   }
   100% {
     transform: scaleX(-1) rotate(-6deg) scale(1, 1);
+  }
+}
+
+/* 点击小图标换装：旧图标缩小淡出（0.2s），新图标从小放大到略大于正常尺寸再回弹到正常（0.5s）。
+   这两个动画会临时覆盖跑动动画，结束后由 app.js 移除类名，恢复跑步动画 */
+.loading-icon-out {
+  animation: loading-icon-out 0.2s ease-in forwards;
+}
+
+@keyframes loading-icon-out {
+  0% {
+    transform: scaleX(-1) rotate(-6deg) scale(1, 1);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleX(-1) rotate(-6deg) scale(0.2, 0.2);
+    opacity: 0;
+  }
+}
+
+.loading-icon-in {
+  animation: loading-icon-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes loading-icon-in {
+  0% {
+    transform: scaleX(-1) rotate(-6deg) scale(0.2, 0.2);
+    opacity: 0;
+  }
+  55% {
+    transform: scaleX(-1) rotate(-6deg) scale(1.35, 1.35);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleX(-1) rotate(-6deg) scale(1, 1);
+    opacity: 1;
   }
 }
 

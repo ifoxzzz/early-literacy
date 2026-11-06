@@ -720,15 +720,18 @@
   let enteringVolume = false; // 加载遮罩显示期间忽略重复点册
 
   // 加载进度条前端的小图标（会一颠一颠地往前跑）：可自由增删，每次加载随机取一个
-  const LOADING_ICONS = ["🚗", "🚕", "🚓", "🛺", "🚌", "🦖", "🐢", "🐠", "🚴"];
+  const LOADING_ICONS = ["🚗", "🚕", "🚓", "🛺", "🚌", "🦖", "🐢", "🐌", "🐠", "🚴"];
 
   function showLoading(title) {
     // 每次显示加载页随机换一个图标，避免每次都一样
     const icons = LOADING_ICONS.length ? LOADING_ICONS : ["🚗"];
-    $("#loading-icon").textContent = icons[Math.floor(Math.random() * icons.length)];
+    const icon = $("#loading-icon");
+    icon.classList.remove("loading-icon-out", "loading-icon-in"); // 清掉可能残留的换装动画
+    loadingIconSwapping = false; // 上一次换装若因遮罩提前隐藏而中断，这里重置
+    icon.textContent = icons[Math.floor(Math.random() * icons.length)];
     $("#loading-title").textContent = title;
     $("#loading-fill").style.width = "0%";
-    $("#loading-icon").style.left = "0%";
+    icon.style.left = "0%";
     $("#loading-count").textContent = "0 / 0";
     $("#loading-mask").classList.remove("hidden");
   }
@@ -743,6 +746,42 @@
   function hideLoading() {
     $("#loading-mask").classList.add("hidden");
   }
+
+  // 点击进度条上的小图标：随机换一个（不与当前相同），
+  // 旧图标缩小淡出 → 新图标从小放大到略大于正常尺寸 → 回弹到正常，然后恢复跑动动画
+  let loadingIconSwapping = false;
+
+  function nextLoadingIcon(current) {
+    const icons = LOADING_ICONS.length ? LOADING_ICONS : ["🚗"];
+    if (icons.length <= 1) return icons[0];
+    let next = current;
+    while (next === current) {
+      next = icons[Math.floor(Math.random() * icons.length)];
+    }
+    return next;
+  }
+
+  $("#loading-icon").addEventListener("click", () => {
+    const icon = $("#loading-icon");
+    if (loadingIconSwapping) return; // 动画进行中忽略重复点击
+    loadingIconSwapping = true;
+    icon.classList.add("loading-icon-out");
+  });
+
+  $("#loading-icon").addEventListener("animationend", (e) => {
+    const icon = e.currentTarget;
+    if (e.animationName === "loading-icon-out") {
+      // 旧图标已收缩淡出：换成新图标，接着播放放大回弹
+      icon.classList.remove("loading-icon-out");
+      icon.textContent = nextLoadingIcon(icon.textContent);
+      void icon.offsetWidth; // 强制重排，让下一段动画从头开始
+      icon.classList.add("loading-icon-in");
+    } else if (e.animationName === "loading-icon-in") {
+      // 新图标已恢复到正常尺寸：清掉类名，交还给跑动动画
+      icon.classList.remove("loading-icon-in");
+      loadingIconSwapping = false;
+    }
+  });
 
   // 点册后只预加载第一题的语音，就绪即进入练习页；
   // 之后每出一题就后台预取下一题（prefetchUpcoming）

@@ -137,8 +137,9 @@ const Storage = {
 
   addGifts(names, id) {
     const arr = this.gifts(id);
-    (names || []).forEach((name) => arr.push(this._giftItem(name, true)));
-    this.writeJSON(this.giftsKey(id), arr);
+    // 新礼物放在最前面（橱窗从第一件开始摆放），装不下的旧礼物会按顺序进入收纳盒
+    const added = (names || []).map((name) => this._giftItem(name, true));
+    this.writeJSON(this.giftsKey(id), added.concat(arr));
   },
 
   // 整体保存顺序（拖拽排序后用）

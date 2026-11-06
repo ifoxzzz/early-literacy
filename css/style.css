@@ -2457,7 +2457,7 @@ body.hide-note .hint-bar {
   );
 }
 
-/* 礼物网格：内容过多时出现滚动条，上下边缘由 fade-top / fade-bottom 渐隐 */
+/* 礼物网格：容量由 JS 按当前设备计算，橱窗本身不出现滚动条（装不下的进入收纳盒） */
 .gift-shelf {
   position: relative;
   z-index: 1;
@@ -2469,7 +2469,7 @@ body.hide-note .hint-bar {
   align-content: start;
   gap: 10px;
   padding: 18px;
-  overflow-y: auto;
+  overflow: hidden;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
@@ -2754,6 +2754,144 @@ body.hide-note .hint-bar {
 .gift-list-time {
   color: #b09a7d;
   font-size: clamp(12px, 2.5vmin, 14px);
+}
+
+/* 收纳盒：橱窗装不下的礼物在这里紧凑展示，只有图标，内容多时内部滚动 */
+.gift-box {
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+  align-content: start;
+  gap: 8px;
+  padding: 14px;
+  margin-bottom: 18px;
+  overflow-y: auto;
+  border: 3px solid #e0cba8;
+  border-radius: 22px;
+  background: linear-gradient(to bottom, #fbf1de, #f2e3c8);
+  box-shadow:
+    inset 0 3px 8px rgba(180, 140, 90, 0.14),
+    0 4px 0 #ead8b4,
+    0 10px 22px rgba(160, 120, 70, 0.12);
+  /* 礼物多时显示细滚动条（与礼物袋一致的配色） */
+  scrollbar-width: thin;
+  scrollbar-color: #e0cba8 transparent;
+}
+
+.gift-box::-webkit-scrollbar {
+  width: 8px;
+}
+
+.gift-box::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.gift-box::-webkit-scrollbar-thumb {
+  background: #e0cba8;
+  border-radius: 999px;
+}
+
+.gift-box.fade-top {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 20px);
+  mask-image: linear-gradient(to bottom, transparent, #000 20px);
+}
+
+.gift-box.fade-bottom {
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 20px);
+  mask-image: linear-gradient(to top, transparent, #000 20px);
+}
+
+.gift-box.fade-top.fade-bottom {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 20px, #000 calc(100% - 20px), transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 20px, #000 calc(100% - 20px), transparent);
+}
+
+/* 收纳盒卡片：只有图标，紧凑排列；可点击放大，不支持拖拽/换位 */
+.gift-box-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  padding: 4px;
+  background: #fffdf8;
+  border: 2px solid #f3e4c4;
+  border-radius: 12px;
+  box-shadow: 0 2px 0 #f0e0bd;
+  font-family: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 0.15s, background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.gift-box-item:hover {
+  background: #fff3d6;
+  transform: translateY(-2px);
+}
+
+.gift-box-item:active {
+  transform: scale(0.92);
+}
+
+.gift-box-icon {
+  display: inline-block;
+  font-size: clamp(26px, 5.6vmin, 36px);
+  line-height: 1;
+  transform-origin: center;
+}
+
+/* 点击收纳盒礼物：图标放大 + 摇晃 + 复原 */
+.gift-box-item.pop .gift-box-icon {
+  animation: gift-emoji-pop 0.55s ease-in-out;
+}
+
+/* 礼物在橱窗与收纳盒之间飞行的浮层卡片，动画结束由 JS 移除 */
+.gift-fly-ghost {
+  position: fixed;
+  z-index: 9800;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  pointer-events: none;
+  background: #fffdf8;
+  border: 2px solid #f3e4c4;
+  border-radius: 16px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.2);
+  will-change: transform, opacity;
+}
+
+.gift-fly-icon {
+  font-size: clamp(30px, 7vmin, 46px);
+  line-height: 1;
+}
+
+.gift-fly-name {
+  color: #7c6a52;
+  font-size: clamp(12px, 2.8vmin, 16px);
+  white-space: nowrap;
+}
+
+/* 收纳盒按钮接住礼物时轻弹一下 */
+.gift-mode-btn.receive {
+  animation: gift-mode-receive 0.45s ease-in-out;
+}
+
+@keyframes gift-mode-receive {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.18); }
+  65% { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gift-box-item.pop .gift-box-icon,
+  .gift-mode-btn.receive {
+    animation: none;
+  }
 }
 
 /* 礼物放大 overlay：全屏暗遮罩 + 居中礼物，只有点卡片外区域才关闭 */

@@ -76,7 +76,7 @@
   let giftClaimed = false;
   let giftBagRefreshed = false; // 本次打开的礼物袋是否已用过「换一批」（每袋只能用一次）
   let giftsReturnView = "quiz";
-  let giftShelfMode = "shelf"; // "shelf" 收纳 / "list" 记录
+  let giftShelfMode = "shelf"; // "shelf" 橱窗 / "box" 收纳盒 / "list" 记录
   const GIFT_MODE_KEY = "early-literacy-gift-mode";
 
   function show(name) {
@@ -1556,12 +1556,84 @@
     }
   }
 
-  // 橱窗：两种模式切换（橱窗 / 记录），按 localStorage 记忆偏好
-  // giftItems 是当前橱窗的礼物实例数组（拖拽排序时就地改它，松手后持久化）
+  // 橱窗：三种状态（橱窗 / 收纳盒 / 记录），按 localStorage 记忆「橱窗 / 记录」偏好
+  // giftItems 是礼物实例数组，顺序即摆放顺序：前 N 件在橱窗，其余进入收纳盒（纯界面派生，不额外存储）
   let giftItems = [];
+  let giftShelfCapacity = 0; // 当前窗口下橱窗能完整放下的礼物数量
+  let giftShelfCols = 1;
+  let giftShelfRows = 1;
   let giftDragId = null; // 正在拖拽的礼物实例 id
   let giftDragMoved = false; // 本次拖拽是否发生过移动（用来区分点击与拖拽）
   let giftDragOverId = null; // 最近一次交换的目标卡片 id，避免同一位置反复交换
+  let giftOverflowPending = 0; // 刚领取的新礼物数：进柜时把被挤出的卡片飞进收纳盒
+  let giftOverflowUid = ""; // 上面的数量属于哪位小朋友
+  let lastShelfIds = null; // 上一次渲染时橱窗里的礼物 id，用于判断谁被挤进/补进
+  let lastBoxIds = null; // 上一次渲染时收纳盒里的礼物 id
+  let lastGiftUid = ""; // 上一次渲染属于哪位小朋友
+  let giftReflowTimer = 0; // 窗口尺寸变化后延迟重排
+
+  // 计算橱窗容量：按当前设备能完整放下的行列数得出（如 4 行 3 列 = 12 件），保证橱窗不出现滚动条
+  // 测量时即使最终要显示收纳盒/记录，也先让展柜参与布局，量完立即恢复
+  function measureGiftShelf() {
+    const frame = $("#gift-shelf-frame");
+    const shelf = $("#gift-shelf");
+    const actions = $(".gift-actions");
+    frame.classList.remove("hidden");
+    const view = views.gifts;
+    const viewCs = getComputedStyle(view);
+    const viewRect = view.getBoundingClientRect();
+    const padBottom = parseFloat(viewCs.paddingBottom) || 0;
+    const frameTop = frame.getBoundingClientRect().top;
+    const frameCs = getComputedStyle(frame);
+    const marginBottom = parseFloat(frameCs.marginBottom) || 0;
+    const borderY =
+      (parseFloat(frameCs.borderTopWidth) || 0) + (parseFloat(frameCs.borderBottomWidth) || 0);
+    const availH = Math.max(
+      0,
+      viewRect.bottom - padBottom - frameTop - marginBottom - actions.offsetHeight
+    );
+
+    // 用一张隐藏的示例卡片量出真实行高（字号随视口变化，不能写死）
+    const probe = document.createElement("div");
+    probe.className = "gift-shelf-item";
+    probe.style.visibility = "hidden";
+    probe.innerHTML = `<span class="gift-shelf-icon">🎁</span><span class="gift-shelf-name">有轨电车</span>`;
+    shelf.appendChild(probe);
+    const cardH = probe.getBoundingClientRect().height || 0;
+    probe.remove();
+
+    const shelfCs = getComputedStyle(shelf);
+    const gap = parseFloat(shelfCs.rowGap) || 10;
+    const padY = (parseFloat(shelfCs.paddingTop) || 0) + (parseFloat(shelfCs.paddingBottom) || 0);
+    const padX = (parseFloat(shelfCs.paddingLeft) || 0) + (parseFloat(shelfCs.paddingRight) || 0);
+    const innerW = Math.max(0, shelf.clientWidth - padX);
+    const innerH = Math.max(0, availH - borderY);
+    // 与 CSS 的 repeat(auto-fill, minmax(92px, 1fr)) 保持同样的列数
+    const cols = Math.max(1, Math.floor((innerW + gap + 0.01) / (92 + gap)));
+    const rows = Math.max(1, Math.floor((innerH - padY + gap + 0.01) / (cardH + gap)));
+    giftShelfCols = cols;
+    giftShelfRows = rows;
+    giftShelfCapacity = Math.max(1, cols * rows);
+    return giftShelfCapacity;
+  }
+
+  // 打开礼物展柜：按记忆偏好决定初始模式（记录在收纳盒有礼物时会被收纳盒替代）
+  function openGiftView(returnView) {
+    giftsReturnView = returnView;
+    giftShelfMode = localStorage.getItem(GIFT_MODE_KEY) === "list" ? "list" : "shelf";
+    renderGiftShelf();
+  }
+
+  // 窗口尺寸变化（电脑拖动窗口 / 手机转屏）后橱窗容量会变，重新拆分橱窗与收纳盒
+  function scheduleGiftReflow() {
+    if (views.gifts.classList.contains("hidden")) return;
+    clearTimeout(giftReflowTimer);
+    giftReflowTimer = setTimeout(() => {
+      giftReflowTimer = 0;
+      if (views.gifts.classList.contains("hidden")) return;
+      renderGiftShelf();
+    }, 160);
+  }
 
   function renderGiftShelf() {
     const user = Storage.currentUser();
@@ -1580,31 +1652,83 @@
       ? `${user.name} 的礼物 · 共 ${total} 件`
       : `我的礼物 · 共 ${total} 件`;
 
-    // 模式按钮 active 状态
-    giftShelfMode = localStorage.getItem(GIFT_MODE_KEY) === "list" ? "list" : "shelf";
-    document.querySelectorAll(".gift-mode-btn").forEach((btn) => {
-      btn.classList.toggle("active", btn.dataset.mode === giftShelfMode);
+    // 先显示页面再测量：隐藏状态下量不到展柜的位置与尺寸
+    show("gifts");
+
+    // 按容量切分：前面的摆在橱窗，后面（超出的）进入收纳盒
+    const capacity = total > 0 ? measureGiftShelf() : 0;
+    const shelfItems = giftItems.slice(0, capacity);
+    const boxItems = giftItems.slice(capacity);
+    const boxActive = boxItems.length > 0;
+
+    // 「记录」按钮就是收纳盒入口：有礼物时改为「收纳盒」，为空时恢复「记录」
+    if (boxActive && giftShelfMode === "list") giftShelfMode = "box";
+    if (!boxActive && giftShelfMode === "box") giftShelfMode = "list";
+    const mode = giftShelfMode;
+
+    // 判断本次渲染中谁被挤进收纳盒、谁从收纳盒补进橱窗（用于飞行动画）
+    const sameUser = lastGiftUid === uid;
+    const prevShelf = sameUser && lastShelfIds ? new Set(lastShelfIds) : null;
+    const prevBox = sameUser && lastBoxIds ? new Set(lastBoxIds) : null;
+    const pushed = prevShelf
+      ? boxItems.filter((g) => prevShelf.has(g.id))
+      : giftOverflowPending > 0 && giftOverflowUid === uid
+        ? boxItems.slice(0, Math.min(giftOverflowPending, boxItems.length))
+        : [];
+    const filled = prevBox ? shelfItems.filter((g) => prevBox.has(g.id)) : [];
+    giftOverflowPending = 0;
+    giftOverflowUid = "";
+    lastGiftUid = uid;
+    lastShelfIds = shelfItems.map((g) => g.id);
+    lastBoxIds = boxItems.map((g) => g.id);
+
+    // 模式按钮：第一个固定为「橱窗」，第二个在收纳盒有礼物时显示「收纳盒」，否则显示「记录」
+    const modeBtns = document.querySelectorAll(".gift-mode-btn");
+    modeBtns.forEach((btn) => {
+      if (btn.dataset.mode === "shelf") {
+        btn.classList.toggle("active", mode === "shelf");
+        return;
+      }
+      btn.dataset.mode = boxActive ? "box" : "list";
+      btn.textContent = boxActive ? "盒子" : "记录";
+      btn.classList.toggle("active", mode === btn.dataset.mode);
     });
+
     const hasGifts = total > 0;
-    $("#gift-shelf-frame").classList.toggle("hidden", giftShelfMode !== "shelf" || !hasGifts);
-    $("#gift-list").classList.toggle("hidden", giftShelfMode !== "list" || !hasGifts);
+    $("#gift-shelf-frame").classList.toggle("hidden", !(hasGifts && mode === "shelf"));
+    $("#gift-list").classList.toggle("hidden", !(hasGifts && mode === "list"));
+    $("#gift-box").classList.toggle("hidden", !(hasGifts && mode === "box"));
     // 垃圾篓只在橱窗模式且拖拽时才需要可见；平时常驻提示也可以，这里只在橱窗模式显示
-    $("#gift-trash").classList.toggle("hidden", giftShelfMode !== "shelf" || !hasGifts);
+    $("#gift-trash").classList.toggle("hidden", !(hasGifts && mode === "shelf"));
     $("#gift-empty").classList.toggle("hidden", hasGifts);
 
-    if (hasGifts && giftShelfMode === "shelf") {
-      // 每件礼物实例一张卡片：同名礼物就是并列的多张卡片，可分别拖拽/删除
-      $("#gift-shelf").innerHTML = giftItems
-        .map(
-          (g) => `<div class="gift-shelf-item${g.fresh ? " fresh" : ""}" data-id="${g.id}">
+    // 每件礼物实例一张卡片：同名礼物就是并列的多张卡片，可分别拖拽/删除
+    $("#gift-shelf").innerHTML =
+      hasGifts && mode === "shelf"
+        ? shelfItems
+            .map(
+              (g) => `<div class="gift-shelf-item${g.fresh ? " fresh" : ""}" data-id="${g.id}">
             <span class="gift-shelf-icon">${catalog[g.name] || "🎁"}</span>
             <span class="gift-shelf-name">${g.name}</span>
           </div>`
-        )
-        .join("");
-    }
+            )
+            .join("")
+        : "";
 
-    if (hasGifts && giftShelfMode === "list") {
+    // 收纳盒：卡片只有图标、排列更紧凑；礼物太多时内部滚动
+    $("#gift-box").innerHTML =
+      hasGifts && mode === "box"
+        ? boxItems
+            .map(
+              (g) => `<button type="button" class="gift-box-item" data-id="${g.id}" title="${g.name}" aria-label="${g.name}">
+            <span class="gift-box-icon">${catalog[g.name] || "🎁"}</span>
+          </button>`
+            )
+            .join("")
+        : "";
+    if (mode === "box") $("#gift-box").scrollTop = 0;
+
+    if (hasGifts && mode === "list") {
       const log = Storage.giftLog(uid);
       // 倒序展示，最新在最上面
       const rows = [...log].reverse().map((rec) => {
@@ -1623,13 +1747,103 @@
         </div>`;
       });
       $("#gift-list").innerHTML = rows.join("");
+    } else {
+      $("#gift-list").innerHTML = "";
     }
 
-    show("gifts");
     // 视图显示后再计算当前模式滚动区的上下渐隐（内容少时两侧都不显示）
     requestAnimationFrame(() => {
       if (!hasGifts) return;
-      updateScrollFade(giftShelfMode === "shelf" ? $("#gift-shelf") : $("#gift-list"));
+      const scroller =
+        mode === "shelf" ? $("#gift-shelf") : mode === "box" ? $("#gift-box") : $("#gift-list");
+      updateScrollFade(scroller);
+    });
+
+    // 飞行动画：被挤进收纳盒的卡片飞向收纳盒按钮；补进橱窗的卡片从收纳盒按钮飞入
+    if (hasGifts && mode === "shelf" && (pushed.length || filled.length)) {
+      const secondBtn = modeBtns[1];
+      requestAnimationFrame(() => {
+        if (pushed.length) flyGiftsIntoBox(pushed, secondBtn);
+        if (filled.length) flyGiftsIntoWardrobe(filled, secondBtn);
+      });
+    }
+  }
+
+  // 被挤进收纳盒：卡片从橱窗最后一行的位置飞向收纳盒按钮，缩小淡出后消失
+  function flyGiftsIntoBox(items, boxBtn) {
+    const shelf = $("#gift-shelf");
+    const cards = shelf.querySelectorAll(".gift-shelf-item");
+    if (!boxBtn || !cards.length) return;
+    const first = cards[0].getBoundingClientRect();
+    const gap = 10;
+    const cardW = first.width;
+    const cardH = first.height;
+    const cols = Math.max(1, giftShelfCols);
+    const rows = Math.max(1, giftShelfRows);
+    const end = boxBtn.getBoundingClientRect();
+    const catalog = giftCatalog();
+    const ghosts = [];
+    items.slice(0, 8).forEach((g, i) => {
+      const left = first.left + (i % cols) * (cardW + gap);
+      const top = first.top + (rows - 1) * (cardH + gap);
+      const ghost = document.createElement("div");
+      ghost.className = "gift-fly-ghost";
+      ghost.style.width = cardW + "px";
+      ghost.style.height = cardH + "px";
+      ghost.style.left = left + "px";
+      ghost.style.top = top + "px";
+      ghost.innerHTML = `<span class="gift-fly-icon">${catalog[g.name] || "🎁"}</span><span class="gift-fly-name">${g.name}</span>`;
+      document.body.appendChild(ghost);
+      ghosts.push({
+        ghost,
+        dx: end.left + end.width / 2 - (left + cardW / 2),
+        dy: end.top + end.height / 2 - (top + cardH / 2),
+        delay: i * 70,
+      });
+    });
+    if (!ghosts.length) return;
+    requestAnimationFrame(() => {
+      ghosts.forEach(({ ghost, dx, dy, delay }) => {
+        ghost.style.transition =
+          `transform 0.5s cubic-bezier(0.5, 0.05, 0.7, 0.4) ${delay}ms, ` +
+          `opacity 0.3s ease ${delay + 200}ms`;
+        ghost.style.transform = `translate(${dx}px, ${dy}px) scale(0.16) rotate(14deg)`;
+        ghost.style.opacity = "0";
+      });
+      const total = 600 + (ghosts.length - 1) * 70;
+      setTimeout(() => {
+        ghosts.forEach(({ ghost }) => ghost.remove());
+        // 收纳盒按钮接住礼物后弹一下
+        boxBtn.classList.remove("receive");
+        void boxBtn.offsetWidth;
+        boxBtn.classList.add("receive");
+      }, total);
+    });
+  }
+
+  // 收纳盒补给橱窗：卡片从收纳盒按钮的位置飞进它在橱窗中的新格子
+  function flyGiftsIntoWardrobe(items, boxBtn) {
+    const shelf = $("#gift-shelf");
+    if (!boxBtn || !shelf) return;
+    const end = boxBtn.getBoundingClientRect();
+    items.slice(0, 8).forEach((g, i) => {
+      const card = shelf.querySelector(`.gift-shelf-item[data-id="${g.id}"]`);
+      if (!card) return;
+      const r = card.getBoundingClientRect();
+      const dx = end.left + end.width / 2 - (r.left + r.width / 2);
+      const dy = end.top + end.height / 2 - (r.top + r.height / 2);
+      card.style.transition = "none";
+      card.style.transform = `translate(${dx}px, ${dy}px) scale(0.2)`;
+      card.style.opacity = "0";
+      setTimeout(() => {
+        card.style.transition =
+          "transform 0.5s cubic-bezier(0.2, 1.1, 0.4, 1), opacity 0.28s ease";
+        card.style.transform = "";
+        card.style.opacity = "";
+        setTimeout(() => {
+          card.style.transition = "";
+        }, 600);
+      }, i * 60);
     });
   }
 
@@ -1948,6 +2162,7 @@
   bindScrollFx($("#history-list"));
   bindScrollFx($("#gift-shelf"));
   bindScrollFx($("#gift-list"));
+  bindScrollFx($("#gift-box"));
   bindScrollFx($("#gift-grid"));
   window.addEventListener("resize", () => {
     updateScrollFade($("#volume-list"));
@@ -1955,6 +2170,8 @@
     updateScrollFade($("#history-list"));
     updateScrollFade($("#gift-shelf"));
     updateScrollFade($("#gift-list"));
+    updateScrollFade($("#gift-box"));
+    scheduleGiftReflow(); // 展柜打开时按新窗口重新计算橱窗容量
   });
   // 汉字表小喇叭：先加载该字的语音（未缓存时显示进度条），就绪后再播放
   let loadingWordAudio = false;
@@ -2106,15 +2323,13 @@
   });
   // 练习页顶部的礼物图标：进入当前小朋友的礼物展柜，返回时回到练习页
   $("#btn-gift").addEventListener("click", () => {
-    giftsReturnView = "quiz";
-    renderGiftShelf();
+    openGiftView("quiz");
   });
   // 结束页礼物入口：未领取时打开礼物袋，已领取时直接查看展柜
   $("#btn-gift-open").addEventListener("click", () => {
     cleanupResultFx(); // 点击后立即隐藏小手和水波纹，避免挡住礼物弹窗/展柜
     if (giftClaimed) {
-      giftsReturnView = "result";
-      renderGiftShelf();
+      openGiftView("result");
     } else {
       openGiftPicker();
     }
@@ -2123,11 +2338,11 @@
     show(giftsReturnView);
     if (giftsReturnView === "quiz") applyGridLayout();
   });
-  // 展柜模式切换（收纳 / 记录）：偏好存 localStorage
+  // 展柜模式切换（橱窗 / 收纳盒 / 记录）：收纳盒是临时状态，只记忆「橱窗 / 记录」偏好
   document.querySelectorAll(".gift-mode-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       giftShelfMode = btn.dataset.mode;
-      localStorage.setItem(GIFT_MODE_KEY, giftShelfMode);
+      if (giftShelfMode !== "box") localStorage.setItem(GIFT_MODE_KEY, giftShelfMode);
       renderGiftShelf();
     });
   });
@@ -2137,6 +2352,17 @@
     if (!item || giftDragMoved) return; // 刚结束拖拽时不触发点击
     const gift = giftItems.find((g) => g.id === item.dataset.id);
     if (!gift) return;
+    zoomGift(gift.name, item);
+  });
+  // 收纳盒：点礼物卡片 → 晃动 + 与橱窗一样放大展示（不支持拖拽/换位）
+  $("#gift-box").addEventListener("click", (e) => {
+    const item = e.target.closest(".gift-box-item");
+    if (!item) return;
+    const gift = giftItems.find((g) => g.id === item.dataset.id);
+    if (!gift) return;
+    item.classList.remove("pop");
+    void item.offsetWidth; // 强制重排，连续点击都能重新播放
+    item.classList.add("pop");
     zoomGift(gift.name, item);
   });
   // 点击大图上的礼物图标：左右晃动 + 点击音效（不会关闭大图）
@@ -2168,7 +2394,7 @@
     giftZoomEl = null;
     setTimeout(() => {
       overlay.classList.add("hidden");
-      if (zoomedCard) emphasizeGiftEl(zoomedCard.querySelector(".gift-shelf-icon"));
+      if (zoomedCard) emphasizeGiftEl(zoomedCard.querySelector(".gift-shelf-icon, .gift-box-icon"));
     }, 320);
   });
 
@@ -2294,11 +2520,14 @@
   giftShelf.addEventListener("pointerup", endPointerDrag);
   giftShelf.addEventListener("pointercancel", endPointerDrag);
 
-  // 按当前 DOM 顺序回写 giftItems 并持久化
+  // 按当前橱窗 DOM 顺序回写 giftItems 并持久化
+  // 收纳盒里的礼物不在橱窗 DOM 中，必须保持在它们后面，不能被排到前面
   function persistGiftOrder() {
     if (!giftDragId) return;
     const ids = [...giftShelf.querySelectorAll(".gift-shelf-item")].map((c) => c.dataset.id);
-    giftItems.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+    const shelfItems = ids.map((id) => giftItems.find((g) => g.id === id)).filter(Boolean);
+    const rest = giftItems.filter((g) => !ids.includes(g.id));
+    giftItems = shelfItems.concat(rest);
     Storage.saveGifts(giftItems);
   }
 
@@ -2367,9 +2596,13 @@
   // 没有取消按钮，点其他区域也不会关闭，只有选中礼物后点此按钮才关闭弹窗
   $("#btn-gift-ok").addEventListener("click", () => {
     if (giftClaimed || giftPicked.length === 0) return;
+    const pickedCount = giftPicked.length;
     Storage.addGifts(giftPicked, session.userId);
     Storage.addGiftLog(giftPicked, session.stars, session.userId);
     giftClaimed = true;
+    // 新礼物摆在橱窗顶部；进柜时若有旧礼物被挤进收纳盒，按这个数量播放飞入动画
+    giftOverflowPending += pickedCount;
+    giftOverflowUid = session.userId;
     $("#gift-dialog").classList.add("hidden");
     Sound.play("correct");
     renderGiftReward();

@@ -74,6 +74,7 @@
   let giftQuota = 0;
   let giftPicked = [];
   let giftClaimed = false;
+  let giftBagRefreshed = false; // 本次打开的礼物袋是否已用过「换一批」（每袋只能用一次）
   let giftsReturnView = "quiz";
   let giftShelfMode = "shelf"; // "shelf" 收纳 / "list" 记录
   const GIFT_MODE_KEY = "early-literacy-gift-mode";
@@ -451,7 +452,7 @@
   let enteringVolume = false; // 加载遮罩显示期间忽略重复点册
 
   // 加载进度条前端的小图标（会一颠一颠地往前跑）：可自由增删，每次加载随机取一个
-  const LOADING_ICONS = ["🚗", "🚕", "🦖", "🚌", "🛴", "🚀", "🐢", "🐰"];
+  const LOADING_ICONS = ["🚗", "🚕", "🚓", "🛺", "🚌", "🦖", "🐢", "🐠", "🚴"];
 
   function showLoading(title) {
     // 每次显示加载页随机换一个图标，避免每次都一样
@@ -1394,6 +1395,15 @@
     });
   }
 
+  // 点礼物袋里的礼物：图标放大、摇晃再恢复（与橱窗放大的手感一致）
+  function popGiftEmoji(item) {
+    const icon = item.querySelector(".gift-emoji");
+    if (!icon) return;
+    icon.classList.remove("pop");
+    void icon.offsetWidth; // 强制重排，保证连续点击都能重新播放
+    icon.classList.add("pop");
+  }
+
   function updateGiftPickState() {
     $("#gift-pick-tip").textContent =
       giftPicked.length > 0
@@ -1405,10 +1415,9 @@
     $("#btn-gift-ok").disabled = giftPicked.length === 0;
   }
 
-  function openGiftPicker() {
-    if (giftClaimed || giftQuota <= 0) return;
-    giftPicked = [];
-    // 礼物袋固定 50 件：GIFTS_FIXED 里的礼物必在（位置随机），剩余名额再从全部礼物中随机抽取
+  // 组装一批礼物（每批 50 件，顺序随机）：
+  // withFixed=true 为首批，GIFTS_FIXED 里的礼物必在；false 为「换一批」，完全不含固定礼物
+  function buildGiftBag(withFixed) {
     const fixed = fixedGiftNames();
     const all = Object.keys(giftCatalog());
     const bagSize = Math.min(50, all.length);
@@ -1419,25 +1428,37 @@
       throw new Error("GIFTS_FIXED 中存在重复配置的礼物");
     }
     const pool = all.filter((name) => !fixed.includes(name));
-    const bag = Quiz.shuffle(
-      fixed.concat(Quiz.shuffle(pool).slice(0, bagSize - fixed.length))
-    );
+    if (!withFixed) return Quiz.shuffle(pool).slice(0, Math.min(bagSize, pool.length));
+    return Quiz.shuffle(fixed.concat(Quiz.shuffle(pool).slice(0, bagSize - fixed.length)));
+  }
+
+  // 把一批礼物渲染到弹窗网格；animate=true 时卡片逐个弹入（换一批使用）
+  function renderGiftBag(bag, animate) {
     // 统计各礼物已有数量（实例数组按名字聚合计数）
     const owned = {};
     Storage.gifts(session.userId).forEach((g) => {
       owned[g.name] = (owned[g.name] || 0) + 1;
     });
     $("#gift-grid").innerHTML = bag
-      .map((name) => {
+      .map((name, i) => {
         const icon = giftCatalog()[name];
         const count = owned[name] || 0;
-        return `<button type="button" class="gift-item" data-name="${name}">
+        // --i 供消失/弹入动画计算逐张延迟；位置索引同时是卡片序号
+        return `<button type="button" class="gift-item${animate ? " bag-in" : ""}" data-name="${name}" style="--i:${i}">
           <span class="gift-emoji">${icon}</span>
           <span class="gift-name">${name}</span>
           ${count > 0 ? `<span class="gift-owned">已有 ${count}</span>` : ""}
         </button>`;
       })
       .join("");
+  }
+
+  function openGiftPicker() {
+    if (giftClaimed || giftQuota <= 0) return;
+    giftPicked = [];
+    giftBagRefreshed = false;
+    $("#btn-gift-refresh").classList.remove("hidden");
+    renderGiftBag(buildGiftBag(true), false);
     updateGiftPickState();
     $("#gift-dialog").classList.remove("hidden");
     // 弹窗显示后再计算礼物网格的上下渐隐（未滚动时只显示底部淡出）
@@ -1981,15 +2002,38 @@
     const idx = giftPicked.indexOf(name);
     if (idx >= 0) {
       giftPicked.splice(idx, 1);
+      popGiftEmoji(item);
     } else if (giftPicked.length < giftQuota) {
       giftPicked.push(name);
+      popGiftEmoji(item);
       Sound.play("pick"); // 先播选中音效，再播「你从礼物袋中挑选了：<礼物名称>」
       Speaker.playGiftPick(name);
     } else {
+      // 已选满：不播放放大动画，改用偏低的提示音，与选中音（高音"叮"）区分
       $("#gift-pick-tip").textContent = `最多选 ${giftQuota} 件，可以先取消一件`;
+      Sound.play("full");
       return;
     }
     updateGiftPickState();
+  });
+  // 换一批（每个礼物袋仅一次）：旧礼物逐张缩小消失，再从非固定礼物中换一批弹入
+  $("#btn-gift-refresh").addEventListener("click", () => {
+    if (giftBagRefreshed || giftClaimed) return;
+    giftBagRefreshed = true;
+    $("#btn-gift-refresh").classList.add("hidden");
+    Sound.play("swap");
+    // 旧批次的已选项立即作废（否则动画期间还能点「收下礼物」领走旧礼物）
+    giftPicked = [];
+    updateGiftPickState();
+    const grid = $("#gift-grid");
+    grid.querySelectorAll(".gift-item").forEach((el) => el.classList.add("bag-out"));
+    // 等旧卡片全部消失（0.2s 动画 + 逐张延迟）后再替换内容
+    setTimeout(() => {
+      renderGiftBag(buildGiftBag(false), true);
+      grid.scrollTop = 0;
+      grid.classList.remove("fade-top", "fade-bottom");
+      requestAnimationFrame(() => updateScrollFade(grid));
+    }, 400);
   });
   // 收下礼物：写入计数 + 领取日志；每组只有一次挑选机会，
   // 没有取消按钮，点其他区域也不会关闭，只有选中礼物后点此按钮才关闭弹窗

@@ -658,22 +658,23 @@ body {
   animation: loading-icon-run 0.5s ease-in-out infinite;
 }
 
-/* 左右轻微摇摆 + 轻微挤压回弹，形成跑动感 */
+/* 左右轻微摇摆 + 轻微挤压回弹，形成跑动感
+   scaleX(-1)：把 emoji 原本朝左的朝向水平翻转为朝右，与进度条前进方向一致 */
 @keyframes loading-icon-run {
   0% {
-    transform: rotate(-6deg) scale(1, 1);
+    transform: scaleX(-1) rotate(-6deg) scale(1, 1);
   }
   25% {
-    transform: rotate(-2deg) scale(1.08, 0.92);
+    transform: scaleX(-1) rotate(-2deg) scale(1.08, 0.92);
   }
   50% {
-    transform: rotate(6deg) scale(1, 1);
+    transform: scaleX(-1) rotate(6deg) scale(1, 1);
   }
   75% {
-    transform: rotate(2deg) scale(0.94, 1.06);
+    transform: scaleX(-1) rotate(2deg) scale(0.94, 1.06);
   }
   100% {
-    transform: rotate(-6deg) scale(1, 1);
+    transform: scaleX(-1) rotate(-6deg) scale(1, 1);
   }
 }
 
@@ -2713,11 +2714,36 @@ body.hide-note .hint-bar {
 
 /* 挑选礼物的弹窗：固定高度内滚动，不把按钮挤出屏幕 */
 .gift-dialog {
+  position: relative;
   width: min(92vw, 600px);
   max-height: 88vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* 礼物袋右上角「换一批」：每个礼物袋只出现一次，用后隐藏 */
+.gift-refresh {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 22px;
+  line-height: 1;
+  background: #fff3d6;
+  border: 2px solid #e4d8c2;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.15s, background 0.15s;
+}
+
+.gift-refresh:active {
+  transform: scale(0.9);
 }
 
 .gift-pick-tip {
@@ -2796,8 +2822,53 @@ body.hide-note .hint-bar {
 }
 
 .gift-emoji {
+  display: inline-block;
   font-size: clamp(26px, 6vmin, 36px);
   line-height: 1.1;
+  transform-origin: center;
+}
+
+/* 点击礼物：图标放大 + 摇晃 + 复原（比橱窗放大更短促，不影响继续挑选） */
+.gift-emoji.pop {
+  animation: gift-emoji-pop 0.55s ease-in-out;
+}
+
+@keyframes gift-emoji-pop {
+  0% { transform: scale(1) rotate(0); }
+  20% { transform: scale(1.5) rotate(-8deg); }
+  40% { transform: scale(1.55) rotate(7deg); }
+  60% { transform: scale(1.42) rotate(-5deg); }
+  80% { transform: scale(1.22) rotate(3deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+
+/* 换一批：旧卡片逐张缩小淡出，新卡片逐张弹入（--i 为卡片序号） */
+.gift-item.bag-out {
+  animation: gift-item-out 0.2s ease-in forwards;
+  animation-delay: calc(var(--i) * 3ms);
+}
+
+@keyframes gift-item-out {
+  to {
+    transform: scale(0.2) rotate(12deg);
+    opacity: 0;
+  }
+}
+
+.gift-item.bag-in {
+  animation: gift-item-in 0.32s cubic-bezier(0.2, 1.3, 0.4, 1) backwards;
+  animation-delay: calc(var(--i) * 6ms);
+}
+
+@keyframes gift-item-in {
+  from {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .gift-name {
@@ -2853,6 +2924,12 @@ body.hide-note .hint-bar {
 
 @media (prefers-reduced-motion: reduce) {
   .gift-icon {
+    animation: none;
+  }
+
+  .gift-emoji.pop,
+  .gift-item.bag-in,
+  .gift-item.bag-out {
     animation: none;
   }
 }

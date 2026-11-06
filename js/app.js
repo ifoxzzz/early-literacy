@@ -532,7 +532,9 @@
   function renderVolumes(user) {
     // 拼音 / 注解开关按小朋友保存，切换小朋友后要重新应用
     refreshDisplaySwitches();
-    $("#volume-owner").textContent = user ? `${user.name} 想学哪一册？` : "";
+    // 标题用小朋友的名字做个人空间入口；名字已在标题里，副标题只留动作提示
+    $("#volumes-title").textContent = user ? `${user.name}的小书架` : "我的小书架";
+    $("#volume-owner").textContent = user ? "想学哪一册？" : "";
     const list = $("#volume-list");
     list.innerHTML = "";
     // 最近点开过的册排到第一项，并用不同配色 + 分隔线与其他册区分（按小朋友保存）
@@ -614,6 +616,7 @@
     });
     refreshClickSound();
     show("admin");
+    updateScrollFade($("#admin-scroll"));
   }
 
   /* ---------- 练习设置（按小朋友独立保存） ---------- */
@@ -2171,10 +2174,11 @@
     }
     enterVolume(Storage.currentUser(), volume);
   });
-  // 册目列表、汉字表、练习记录、礼物橱窗、礼物记录与礼物袋网格滚动时更新边缘淡出与滚动条显隐；窗口尺寸变化时重新计算
+  // 册目列表、汉字表、练习记录、应用设置、礼物橱窗、礼物记录与礼物袋网格滚动时更新边缘淡出与滚动条显隐；窗口尺寸变化时重新计算
   bindScrollFx($("#volume-list"));
   bindScrollFx($("#word-list"), $("#word-sheet"));
   bindScrollFx($("#history-list"));
+  bindScrollFx($("#admin-scroll"));
   bindScrollFx($("#gift-shelf"));
   bindScrollFx($("#gift-list"));
   bindScrollFx($("#gift-box"));
@@ -2183,6 +2187,7 @@
     updateScrollFade($("#volume-list"));
     updateScrollFade($("#word-list"), $("#word-sheet"));
     updateScrollFade($("#history-list"));
+    updateScrollFade($("#admin-scroll"));
     updateScrollFade($("#gift-shelf"));
     updateScrollFade($("#gift-list"));
     updateScrollFade($("#gift-box"));
@@ -2339,6 +2344,10 @@
   // 练习页顶部的礼物图标：进入当前小朋友的礼物展柜，返回时回到练习页
   $("#btn-gift").addEventListener("click", () => {
     openGiftView("quiz");
+  });
+  // 小书架副标题右侧的礼物图标：进入礼物展柜，返回时回到小书架
+  $("#btn-volume-gift").addEventListener("click", () => {
+    openGiftView("volumes");
   });
   // 结束页礼物入口：未领取时打开礼物袋，已领取时直接查看展柜
   $("#btn-gift-open").addEventListener("click", () => {

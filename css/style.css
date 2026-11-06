@@ -107,18 +107,73 @@ body {
 }
 
 /* ---------- 选册页 ---------- */
-.volume-owner {
-  font-size: clamp(15px, 3.2vmin, 19px);
-  color: #b09a7d;
+/* 副标题行：左右两列等宽，中间副标题保持居中，礼物入口靠右 */
+.volume-head {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
   margin-bottom: 16px;
 }
 
-/* 选册页底部：练习记录 + 练习设置 + 退出 */
-.volume-actions {
+.volume-owner {
+  font-size: clamp(15px, 3.2vmin, 19px);
+  color: #b09a7d;
+}
+
+/* 礼物入口：沿用练习页的晃动动画，图标尺寸更大 */
+.volume-gift {
+  justify-self: end;
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   justify-content: center;
-  gap: 14px;
+  width: 56px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.volume-gift .gift-icon {
+  font-size: clamp(30px, 6.6vmin, 42px);
+}
+
+/* 选册页底部：左「练习记录」、中「退出」（与其他页面返回按钮同色）、右「练习设置」
+   左右两列等宽，退出按钮始终水平居中 */
+.volume-actions {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  column-gap: 12px;
+  margin-top: 18px;
+}
+
+.volume-actions .btn {
+  margin-top: 0;
+}
+
+.volume-actions #btn-history {
+  justify-self: start;
+}
+
+.volume-actions #btn-settings {
+  justify-self: end;
+}
+
+/* 窄屏收紧按钮内边距，三个按钮仍能排成一行 */
+@media (max-width: 480px) {
+  .volume-actions {
+    column-gap: 8px;
+  }
+
+  .volume-actions .btn {
+    padding: 10px 20px;
+  }
 }
 
 /* 册数多时列表按剩余空间伸缩（不足则内部滚动），册数少时只占内容高度，整块居中 */
@@ -137,7 +192,8 @@ body {
 .volume-list,
 .word-list,
 .history-list,
-.gift-list {
+.gift-list,
+.admin-scroll {
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
@@ -145,28 +201,32 @@ body {
 .volume-list.scrolling,
 .word-list.scrolling,
 .history-list.scrolling,
-.gift-list.scrolling {
+.gift-list.scrolling,
+.admin-scroll.scrolling {
   scrollbar-color: #e0cba8 transparent;
 }
 
 .volume-list::-webkit-scrollbar,
 .word-list::-webkit-scrollbar,
 .history-list::-webkit-scrollbar,
-.gift-list::-webkit-scrollbar {
+.gift-list::-webkit-scrollbar,
+.admin-scroll::-webkit-scrollbar {
   width: 8px;
 }
 
 .volume-list::-webkit-scrollbar-track,
 .word-list::-webkit-scrollbar-track,
 .history-list::-webkit-scrollbar-track,
-.gift-list::-webkit-scrollbar-track {
+.gift-list::-webkit-scrollbar-track,
+.admin-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
 
 .volume-list::-webkit-scrollbar-thumb,
 .word-list::-webkit-scrollbar-thumb,
 .history-list::-webkit-scrollbar-thumb,
-.gift-list::-webkit-scrollbar-thumb {
+.gift-list::-webkit-scrollbar-thumb,
+.admin-scroll::-webkit-scrollbar-thumb {
   background: transparent;
   border-radius: 999px;
 }
@@ -174,28 +234,32 @@ body {
 .volume-list.scrolling::-webkit-scrollbar-thumb,
 .word-list.scrolling::-webkit-scrollbar-thumb,
 .history-list.scrolling::-webkit-scrollbar-thumb,
-.gift-list.scrolling::-webkit-scrollbar-thumb {
+.gift-list.scrolling::-webkit-scrollbar-thumb,
+.admin-scroll.scrolling::-webkit-scrollbar-thumb {
   background: #e0cba8;
 }
 
 /* 册目列表、练习记录、礼物记录：内容超出时把上下边缘淡出，避免被生硬切断（滚到顶/底时对应一侧自动取消） */
 .volume-list.fade-top,
 .history-list.fade-top,
-.gift-list.fade-top {
+.gift-list.fade-top,
+.admin-scroll.fade-top {
   -webkit-mask-image: linear-gradient(to bottom, transparent, #000 20px);
   mask-image: linear-gradient(to bottom, transparent, #000 20px);
 }
 
 .volume-list.fade-bottom,
 .history-list.fade-bottom,
-.gift-list.fade-bottom {
+.gift-list.fade-bottom,
+.admin-scroll.fade-bottom {
   -webkit-mask-image: linear-gradient(to top, transparent, #000 20px);
   mask-image: linear-gradient(to top, transparent, #000 20px);
 }
 
 .volume-list.fade-top.fade-bottom,
 .history-list.fade-top.fade-bottom,
-.gift-list.fade-top.fade-bottom {
+.gift-list.fade-top.fade-bottom,
+.admin-scroll.fade-top.fade-bottom {
   -webkit-mask-image: linear-gradient(to bottom, transparent, #000 20px, #000 calc(100% - 20px), transparent);
   mask-image: linear-gradient(to bottom, transparent, #000 20px, #000 calc(100% - 20px), transparent);
 }
@@ -937,6 +1001,22 @@ body {
 
 #view-admin .app-title {
   margin-bottom: 18px;
+}
+
+/* 应用设置：设置块放进独立滚动区，内容多时压缩滚动，返回按钮留在页面底部（同汉字表、练习记录） */
+.admin-scroll {
+  width: 100%;
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 4px;
+  /* 与 .view 的 16px 内边距相同，按钮上方与下方的留白对称 */
+  margin-bottom: 16px;
+}
+
+/* 最后一块卡片与返回按钮之间只留 16px，不叠加自身的下边距 */
+.admin-scroll .admin-block:last-child {
+  margin-bottom: 0;
 }
 
 .admin-block {

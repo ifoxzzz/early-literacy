@@ -780,6 +780,12 @@ body {
   text-decoration: underline;
 }
 
+/* 首页底部固定着站点地址（约 30px 高）与右下角版本号：首页额外留出这段底部内边距，
+   保证「+ 创建小朋友」按钮和名字气泡不会压到它们 */
+#view-home {
+  padding-bottom: 48px;
+}
+
 /* ---------- 作者信息浮层：点遮罩（浮层以外区域）关闭 ---------- */
 .about-mask {
   position: fixed;

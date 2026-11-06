@@ -1821,6 +1821,24 @@ body.hide-pinyin #view-card .card .pinyin {
     opacity 0.2s, filter 0.2s;
 }
 
+/* 出题入场：田字格由小变大、由透明到清晰，多张卡片按 --card-in-delay 依次浮现。
+   只用 backwards 填充，动画结束后交还常规样式，不影响 hover / 按压 / 抖动 */
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: scale(0.35);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.card.card-in {
+  animation: card-in 0.34s cubic-bezier(0.22, 0.68, 0.4, 1.06) backwards;
+  animation-delay: var(--card-in-delay, 0ms);
+}
+
 /* 悬停选中效果（答题锁定后禁用；已作答卡片不参与；
    仅在有真实悬停能力的设备上启用，避免手机点按后 hover 粘住导致卡片一直放大） */
 @media (hover: hover) and (pointer: fine) {
@@ -2061,6 +2079,24 @@ body.hide-pinyin .card .pinyin {
   40% { transform: translateX(10px); }
   60% { transform: translateX(-6px); }
   80% { transform: translateX(6px); }
+}
+
+/* 换题离场：田字格由大到小、逐渐淡化不见。
+   不写 from，从卡片当前状态（含已变淡的干扰项）平滑缩向消失 */
+@keyframes card-out {
+  to {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+}
+
+.card.card-out {
+  animation: card-out 0.26s cubic-bezier(0.4, 0, 0.6, 1) forwards;
+}
+
+/* 离场中的卡片不再响应点击 */
+.grid.leaving .card {
+  pointer-events: none;
 }
 
 /* 答对星星动画 */

@@ -848,44 +848,65 @@
     });
   }
 
+  // 换题时田字格退场动画时长（与 CSS 的 card-out 保持一致）
+  const CARD_OUT_MS = 260;
+
   function beginQuestion(q) {
     q.locked = false;
     session.current = q;
-
-    // 题号并入底部信息行：小朋友 · 册名 · 第 x/x 题
-    $("#quiz-user").textContent =
-      `${session.userName} · ${session.volume} · 第 ${Math.min(session.done + 1, session.total)}/${session.total} 题`;
-    setStars(session.stars, false);
-    // 第一行组词（用「」包起来），第二行注解；拼音标注只给语音脚本，展示时去掉
-    const words = displayText(q.target.words);
-    $("#hint-words").textContent = words ? `「${words}」` : "";
-    const hintNote = displayText(q.target.note);
-    $("#hint-note").textContent = hintNote;
-    $("#hint-note").classList.toggle("hidden", !hintNote);
-    $("#btn-help").classList.remove("used"); // 新题目重新允许求助
-
-    const grid = $("#grid");
-    grid.classList.remove("locked", "helping");
-    grid.innerHTML = "";
-    q.options.forEach((opt) => {
-      const card = document.createElement("div");
-      card.className = "card";
-      card.dataset.key = Quiz.keyOf(opt); // 多音字：字同音不同是不同卡片
-      card.dataset.char = opt.char;
-      card.innerHTML = `<span class="pinyin">${opt.pinyin}</span><span class="char">${opt.char}</span>`;
-      card.addEventListener("click", (e) => onPick(card, opt, q, e));
-      // 鼠标悬停高亮卡片时播放轻音效；触屏的 pointerenter 不触发
-      card.addEventListener("pointerenter", (e) => {
-        if (e.pointerType === "mouse" && !q.locked) Sound.play("hover");
-      });
-      grid.appendChild(card);
-    });
-
-    fitGridToHint(); // 组词/注解文字换行导致提示条变高时，立即缩小田字格
-
+    const gen = session.gen;
     const isFirst = session.firstQuestion;
     session.firstQuestion = false;
-    Speaker.readQuestion(q.target, { welcome: isFirst, name: session.userName });
+    const grid = $("#grid");
+
+    const render = () => {
+      if (gen !== session.gen || session.current !== q) return;
+
+      // 题号并入底部信息行：小朋友 · 册名 · 第 x/x 题
+      $("#quiz-user").textContent =
+        `${session.userName} · ${session.volume} · 第 ${Math.min(session.done + 1, session.total)}/${session.total} 题`;
+      setStars(session.stars, false);
+      // 第一行组词（用「」包起来），第二行注解；拼音标注只给语音脚本，展示时去掉
+      const words = displayText(q.target.words);
+      $("#hint-words").textContent = words ? `「${words}」` : "";
+      const hintNote = displayText(q.target.note);
+      $("#hint-note").textContent = hintNote;
+      $("#hint-note").classList.toggle("hidden", !hintNote);
+      $("#btn-help").classList.remove("used"); // 新题目重新允许求助
+
+      grid.classList.remove("locked", "helping", "leaving");
+      grid.innerHTML = "";
+      q.options.forEach((opt, i) => {
+        const card = document.createElement("div");
+        // card-in：由小变大、由透明到清晰，按序号依次浮现
+        card.className = "card card-in";
+        card.style.setProperty("--card-in-delay", `${i * 35}ms`);
+        card.dataset.key = Quiz.keyOf(opt); // 多音字：字同音不同是不同卡片
+        card.dataset.char = opt.char;
+        card.innerHTML = `<span class="pinyin">${opt.pinyin}</span><span class="char">${opt.char}</span>`;
+        card.addEventListener("click", (e) => onPick(card, opt, q, e));
+        // 鼠标悬停高亮卡片时播放轻音效；触屏的 pointerenter 不触发
+        card.addEventListener("pointerenter", (e) => {
+          if (e.pointerType === "mouse" && !q.locked) Sound.play("hover");
+        });
+        grid.appendChild(card);
+      });
+
+      fitGridToHint(); // 组词/注解文字换行导致提示条变高时，立即缩小田字格
+
+      Speaker.readQuestion(q.target, { welcome: isFirst, name: session.userName });
+    };
+
+    // 上一题的田字格先由大到小、逐渐淡化退场，播完再换上新题；
+    // 本组第一题没有旧卡片，直接出题
+    const leaving = grid.querySelectorAll(".card");
+    if (leaving.length && !isFirst && !prefersReducedMotion()) {
+      grid.classList.add("leaving");
+      leaving.forEach((card) => card.classList.add("card-out"));
+      setTimeout(render, CARD_OUT_MS);
+    } else {
+      render();
+    }
   }
 
   // 作答后记录已写入：correct==1 且 wrong==0 说明是第一次接触的新字

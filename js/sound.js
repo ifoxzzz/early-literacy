@@ -81,6 +81,15 @@ const Sound = {
       this.tone(659, 0, 0.08, "triangle", 0.18);
       this.tone(523, 0.07, 0.08, "triangle", 0.18);
       this.tone(392, 0.14, 0.18, "triangle", 0.18);
+    } else if (name === "boxIn") {
+      // 礼物收进盒子：短促的下行「咚」，像卡片落进盒底
+      this.tone(523, 0, 0.07, "sine", 0.16);
+      this.tone(392, 0.07, 0.14, "sine", 0.18);
+    } else if (name === "boxOut") {
+      // 礼物从盒子取出：轻快的三连上行「铃」，与两连升的交换音区分
+      this.tone(622, 0, 0.07, "sine", 0.14);
+      this.tone(932, 0.08, 0.1, "sine", 0.14);
+      this.tone(1245, 0.18, 0.12, "sine", 0.1);
     }
   },
 };

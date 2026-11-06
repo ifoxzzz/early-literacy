@@ -1630,11 +1630,11 @@
     giftReflowTimer = setTimeout(() => {
       giftReflowTimer = 0;
       if (views.gifts.classList.contains("hidden")) return;
-      renderGiftShelf();
+      renderGiftShelf(true); // 窗口缩放导致的重排不播放音效
     }, 160);
   }
 
-  function renderGiftShelf() {
+  function renderGiftShelf(silent) {
     const user = Storage.currentUser();
     const catalog = giftCatalog();
     const uid = user ? user.id : "";
@@ -1762,8 +1762,19 @@
     if (hasGifts && mode === "shelf" && (pushed.length || filled.length)) {
       const secondBtn = modeBtns[1];
       requestAnimationFrame(() => {
-        if (pushed.length) flyGiftsIntoBox(pushed, secondBtn);
-        if (filled.length) flyGiftsIntoWardrobe(filled, secondBtn);
+        if (pushed.length) {
+          flyGiftsIntoBox(pushed, secondBtn);
+          if (!silent) Sound.play("boxIn"); // 礼物收进盒子
+        }
+        if (filled.length) {
+          flyGiftsIntoWardrobe(filled, secondBtn);
+          // 补位通常发生在删除礼物之后，延后一点让「删除」音效先响完
+          if (!silent) {
+            setTimeout(() => {
+              if (!views.gifts.classList.contains("hidden")) Sound.play("boxOut");
+            }, 260);
+          }
+        }
       });
     }
   }

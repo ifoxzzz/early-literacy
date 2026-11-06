@@ -1806,7 +1806,7 @@
       ghosts.forEach(({ ghost, dx, dy, delay }) => {
         ghost.style.transition =
           `transform 0.5s cubic-bezier(0.5, 0.05, 0.7, 0.4) ${delay}ms, ` +
-          `opacity 0.3s ease ${delay + 200}ms`;
+          `opacity 0.16s ease ${delay + 360}ms`;
         ghost.style.transform = `translate(${dx}px, ${dy}px) scale(0.16) rotate(14deg)`;
         ghost.style.opacity = "0";
       });
@@ -1825,6 +1825,10 @@
   function flyGiftsIntoWardrobe(items, boxBtn) {
     const shelf = $("#gift-shelf");
     if (!boxBtn || !shelf) return;
+    // 礼物从盒子里取出时，盒子按钮同样弹一下
+    boxBtn.classList.remove("receive");
+    void boxBtn.offsetWidth;
+    boxBtn.classList.add("receive");
     const end = boxBtn.getBoundingClientRect();
     items.slice(0, 8).forEach((g, i) => {
       const card = shelf.querySelector(`.gift-shelf-item[data-id="${g.id}"]`);
@@ -1833,13 +1837,11 @@
       const dx = end.left + end.width / 2 - (r.left + r.width / 2);
       const dy = end.top + end.height / 2 - (r.top + r.height / 2);
       card.style.transition = "none";
-      card.style.transform = `translate(${dx}px, ${dy}px) scale(0.2)`;
-      card.style.opacity = "0";
+      // 从盒子按钮位置以缩小状态直接出现（不做透明渐变），让小朋友看清是从盒子里飞出来的
+      card.style.transform = `translate(${dx}px, ${dy}px) scale(0.3)`;
       setTimeout(() => {
-        card.style.transition =
-          "transform 0.5s cubic-bezier(0.2, 1.1, 0.4, 1), opacity 0.28s ease";
+        card.style.transition = "transform 0.5s cubic-bezier(0.2, 1.1, 0.4, 1)";
         card.style.transform = "";
-        card.style.opacity = "";
         setTimeout(() => {
           card.style.transition = "";
         }, 600);

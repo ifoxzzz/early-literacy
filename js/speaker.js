@@ -248,12 +248,24 @@ const Speaker = {
     }
   },
 
+  // 带缓存的 fetch：浏览器 HTTP 缓存里已有该文件（无论是否过期）就直接取本地副本，
+  // 没有才发起网络请求。内存里的 blob 缓存只活一个页面会话，刷新/关闭后就没了；
+  // 之前不带 cache 选项，缓存过期后 300 多个文件每次重进都要逐个回源验证，像重新下载。
+  // 音频地址自带 ?v= 版本号与缓存标记，更新资源时 URL 变化，旧缓存自然失效，不必担心拿到旧文件
+  fetchCached(url) {
+    try {
+      return fetch(url, { cache: "force-cache" });
+    } catch (e) {
+      return fetch(url); // 个别老浏览器不认识 cache 选项会同步抛错，退回普通请求
+    }
+  },
+
   // 实际下载：超时从此刻开始计（而不是入队时），保证排队的文件不会"还没开始就超时"。
   // 超时后请求仍在后台继续，晚到的文件照样换成 blob，之后播放直接用本地地址
   download(url, entry) {
     const request =
       typeof fetch === "function"
-        ? fetch(url)
+        ? this.fetchCached(url)
             .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(r.status))))
             .then((blob) => {
               entry.blobUrl = URL.createObjectURL(blob);

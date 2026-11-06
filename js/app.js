@@ -450,9 +450,16 @@
   /* ---------- 练习 ---------- */
   let enteringVolume = false; // 加载遮罩显示期间忽略重复点册
 
+  // 加载进度条前端的小图标（会一颠一颠地往前跑）：可自由增删，每次加载随机取一个
+  const LOADING_ICONS = ["🚗", "🚕", "🦖", "🚌", "🛴", "🚀", "🐢", "🐰"];
+
   function showLoading(title) {
+    // 每次显示加载页随机换一个图标，避免每次都一样
+    const icons = LOADING_ICONS.length ? LOADING_ICONS : ["🚗"];
+    $("#loading-icon").textContent = icons[Math.floor(Math.random() * icons.length)];
     $("#loading-title").textContent = title;
     $("#loading-fill").style.width = "0%";
+    $("#loading-icon").style.left = "0%";
     $("#loading-count").textContent = "0 / 0";
     $("#loading-mask").classList.remove("hidden");
   }
@@ -460,6 +467,7 @@
   function updateLoading(done, total) {
     const pct = total ? Math.round((done / total) * 100) : 100;
     $("#loading-fill").style.width = `${pct}%`;
+    $("#loading-icon").style.left = `${pct}%`; // 小图标跟着进度前端走
     $("#loading-count").textContent = `${done} / ${total}`;
   }
 

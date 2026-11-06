@@ -619,9 +619,15 @@ body {
   color: #8c7a63;
 }
 
+/* 进度条容器：只负责定位，小图标可以超出进度条本身（不被 overflow 裁掉） */
+.loading-track {
+  position: relative;
+  margin: 18px 0 10px;
+  padding-top: 24px; /* 给上方的小图标留出空间 */
+}
+
 .loading-bar {
   height: 14px;
-  margin: 18px 0 10px;
   background: #f0e6d2;
   border-radius: 999px;
   overflow: hidden;
@@ -634,6 +640,41 @@ body {
   background: #f2a541;
   border-radius: 999px;
   transition: width 0.18s ease;
+}
+
+/* 跑在进度条最前端的小图标：位置随进度移动，动画模拟"一颠一颠地跑" */
+.loading-icon {
+  position: absolute;
+  left: 0;
+  bottom: 9px; /* 骑在进度条上方，只留一点点重叠，像车贴着跑道跑 */
+  margin-left: -12px; /* 让图标中心对准进度前端 */
+  font-size: 24px;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: left 0.18s ease;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.18));
+  transform-origin: 50% 100%; /* 以"接触地面"的点为轴，压扁时更像踩在地上 */
+  animation: loading-icon-run 0.5s ease-in-out infinite;
+}
+
+/* 左右轻微摇摆 + 轻微挤压回弹，形成跑动感 */
+@keyframes loading-icon-run {
+  0% {
+    transform: rotate(-6deg) scale(1, 1);
+  }
+  25% {
+    transform: rotate(-2deg) scale(1.08, 0.92);
+  }
+  50% {
+    transform: rotate(6deg) scale(1, 1);
+  }
+  75% {
+    transform: rotate(2deg) scale(0.94, 1.06);
+  }
+  100% {
+    transform: rotate(-6deg) scale(1, 1);
+  }
 }
 
 .loading-count {

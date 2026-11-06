@@ -315,7 +315,7 @@ const Speaker = {
   // 以及内置楷体字体文件。全部就绪后才放行，避免练习/结算页边下边播。
   // 题目相关的单字/组词/注解语音不在这里加载（由 app.js 按首题阻塞 + 后台滑窗预取）
   preloadGlobal(name, onProgress) {
-    const phrases = ["welcome", "done", "cheer", "gift"];
+    const phrases = ["welcome", "done", "cheer"];
     for (let level = 1; level <= 5; level++) {
       for (let n = 1; n <= 6; n++) phrases.push(`praise${level}_${n}`);
     }

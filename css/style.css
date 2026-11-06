@@ -518,39 +518,101 @@ body {
   }
 }
 
-/* ---------- 首页：小朋友列表 ---------- */
+/* ---------- 首页：小朋友名字气泡 ---------- */
+/* 名字显示成带高光的彩色气泡，由 app.js 逐帧驱动悬浮漂移与相互碰撞。
+   容器是气泡的"活动场"：只负责尺寸与裁切，气泡绝对定位、位移全部走 transform。 */
 .user-list {
+  position: relative;
   width: 100%;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 14px;
-  max-height: 46vh;
-  overflow-y: auto;
-  padding: 4px;
+  flex: 1 1 auto;
+  min-height: 150px;
+  max-height: 420px;
+  overflow: hidden;
   margin-bottom: 8px;
 }
 
+/* 没有小朋友时不占空白，提示文字自己居中 */
+.user-list:empty {
+  display: none;
+}
+
 .user-card {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: center;
+  will-change: transform;
   font-family: inherit;
-  border: 3px solid #f2a541;
-  background: #fffdf5;
-  color: #d1603d;
-  border-radius: 16px;
-  padding: 14px 30px;
-  font-size: clamp(24px, 5.5vmin, 34px);
+  font-weight: 700;
+  border: none;
+  border-radius: 999px;
+  padding: 0.55em 1.25em;
+  font-size: calc(clamp(24px, 5.5vmin, 34px) * var(--bscale, 1));
+  line-height: 1.25;
+  color: #fff;
   cursor: pointer;
-  box-shadow: 0 4px 0 #e8cfa1;
-  transition: transform 0.15s, background 0.2s;
+  text-shadow: 0 1px 0 rgba(120, 60, 20, 0.22), 0 3px 8px rgba(90, 40, 10, 0.3);
+  background: radial-gradient(ellipse at 32% 24%, var(--b1) 0%, var(--b2) 48%, var(--b3) 100%);
+  box-shadow: inset 0 -10px 18px -10px var(--b3),
+    inset 0 8px 16px -8px rgba(255, 255, 255, 0.85),
+    0 10px 24px -12px rgba(120, 70, 30, 0.6);
+  transition: filter 0.18s;
+}
+
+/* 气泡左上角的一团高光，制造"玻璃球"的通透感 */
+.user-card::before {
+  content: "";
+  position: absolute;
+  left: 12%;
+  top: 10%;
+  width: calc(46px * var(--bscale, 1));
+  height: calc(34px * var(--bscale, 1));
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 42% 42%,
+    rgba(255, 255, 255, 0.95),
+    rgba(255, 255, 255, 0) 70%
+  );
+}
+
+/* 五个配色轮流分配，让多个小朋友的气泡颜色各不相同 */
+.user-card:nth-child(5n + 1) {
+  --b1: #ffd873;
+  --b2: #f59331;
+  --b3: #d96a1e;
+}
+
+.user-card:nth-child(5n + 2) {
+  --b1: #ffc3d8;
+  --b2: #ef6f9a;
+  --b3: #cb3c6d;
+}
+
+.user-card:nth-child(5n + 3) {
+  --b1: #bcf0d4;
+  --b2: #3ec68d;
+  --b3: #18956a;
+}
+
+.user-card:nth-child(5n + 4) {
+  --b1: #c5e2ff;
+  --b2: #5a9ee6;
+  --b3: #2d6cb8;
+}
+
+.user-card:nth-child(5n + 5) {
+  --b1: #ded0ff;
+  --b2: #9a72ec;
+  --b3: #6a45c0;
 }
 
 .user-card:hover {
-  background: #fff3d6;
-  transform: translateY(-2px);
+  filter: brightness(1.06);
 }
 
 .user-card:active {
-  transform: scale(0.95);
+  filter: brightness(1.14) saturate(1.08);
 }
 
 /* ---------- 创建小朋友弹窗 ---------- */

@@ -82,6 +82,8 @@
   function show(name) {
     Object.values(views).forEach((v) => v.classList.add("hidden"));
     views[name].classList.remove("hidden");
+    // 离开首页就停掉气泡漂移，避免后台空转
+    if (name !== "home") stopBubbles();
     // 离开结束页时清理小手和水波纹
     if (name !== "result") cleanupResultFx();
     // 练习页保持屏幕常亮，离开练习页立即释放
@@ -230,7 +232,273 @@
         ? `字库共 ${total} 字，先创建一个小朋友吧`
         : "点小朋友的名字，开始练习";
     show("home");
+    startBubbles();
   }
+
+  /* ---------- 首页气泡：名字气泡悬浮漂移 + 相互碰撞 ---------- */
+  // 名字按钮做成彩色气泡：缓慢漂浮，撞到边框或彼此就弹开（QQ 弹弹）。
+  // 每帧只改 transform、不写 left/top；离开首页、没有名字或系统要求减少动态时立即停下。
+  // 留白按外阴影的实际伸展量给：投影向下偏移 10px、模糊 24px、收拢 12px，
+  // 所以底部要留约 22px，否则气泡贴到底边时阴影会被容器裁掉
+  const BUBBLE_PAD_X = 14; // 左右：阴影向两侧各扩约 12px
+  const BUBBLE_PAD_TOP = 10; // 上方：阴影基本不向上扩
+  const BUBBLE_PAD_BOTTOM = 26; // 下方：给投影留足空间，气泡不会飘到最下区域
+  const BUBBLE_GAP = 14; // 初始排布时气泡之间的间距
+  const BUBBLE_SPEED = 20; // 基础漂移速度（px/s），慢一些方便小朋友点中
+
+  const bubbles = {
+    el: null, // 气泡容器 #user-list
+    items: [], // [{ el, x, y, hw, hh, vx, vy, phase }]
+    box: { w: 0, h: 0 }, // 活动场尺寸
+    raf: 0,
+    last: 0,
+    running: false,
+  };
+
+  function prefersReducedMotion() {
+    return !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  }
+
+  // 气泡是两端半圆的胶囊。把每个气泡看成"一条水平线段 + 半径"：
+  // 两条线段的最近距离小于两端半径之和，才是真正碰到。
+  // 用线段距离（而不是椭圆近似）可以保证接触瞬间刚好贴边，不会先压进去一块。
+  function capsuleGap(a, b) {
+    const ar = Math.max(0, a.hw - a.hh); // 胶囊"芯"的半长（两端半圆的圆心范围）
+    const br = Math.max(0, b.hw - b.hh);
+    const dx = Math.abs(b.x - a.x) - (ar + br); // 两条芯线段的水平间隙
+    const gapX = Math.max(0, dx);
+    const gapY = Math.abs(b.y - a.y);
+    const dist = Math.hypot(gapX, gapY);
+
+    let nx = 0;
+    let ny = b.y >= a.y ? 1 : -1;
+    if (gapX > 0) {
+      // 芯线段在水平方向错开：最近点落在两段相邻的端点上，法线沿这两个端点的连线
+      const dir = b.x >= a.x ? 1 : -1;
+      const cxA = a.x + ar * dir;
+      const cxB = b.x - br * dir;
+      const len = Math.hypot(cxB - cxA, b.y - a.y) || 1;
+      nx = (cxB - cxA) / len;
+      ny = (b.y - a.y) / len;
+    }
+    return { dist, nx, ny };
+  }
+
+  // 贪心换行：每行尽量多放，超出可用宽度就另起一行
+  function packBubbleRows(sizes, availW) {
+    const rows = [];
+    let row = null;
+    sizes.forEach((item) => {
+      if (!row || row.w + BUBBLE_GAP + item.w > availW) {
+        row = { items: [], w: 0, h: 0 };
+        rows.push(row);
+      }
+      row.w += (row.items.length ? BUBBLE_GAP : 0) + item.w;
+      row.h = Math.max(row.h, item.h);
+      row.items.push(item);
+    });
+    return rows;
+  }
+
+  // 初始排布：先按自然尺寸排；放不下就等比缩小字号重排，保证气泡都在场内且不重叠
+  function layoutBubbles() {
+    const el = bubbles.el;
+    if (!el) return;
+    const availW = bubbles.box.w - BUBBLE_PAD_X * 2;
+    const availH = bubbles.box.h - BUBBLE_PAD_TOP - BUBBLE_PAD_BOTTOM;
+    if (availW <= 40 || availH <= 40) return;
+
+    let scale = 1;
+    let rows = [];
+    for (let i = 0; i < 5; i++) {
+      el.style.setProperty("--bscale", scale.toFixed(3));
+      const sizes = bubbles.items.map((b) => ({
+        b,
+        w: b.el.offsetWidth,
+        h: b.el.offsetHeight,
+      }));
+      rows = packBubbleRows(sizes, availW);
+      const widest = Math.max(...sizes.map((s) => s.w));
+      const needH = rows.reduce((s, r) => s + r.h, 0) + BUBBLE_GAP * (rows.length - 1);
+      if (widest > availW) {
+        scale *= Math.max(0.55, availW / widest); // 单个气泡比场地还宽：只能整体缩小
+        continue;
+      }
+      if (needH > availH) {
+        scale *= Math.max(0.55, availH / needH); // 行数太多放不下：整体缩小
+        continue;
+      }
+      break;
+    }
+
+    // 行内水平居中、整体在"去掉上下留白后的区域"内垂直居中；坐标记的是气泡中心
+    const totalH = rows.reduce((s, r) => s + r.h, 0) + BUBBLE_GAP * (rows.length - 1);
+    let y = BUBBLE_PAD_TOP + Math.max(0, (availH - totalH) / 2);
+    rows.forEach((row) => {
+      let x = (bubbles.box.w - row.w) / 2;
+      row.items.forEach((item) => {
+        const b = item.b;
+        b.hw = item.w / 2;
+        b.hh = item.h / 2;
+        b.x = x + b.hw;
+        b.y = y + row.h / 2;
+        x += item.w + BUBBLE_GAP;
+      });
+      y += row.h + BUBBLE_GAP;
+    });
+  }
+
+  // 把气泡中心拉回活动场内（撞墙翻转在下一帧的位移里做）
+  function clampBubble(b) {
+    const midX = bubbles.box.w / 2;
+    const midY = bubbles.box.h / 2;
+    const minX = Math.min(b.hw + BUBBLE_PAD_X, midX);
+    const maxX = Math.max(bubbles.box.w - b.hw - BUBBLE_PAD_X, midX);
+    const minY = Math.min(b.hh + BUBBLE_PAD_TOP, midY);
+    const maxY = Math.max(bubbles.box.h - b.hh - BUBBLE_PAD_BOTTOM, midY);
+    b.x = Math.min(maxX, Math.max(minX, b.x));
+    b.y = Math.min(maxY, Math.max(minY, b.y));
+  }
+
+  // 等质量弹性碰撞：交换沿碰撞法线方向的速度分量，切向不变，就像两个球撞在一起
+  function collideBubbles(a, b) {
+    const gap = capsuleGap(a, b);
+    const minDist = a.hh + b.hh; // 两端半圆半径之和
+    if (gap.dist >= minDist) return;
+
+    const nx = gap.nx;
+    const ny = gap.ny;
+    // 各自让开一半，并多留 0.3px 缝隙：既消除视觉重叠，也避免贴边抖动
+    const overlap = minDist - gap.dist + 0.3;
+    a.x -= nx * overlap * 0.5;
+    a.y -= ny * overlap * 0.5;
+    b.x += nx * overlap * 0.5;
+    b.y += ny * overlap * 0.5;
+
+    const va = a.vx * nx + a.vy * ny;
+    const vb = b.vx * nx + b.vy * ny;
+    if (va - vb > 0) {
+      a.vx += (vb - va) * nx;
+      a.vy += (vb - va) * ny;
+      b.vx += (va - vb) * nx;
+      b.vy += (va - vb) * ny;
+    }
+  }
+
+  // 一帧内：先漂移并撞墙反弹，再处理气泡互撞，最后统一写 transform
+  function stepBubbles(dt) {
+    const items = bubbles.items;
+    items.forEach((b) => {
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      const midX = bubbles.box.w / 2;
+      const midY = bubbles.box.h / 2;
+      const minX = Math.min(b.hw + BUBBLE_PAD_X, midX);
+      const maxX = Math.max(bubbles.box.w - b.hw - BUBBLE_PAD_X, midX);
+      const minY = Math.min(b.hh + BUBBLE_PAD_TOP, midY);
+      const maxY = Math.max(bubbles.box.h - b.hh - BUBBLE_PAD_BOTTOM, midY);
+      if (b.x < minX) {
+        b.x = minX;
+        b.vx = Math.abs(b.vx);
+      } else if (b.x > maxX) {
+        b.x = maxX;
+        b.vx = -Math.abs(b.vx);
+      }
+      if (b.y < minY) {
+        b.y = minY;
+        b.vy = Math.abs(b.vy);
+      } else if (b.y > maxY) {
+        b.y = maxY;
+        b.vy = -Math.abs(b.vy);
+      }
+    });
+    // 先处理气泡互撞，再统一写 transform
+    for (let i = 0; i < items.length; i++) {
+      for (let j = i + 1; j < items.length; j++) {
+        collideBubbles(items[i], items[j]);
+      }
+    }
+    items.forEach(clampBubble);
+  }
+
+  // 气泡外观：位置之外只保留极轻的呼吸起伏；碰撞不再改变大小
+  function paintBubble(b, now) {
+    const k = 1 + Math.sin(now / 1100 + b.phase) * 0.012;
+    b.el.style.transform =
+      `translate3d(${(b.x - b.hw).toFixed(2)}px, ${(b.y - b.hh).toFixed(2)}px, 0) ` +
+      `scale(${k.toFixed(3)})`;
+  }
+
+  function tickBubbles(now) {
+    if (!bubbles.running) return;
+    if (views.home.classList.contains("hidden")) {
+      stopBubbles(); // 已经不在首页，别继续空转
+      return;
+    }
+    const dt = bubbles.last ? Math.min(0.05, (now - bubbles.last) / 1000) : 0;
+    bubbles.last = now;
+    if (dt > 0) stepBubbles(dt);
+    bubbles.items.forEach((b) => paintBubble(b, now));
+    bubbles.raf = requestAnimationFrame(tickBubbles);
+  }
+
+  function stopBubbles() {
+    bubbles.running = false;
+    if (bubbles.raf) cancelAnimationFrame(bubbles.raf);
+    bubbles.raf = 0;
+    bubbles.last = 0;
+  }
+
+  // 进入首页时调用：排布气泡并启动漂移（系统开启"减少动态"时只静态排布）
+  function startBubbles() {
+    stopBubbles();
+    const el = $("#user-list");
+    bubbles.el = el;
+    const cards = Array.from(el.querySelectorAll(".user-card"));
+    bubbles.items = cards.map((card) => ({
+      el: card,
+      x: 0,
+      y: 0,
+      hw: 0,
+      hh: 0,
+      vx: 0,
+      vy: 0,
+      phase: Math.random() * Math.PI * 2,
+    }));
+    if (!cards.length) return;
+    bubbles.box = { w: el.clientWidth, h: el.clientHeight };
+    if (!bubbles.box.w || !bubbles.box.h) return; // 视图尚未显示，等下次进入时再排
+
+    layoutBubbles();
+    bubbles.items.forEach(clampBubble);
+    // 起漂方向：只有一个小朋友时随便漂；有多个时先朝场地中心靠拢，
+    // 这样很快就能看到它们撞在一起，之后各自弹开
+    const speed = BUBBLE_SPEED * (bubbles.items.length > 1 ? 1.15 : 0.6);
+    bubbles.items.forEach((b) => {
+      const toCenter = Math.atan2(
+        bubbles.box.h / 2 - b.y,
+        bubbles.box.w / 2 - b.x
+      );
+      const ang =
+        bubbles.items.length > 1
+          ? toCenter + (Math.random() - 0.5) * Math.PI * 0.6
+          : Math.random() * Math.PI * 2;
+      const sp = speed * (0.75 + Math.random() * 0.5);
+      b.vx = Math.cos(ang) * sp;
+      b.vy = Math.sin(ang) * sp;
+    });
+    bubbles.items.forEach((b) => paintBubble(b, 0));
+    if (prefersReducedMotion()) return;
+
+    bubbles.running = true;
+    bubbles.last = 0;
+    bubbles.raf = requestAnimationFrame(tickBubbles);
+  }
+
+  // 窗口尺寸变化后重新排布（手机横竖屏切换、地址栏收起等）
+  window.addEventListener("resize", () => {
+    if (!views.home.classList.contains("hidden")) startBubbles();
+  });
 
   /* ---------- 滚动容器效果：边缘淡出 + 滚动条自动隐藏 ---------- */
   // 内容超出时给容器加 fade-top / fade-bottom，滚到顶/底则取消对应一侧

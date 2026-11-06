@@ -2527,6 +2527,8 @@ body.hide-note .hint-bar {
   transform-origin: 50% 60%;
   font-size: clamp(30px, 7vmin, 46px);
   line-height: 1.1;
+  /* 与大图一样的缓慢呼吸效果 */
+  animation: gift-zoom-breathe 3.2s ease-in-out infinite;
 }
 
 .gift-shelf-name {
@@ -2983,6 +2985,7 @@ body.hide-note .hint-bar {
   }
 
   .gift-zoom-icon-wrap,
+  .gift-shelf-icon,
   .gift-zoom-icon.shaking {
     animation: none;
   }

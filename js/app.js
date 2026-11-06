@@ -77,7 +77,6 @@
   let giftBagRefreshed = false; // 本次打开的礼物袋是否已用过「换一批」（每袋只能用一次）
   let giftsReturnView = "quiz";
   let giftShelfMode = "shelf"; // "shelf" 橱窗 / "box" 收纳盒 / "list" 记录
-  const GIFT_MODE_KEY = "early-literacy-gift-mode";
 
   function show(name) {
     Object.values(views).forEach((v) => v.classList.add("hidden"));
@@ -1617,10 +1616,10 @@
     return giftShelfCapacity;
   }
 
-  // 打开礼物展柜：按记忆偏好决定初始模式（记录在收纳盒有礼物时会被收纳盒替代）
+  // 打开礼物展柜：每次进入都先显示橱窗
   function openGiftView(returnView) {
     giftsReturnView = returnView;
-    giftShelfMode = localStorage.getItem(GIFT_MODE_KEY) === "list" ? "list" : "shelf";
+    giftShelfMode = "shelf";
     renderGiftShelf();
   }
 
@@ -1853,6 +1852,9 @@
   // 落位后拖拽卡片执行一次「变大 → 摇晃 → 恢复」的强调动画，确认交换完成
   function swapShelf(a, b) {
     Sound.play("swap"); // 互换音效
+    // 参与交换的新礼物，交换后不再显示新礼物特效
+    a.classList.remove("fresh");
+    b.classList.remove("fresh");
     const shelf = $("#gift-shelf");
     const cards = [...shelf.querySelectorAll(".gift-shelf-item")];
     const first = new Map(cards.map((el) => [el, el.getBoundingClientRect()]));
@@ -2340,11 +2342,10 @@
     show(giftsReturnView);
     if (giftsReturnView === "quiz") applyGridLayout();
   });
-  // 展柜模式切换（橱窗 / 收纳盒 / 记录）：收纳盒是临时状态，只记忆「橱窗 / 记录」偏好
+  // 展柜模式切换（橱窗 / 盒子 / 记录）：收纳盒是临时状态，不记忆
   document.querySelectorAll(".gift-mode-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       giftShelfMode = btn.dataset.mode;
-      if (giftShelfMode !== "box") localStorage.setItem(GIFT_MODE_KEY, giftShelfMode);
       renderGiftShelf();
     });
   });
@@ -2354,6 +2355,7 @@
     if (!item || giftDragMoved) return; // 刚结束拖拽时不触发点击
     const gift = giftItems.find((g) => g.id === item.dataset.id);
     if (!gift) return;
+    item.classList.remove("fresh"); // 点开看过之后，新礼物特效消失
     zoomGift(gift.name, item);
   });
   // 收纳盒：点礼物卡片 → 晃动 + 与橱窗一样放大展示（不支持拖拽/换位）

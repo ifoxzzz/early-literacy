@@ -7,7 +7,7 @@
   <script>
     // 全局唯一版本号（同时用于缓存失效）：改动任何 css/js/音频后递增版本号，
     // 如 1.0.0 → 1.0.1，即可让全部缓存失效；首页右下角显示的也是这个版本
-    var CACHE_VERSION = "1.0.24";
+    var CACHE_VERSION = "1.0.30";
     window.APP_VERSION = CACHE_VERSION;
     // 站点图标：SVG 矢量图，任意尺寸都清晰；想换图标只需替换根目录的 favicon.svg
     document.write('<link rel="icon" type="image/svg+xml" href="favicon.svg?v=' + CACHE_VERSION + '">');
@@ -201,27 +201,70 @@
   <section id="view-settings" class="view hidden">
     <h1 class="app-title">练习设置</h1>
     <p class="settings-owner" id="settings-owner"></p>
-    <section class="settings-panel">
-      <div class="setting-row">
-        <span class="setting-label">每题候选字</span>
-        <span class="setting-opts" id="set-options">
-          <button class="btn btn-skip" data-v="2">2 个</button>
-          <button class="btn btn-skip" data-v="3">3 个</button>
-          <button class="btn btn-skip" data-v="4">4 个</button>
-          <button class="btn btn-skip" data-v="6">6 个</button>
-          <button class="btn btn-skip" data-v="8">8 个</button>
-          <button class="btn btn-skip" data-v="9">9 个</button>
-        </span>
-      </div>
-      <div class="setting-row">
-        <span class="setting-label">每组题数</span>
-        <span class="setting-opts">
-          <input class="setting-input" type="number" id="set-count" min="5" max="20" step="1" />
-          <span class="setting-unit">5 ~ 20 题</span>
-        </span>
-      </div>
-    </section>
-    <p class="settings-tip">设置只对这位小朋友生效，下一组练习开始生效。</p>
+    <!-- 内容按功能分栏，样式与应用设置页一致 -->
+    <div class="admin-scroll" id="settings-scroll">
+      <section class="admin-block">
+        <h2 class="admin-title">出题设置</h2>
+        <div class="setting-row">
+          <span class="setting-label">每题候选字</span>
+          <span class="setting-opts" id="set-options">
+            <button class="btn btn-skip" data-v="2">2 个</button>
+            <button class="btn btn-skip" data-v="3">3 个</button>
+            <button class="btn btn-skip" data-v="4">4 个</button>
+            <button class="btn btn-skip" data-v="6">6 个</button>
+            <button class="btn btn-skip" data-v="8">8 个</button>
+            <button class="btn btn-skip" data-v="9">9 个</button>
+          </span>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">每组题数</span>
+          <span class="setting-opts">
+            <input class="setting-input" type="number" id="set-count" min="5" max="20" step="1" />
+            <span class="setting-unit">5 ~ 20 题</span>
+          </span>
+        </div>
+        <p class="settings-tip">设置只对这位小朋友生效，下一组练习开始生效。</p>
+      </section>
+      <section class="admin-block">
+        <h2 class="admin-title">练习计划</h2>
+        <div class="setting-row">
+          <span class="setting-label">每日出题顺序</span>
+          <span class="setting-opts">
+            <span class="setting-switch" id="set-order">
+              <button class="setting-switch-btn" data-v="review">复习优先</button>
+              <button class="setting-switch-btn" data-v="new">生字优先</button>
+            </span>
+          </span>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">每日生字上限</span>
+          <span class="setting-opts">
+            <input class="setting-input" type="number" id="set-newlimit" min="5" max="50" step="1" />
+            <span class="setting-unit">5 ~ 50 个</span>
+          </span>
+        </div>
+        <p class="settings-tip">每天学到上限数量的生字后，接下来的练习只出学过的字。</p>
+      </section>
+      <section class="admin-block">
+        <h2 class="admin-title">数据管理</h2>
+        <div class="setting-row">
+          <span class="setting-label">数据备份</span>
+          <span class="setting-opts">
+            <button class="btn btn-skip" id="btn-data-export">数据导出</button>
+            <button class="btn btn-skip" id="btn-data-import">数据导入</button>
+          </span>
+        </div>
+        <input type="file" id="import-file" accept=".json,application/json" hidden />
+        <p class="settings-tip">导出会将这位小朋友的全部数据保存为 JSON 文件；导入会覆盖其学习进度、练习记录、礼物与练习设置。</p>
+        <div class="setting-row">
+          <span class="setting-label">学习记录</span>
+          <span class="setting-opts">
+            <button class="btn btn-danger" id="btn-learning-reset">学习重置</button>
+          </span>
+        </div>
+        <p class="settings-tip">将清空这位小朋友的学习进度与练习记录，礼物与练习设置会保留；此操作不可恢复。</p>
+      </section>
+    </div>
     <button class="btn btn-primary" id="btn-settings-back">返回</button>
   </section>
 
@@ -286,6 +329,41 @@
       <p class="dialog-title">要结束这组练习吗？</p>
       <div class="dialog-btns">
         <button class="btn btn-primary" id="btn-quit-ok">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 学习重置确认：应用内对话框，避免系统 confirm 在部分手机 WebView 中行为异常 -->
+  <div class="dialog-mask hidden" id="learning-reset-dialog">
+    <div class="dialog">
+      <p class="dialog-title">要重置学习记录吗？</p>
+      <p class="dialog-note">将清空这位小朋友的学习进度与练习记录，礼物与练习设置会保留。此操作不可恢复。</p>
+      <div class="dialog-btns">
+        <button class="btn btn-ghost" id="btn-learning-reset-cancel">取消</button>
+        <button class="btn btn-danger" id="btn-learning-reset-ok">确定重置</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 数据导入确认：导入会覆盖当前小朋友的相关数据，需二次确认 -->
+  <div class="dialog-mask hidden" id="import-dialog">
+    <div class="dialog">
+      <p class="dialog-title">要导入这份数据吗？</p>
+      <p class="dialog-note" id="import-dialog-note"></p>
+      <div class="dialog-btns">
+        <button class="btn btn-ghost" id="btn-import-cancel">取消</button>
+        <button class="btn btn-danger" id="btn-import-ok">确定导入</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 数据导入结果提示：成功摘要或失败原因 -->
+  <div class="dialog-mask hidden" id="data-message-dialog">
+    <div class="dialog">
+      <p class="dialog-title" id="data-message-title"></p>
+      <p class="dialog-note" id="data-message-note"></p>
+      <div class="dialog-btns">
+        <button class="btn btn-primary" id="btn-data-message-ok">知道了</button>
       </div>
     </div>
   </div>

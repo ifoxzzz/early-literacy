@@ -705,6 +705,14 @@ body {
   margin-bottom: 16px;
 }
 
+/* 确认类对话框的说明文字（位于标题与按钮之间） */
+.dialog-note {
+  font-size: clamp(13px, 2.9vmin, 16px);
+  line-height: 1.6;
+  color: #b09a7d;
+  text-align: left;
+}
+
 .dialog-input {
   width: 100%;
   font-family: inherit;
@@ -1079,14 +1087,6 @@ body {
   margin-bottom: 14px;
 }
 
-.settings-panel {
-  width: 100%;
-  padding: 14px 16px;
-  background: #fffdf5;
-  border: 1px solid #ece0c8;
-  border-radius: 14px;
-}
-
 .settings-tip {
   font-size: clamp(13px, 2.9vmin, 16px);
   line-height: 1.6;
@@ -1140,6 +1140,38 @@ body {
 .setting-unit {
   font-size: clamp(13px, 2.8vmin, 16px);
   color: #b09a7d;
+}
+
+/* 优先顺序开关：胶囊底槽 + 选中项橙色高亮，样式同礼物展柜的「橱窗｜记录」 */
+.setting-switch {
+  display: flex;
+  gap: 6px;
+  background: #f1e7d3;
+  padding: 4px;
+  border-radius: 999px;
+}
+
+.setting-switch-btn {
+  font-family: inherit;
+  padding: 6px 14px;
+  border: none;
+  background: transparent;
+  color: #8a7a63;
+  font-size: clamp(14px, 3vmin, 18px);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.setting-switch-btn.active {
+  background: #f2a541;
+  color: #fff;
+  box-shadow: 0 2px 0 #d18a2e;
+}
+
+/* 学习重置按钮在设置行内：去掉默认上间距，与左侧文字垂直居中 */
+.setting-row .btn-danger {
+  margin-top: 0;
 }
 
 .admin-block .btn-ghost {

@@ -625,6 +625,7 @@
     $("#settings-owner").textContent = user ? `${user.name} 的练习设置` : "";
     refreshSettings(user);
     show("settings");
+    updateScrollFade($("#settings-scroll"));
   }
 
   // 读取该小朋友的设置并回填按钮与题数
@@ -635,6 +636,11 @@
       .querySelectorAll("button")
       .forEach((b) => b.classList.toggle("active", Number(b.dataset.v) === opt));
     $("#set-count").value = Storage.quizCount(id);
+    $("#set-newlimit").value = Storage.dailyNewLimit(id);
+    const order = Storage.quizOrder(id);
+    $("#set-order")
+      .querySelectorAll("button")
+      .forEach((b) => b.classList.toggle("active", b.dataset.v === order));
   }
 
   /* ---------- 通用单字详情页 ---------- */
@@ -2174,10 +2180,11 @@
     }
     enterVolume(Storage.currentUser(), volume);
   });
-  // 册目列表、汉字表、练习记录、应用设置、礼物橱窗、礼物记录与礼物袋网格滚动时更新边缘淡出与滚动条显隐；窗口尺寸变化时重新计算
+  // 册目列表、汉字表、练习记录、练习设置、应用设置、礼物橱窗、礼物记录与礼物袋网格滚动时更新边缘淡出与滚动条显隐；窗口尺寸变化时重新计算
   bindScrollFx($("#volume-list"));
   bindScrollFx($("#word-list"), $("#word-sheet"));
   bindScrollFx($("#history-list"));
+  bindScrollFx($("#settings-scroll"));
   bindScrollFx($("#admin-scroll"));
   bindScrollFx($("#gift-shelf"));
   bindScrollFx($("#gift-list"));
@@ -2187,6 +2194,7 @@
     updateScrollFade($("#volume-list"));
     updateScrollFade($("#word-list"), $("#word-sheet"));
     updateScrollFade($("#history-list"));
+    updateScrollFade($("#settings-scroll"));
     updateScrollFade($("#admin-scroll"));
     updateScrollFade($("#gift-shelf"));
     updateScrollFade($("#gift-list"));
@@ -2275,7 +2283,7 @@
     if (e.key === "Enter") $("#btn-user-ok").click();
   });
 
-  // 练习设置：候选字数、每组题数（只写当前小朋友，改动后下一组练习生效）
+  // 练习设置：候选字数、每组题数、每日生字上限（只写当前小朋友，改动后下一组练习生效）
   $("#set-options").addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-v]");
     if (!btn) return;
@@ -2284,6 +2292,143 @@
   });
   $("#set-count").addEventListener("change", () => {
     $("#set-count").value = Storage.setQuizCount($("#set-count").value, Storage.currentId());
+  });
+  $("#set-newlimit").addEventListener("change", () => {
+    $("#set-newlimit").value = Storage.setDailyNewLimit(
+      $("#set-newlimit").value,
+      Storage.currentId()
+    );
+  });
+  // 优先顺序：复习优先 / 生字优先（胶囊开关，样式同礼物展柜的「橱窗｜记录」）
+  $("#set-order").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-v]");
+    if (!btn) return;
+    Storage.setQuizOrder(btn.dataset.v, Storage.currentId());
+    refreshSettings(Storage.currentUser());
+  });
+
+  // 练习设置里的「学习重置」：应用内二次确认
+  // 确认后清空该小朋友的学习进度与练习记录，礼物、练习设置等其余数据保留
+  const learningResetDialog = $("#learning-reset-dialog");
+  $("#btn-learning-reset").addEventListener("click", () => {
+    learningResetDialog.classList.remove("hidden");
+  });
+  learningResetDialog.addEventListener("click", () => {
+    learningResetDialog.classList.add("hidden");
+  });
+  $("#btn-learning-reset-ok").addEventListener("click", (e) => {
+    e.stopPropagation(); // 避免触发遮罩的关闭逻辑
+    learningResetDialog.classList.add("hidden");
+    Storage.clearUserData();
+  });
+
+  /* ---------- 数据导入 / 导出 ---------- */
+  // 导入结果提示：成功摘要或失败原因
+  const dataMessageDialog = $("#data-message-dialog");
+  function showDataMessage(title, note) {
+    $("#data-message-title").textContent = title;
+    $("#data-message-note").textContent = note;
+    dataMessageDialog.classList.remove("hidden");
+  }
+  dataMessageDialog.addEventListener("click", () => dataMessageDialog.classList.add("hidden"));
+
+  // 文件名中不能出现的字符替换为下划线
+  function safeFileName(name) {
+    return String(name || "小朋友").replace(/[\\/:*?"<>|\s]+/g, "_");
+  }
+
+  // 导出：把当前小朋友的全部相关数据打包为 JSON 并触发下载
+  $("#btn-data-export").addEventListener("click", () => {
+    const user = Storage.currentUser();
+    if (!user) {
+      showDataMessage("无法导出", "尚未选择小朋友，请先选择后再试。");
+      return;
+    }
+    const backup = Storage.exportUserData(user.id);
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `识字数据-${safeFileName(user.name)}-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+
+  // 导入：选择文件 → 校验格式 → 二次确认后覆盖当前小朋友的相关数据
+  const importFile = $("#import-file");
+  const importDialog = $("#import-dialog");
+  let pendingImport = null;
+
+  function closeImportDialog() {
+    pendingImport = null;
+    importDialog.classList.add("hidden");
+  }
+
+  $("#btn-data-import").addEventListener("click", () => {
+    importFile.value = ""; // 清空后可重复选择同一个文件
+    importFile.click();
+  });
+
+  importFile.addEventListener("change", () => {
+    const file = importFile.files && importFile.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let raw = null;
+      try {
+        raw = JSON.parse(String(reader.result));
+      } catch (e) {
+        showDataMessage("导入失败", "文件内容不是合法的 JSON，无法解析。");
+        return;
+      }
+      try {
+        Storage.validateUserData(raw); // 先在确认前校验，避免确认后才报错
+      } catch (err) {
+        showDataMessage("导入失败", err.message);
+        return;
+      }
+      const user = Storage.currentUser();
+      if (!user) {
+        showDataMessage("无法导入", "尚未选择小朋友，请先选择后再试。");
+        return;
+      }
+      pendingImport = raw;
+      const fromName = raw.user && raw.user.name ? `「${raw.user.name}」的` : "这份";
+      $("#import-dialog-note").textContent =
+        `即将把${fromName}备份导入到当前小朋友「${user.name}」，覆盖其学习进度、` +
+        "练习记录、礼物与练习设置。此操作不可恢复。";
+      importDialog.classList.remove("hidden");
+    };
+    reader.onerror = () => showDataMessage("导入失败", "读取文件失败，请重试。");
+    reader.readAsText(file);
+  });
+
+  // 只有点在遮罩空白处才关闭确认框，避免误触取消
+  importDialog.addEventListener("click", (e) => {
+    if (e.target === importDialog) closeImportDialog();
+  });
+  $("#btn-import-cancel").addEventListener("click", closeImportDialog);
+  $("#btn-import-ok").addEventListener("click", (e) => {
+    e.stopPropagation();
+    const raw = pendingImport;
+    closeImportDialog();
+    if (!raw) return;
+    try {
+      const result = Storage.importUserData(raw);
+      refreshSettings(Storage.currentUser());
+      showDataMessage(
+        "导入成功",
+        `已恢复 ${result.progress} 个字的学习进度、${result.history} 条练习记录、` +
+          `${result.gifts} 件礼物与 ${result.giftLog} 条礼物领取记录。`
+      );
+    } catch (err) {
+      showDataMessage("导入失败", err.message);
+    }
   });
 
   $("#btn-history").addEventListener("click", renderHistory);

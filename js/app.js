@@ -1479,6 +1479,8 @@
     const target = document.getElementById("btn-gift-open");
     if (!target) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    // 礼物袋已打开时不显示小手，避免手势盖在弹窗上
+    if (!document.getElementById("gift-dialog").classList.contains("hidden")) return;
     cleanupResultFx();
 
     const t = target.getBoundingClientRect();
@@ -1649,6 +1651,8 @@
     const uid = user ? user.id : "";
     giftItems = Storage.gifts(uid);
     const total = giftItems.length;
+    // 进入展柜时若有新礼物，先记下标记（下面会立即清除），用于播报提示
+    const hasFresh = !silent && giftItems.some((g) => g.fresh);
     // 新礼物的闪烁只在本次首次进入橱窗时展示：拿到 fresh 状态后立即标记为已看，
     // 本次渲染保留闪烁，后续再次进入页面或切换模式都不会再闪
     giftItems.filter((g) => g.fresh).forEach((g) => Storage.markGiftSeen(g.id));
@@ -1689,6 +1693,14 @@
     lastGiftUid = uid;
     lastShelfIds = shelfItems.map((g) => g.id);
     lastBoxIds = boxItems.map((g) => g.id);
+
+    // 进入展柜时播报：有新礼物先报，若有礼物被推进收纳盒再接一句（窗口缩放重排不播报）
+    if (!silent && pushed.length > 0) {
+      if (hasFresh) Speaker.playGiftShelfNew(() => Speaker.playGiftBoxOverflow());
+      else Speaker.playGiftBoxOverflow();
+    } else if (hasFresh) {
+      Speaker.playGiftShelfNew();
+    }
 
     // 模式按钮：第一个固定为「橱窗」，第二个在收纳盒有礼物时显示「收纳盒」，否则显示「记录」
     const modeBtns = document.querySelectorAll(".gift-mode-btn");
@@ -2774,7 +2786,10 @@
     giftOverflowUid = session.userId;
     $("#gift-dialog").classList.add("hidden");
     Sound.play("correct");
+    Speaker.playGiftSaved();
     renderGiftReward();
+    // 礼物袋关闭后重新出现小手，指向「查看我的礼物」
+    showGiftHand();
   });
   // 应用设置入口（首页左下角小齿轮）
   $("#btn-admin").addEventListener("click", renderAdmin);

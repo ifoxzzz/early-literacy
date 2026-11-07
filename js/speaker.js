@@ -174,6 +174,21 @@ const Speaker = {
     if (url) this.play([url]);
   },
 
+  // 收下礼物后播报「礼物已经放进你的礼物橱窗，快去看看吧」
+  playGiftSaved() {
+    this.play([this.audioUrl("phrases/giftSaved.mp3")]);
+  },
+
+  // 进入礼物展柜时若有新礼物播报提示（onDone 用于接着播下一句）
+  playGiftShelfNew(onDone) {
+    this.play([this.audioUrl("phrases/giftNew.mp3")], onDone);
+  },
+
+  // 橱窗装不下、有礼物被推进收纳盒时播报提示
+  playGiftBoxOverflow() {
+    this.play([this.audioUrl("phrases/giftBoxOverflow.mp3")]);
+  },
+
   // 橱窗放大礼物：只播礼物名称（音效由 Sound 负责）
   playGiftName(name) {
     const url = this.giftAudio(name);
@@ -322,9 +337,12 @@ const Speaker = {
     const urls = phrases.map((k) => this.phraseFile(k, name));
     urls.push(this.audioUrl("phrases/find.mp3"));
     urls.push(this.audioUrl("phrases/help.mp3"));
-    // 礼物相关语音：勾选前缀、礼物袋打开提示（1/2/3 件）、全部礼物名称
+    // 礼物相关语音：勾选前缀、礼物袋打开提示（1/2/3 件）、收下礼物提示、全部礼物名称
     urls.push(this.audioUrl("phrases/chose.mp3"));
     for (let q = 1; q <= 3; q++) urls.push(this.audioUrl(`phrases/pickBag${q}.mp3`));
+    urls.push(this.audioUrl("phrases/giftSaved.mp3"));
+    urls.push(this.audioUrl("phrases/giftNew.mp3"));
+    urls.push(this.audioUrl("phrases/giftBoxOverflow.mp3"));
     const giftNames = window.GIFT_AUDIO || [];
     giftNames.forEach((n) => {
       const u = this.giftAudio(n);

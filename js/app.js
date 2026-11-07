@@ -1581,6 +1581,8 @@
   let lastBoxIds = null; // 上一次渲染时收纳盒里的礼物 id
   let lastGiftUid = ""; // 上一次渲染属于哪位小朋友
   let giftReflowTimer = 0; // 窗口尺寸变化后延迟重排
+  let giftSwapping = false; // 收纳盒礼物与橱窗礼物正在交换（动画期间忽略点击）
+  let giftForceCapacity = 0; // 交换后重绘时沿用原容量，避免重新测量导致格子错位
 
   // 计算橱窗容量：按当前设备能完整放下的行列数得出（如 4 行 3 列 = 12 件），保证橱窗不出现滚动条
   // 测量时即使最终要显示收纳盒/记录，也先让展柜参与布局，量完立即恢复
@@ -1646,6 +1648,7 @@
   }
 
   function renderGiftShelf(silent) {
+    closeGiftBubble(); // 重新渲染后卡片位置会变，先收起气泡
     const user = Storage.currentUser();
     const catalog = giftCatalog();
     const uid = user ? user.id : "";
@@ -1668,7 +1671,8 @@
     show("gifts");
 
     // 按容量切分：前面的摆在橱窗，后面（超出的）进入收纳盒
-    const capacity = total > 0 ? measureGiftShelf() : 0;
+    const capacity = total > 0 ? (giftForceCapacity || measureGiftShelf()) : 0;
+    giftForceCapacity = 0;
     const shelfItems = giftItems.slice(0, capacity);
     const boxItems = giftItems.slice(capacity);
     const boxActive = boxItems.length > 0;
@@ -1878,6 +1882,173 @@
         }, 600);
       }, i * 60);
     });
+  }
+
+  // 收纳盒礼物气泡：点收纳盒里的礼物后，卡片上方弹出对话气泡
+  // 气泡里有礼物图标（呼吸效果，点击晃动）和「放入橱窗」按钮
+  let giftBubbleEl = null; // 气泡本体（懒创建，挂在 body 上避免被收纳盒滚动区裁切）
+  let giftBubbleId = ""; // 气泡当前对应的礼物实例 id
+  let giftBubbleOpenedAt = 0; // 气泡打开时刻（点击卡片时可能触发一次 scroll，需忽略）
+
+  function ensureGiftBubble() {
+    if (giftBubbleEl) return giftBubbleEl;
+    const el = document.createElement("div");
+    el.className = "gift-bubble";
+    el.innerHTML = `
+      <span class="gift-bubble-icon-wrap"><span class="gift-bubble-icon"></span></span>
+      <button type="button" class="gift-bubble-btn">放入橱窗</button>
+      <span class="gift-bubble-arrow"></span>`;
+    document.body.appendChild(el);
+    // 「放入橱窗」：把这件礼物与橱窗最后一格对调
+    el.querySelector(".gift-bubble-btn").addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (giftBubbleId) swapBoxGiftIntoWardrobe(giftBubbleId);
+    });
+    // 点气泡上的礼物图标：晃动 + 点击音效（与收纳盒卡片点击手感一致）
+    el.querySelector(".gift-bubble-icon-wrap").addEventListener("click", (e) => {
+      e.stopPropagation();
+      Sound.play("click");
+      const icon = el.querySelector(".gift-bubble-icon");
+      icon.classList.remove("shaking");
+      void icon.offsetWidth; // 强制重排，连续点击都能重新播放
+      icon.classList.add("shaking");
+    });
+    el.querySelector(".gift-bubble-icon").addEventListener("animationend", (e) => {
+      if (e.animationName === "gift-icon-shake") e.currentTarget.classList.remove("shaking");
+    });
+    giftBubbleEl = el;
+    return el;
+  }
+
+  function closeGiftBubble() {
+    if (!giftBubbleEl) return;
+    giftBubbleEl.classList.remove("show", "on");
+    giftBubbleId = "";
+  }
+
+  // 在某张收纳盒卡片上方打开气泡；空间不够时翻到卡片下方
+  function openGiftBubble(item) {
+    const gift = giftItems.find((g) => g.id === item.dataset.id);
+    if (!gift) return;
+    const el = ensureGiftBubble();
+    const wasShown = el.classList.contains("show");
+    giftBubbleId = gift.id;
+    el.querySelector(".gift-bubble-icon").textContent = giftCatalog()[gift.name] || "🎁";
+    el.classList.remove("below");
+    el.classList.add("on");
+    // 先放在左上角量出气泡真实尺寸
+    el.style.left = "0px";
+    el.style.top = "0px";
+    const r = item.getBoundingClientRect();
+    const bw = el.offsetWidth;
+    const bh = el.offsetHeight;
+    const margin = 10;
+    const arrowGap = 13; // 气泡与卡片之间留出倒三角的连接空间
+    let left = r.left + r.width / 2 - bw / 2;
+    left = Math.max(margin, Math.min(window.innerWidth - bw - margin, left));
+    let top = r.top - bh - arrowGap;
+    if (top < margin) {
+      // 上方放不下：翻到卡片下方，箭头朝上
+      el.classList.add("below");
+      top = r.bottom + arrowGap;
+    }
+    el.style.left = left + "px";
+    el.style.top = top + "px";
+    // 箭头指向礼物中心；靠近窗口边缘时限制在气泡内
+    const arrowX = Math.max(16, Math.min(bw - 16, r.left + r.width / 2 - left));
+    el.style.setProperty("--arrow-x", arrowX + "px");
+    giftBubbleOpenedAt = performance.now();
+    if (!wasShown) {
+      void el.offsetWidth; // 强制提交初始样式（缩放/透明），再触发展开过渡
+      el.classList.add("show");
+    }
+  }
+
+  // 收纳盒礼物插入橱窗首位：盒中礼物先飞进「橱窗」按钮，
+  // 数据更新（橱窗整体后移、末位礼物回收到收纳盒）并重绘后，
+  // 被回收的那件礼物再从「橱窗」按钮飞回原来的收纳盒格子
+  function swapBoxGiftIntoWardrobe(giftId) {
+    if (giftSwapping) return;
+    const capacity = giftShelfCapacity;
+    const idx = giftItems.findIndex((g) => g.id === giftId);
+    // 只有收纳盒里的礼物（索引在橱窗容量之后）才能放入橱窗
+    if (idx < capacity || capacity < 1) return;
+    const boxGift = giftItems[idx];
+    const shelfGift = giftItems[capacity - 1];
+    const box = $("#gift-box");
+    const card = box.querySelector(`.gift-box-item[data-id="${giftId}"]`);
+    const wardrobeBtn = document.querySelector('.gift-mode-btn[data-mode="shelf"]');
+    if (!boxGift || !shelfGift || !card || !wardrobeBtn) return;
+
+    giftSwapping = true;
+    closeGiftBubble();
+    const catalog = giftCatalog();
+    const c = card.getBoundingClientRect();
+    const b = wardrobeBtn.getBoundingClientRect();
+    // 起飞卡片：缩小飞向「橱窗」按钮并淡出（与礼物被收进收纳盒的特效一致）
+    const ghost = document.createElement("div");
+    ghost.className = "gift-fly-ghost";
+    ghost.style.left = c.left + "px";
+    ghost.style.top = c.top + "px";
+    ghost.style.width = c.width + "px";
+    ghost.style.height = c.height + "px";
+    ghost.innerHTML = `<span class="gift-fly-icon">${catalog[boxGift.name] || "🎁"}</span>`;
+    document.body.appendChild(ghost);
+    card.style.visibility = "hidden";
+    Sound.play("boxIn"); // 礼物飞进橱窗
+    requestAnimationFrame(() => {
+      ghost.style.transition =
+        "transform 0.5s cubic-bezier(0.5, 0.05, 0.7, 0.4), opacity 0.16s ease 0.36s";
+      ghost.style.transform =
+        `translate(${b.left + b.width / 2 - (c.left + c.width / 2)}px, ` +
+        `${b.top + b.height / 2 - (c.top + c.height / 2)}px) scale(0.16) rotate(14deg)`;
+      ghost.style.opacity = "0";
+    });
+
+    setTimeout(() => {
+      ghost.remove();
+      if (views.gifts.classList.contains("hidden")) {
+        giftSwapping = false;
+        return;
+      }
+      wardrobeBtn.classList.remove("receive");
+      void wardrobeBtn.offsetWidth;
+      wardrobeBtn.classList.add("receive");
+
+      // 收纳盒礼物插入橱窗首位：橱窗内已有礼物整体后移一位，
+      // 橱窗末尾那件礼物回到收纳盒中被点选礼物让出的位置
+      const keepScroll = box.scrollTop;
+      for (let i = capacity - 1; i > 0; i--) {
+        giftItems[i] = giftItems[i - 1];
+      }
+      giftItems[0] = boxGift;
+      giftItems[idx] = shelfGift;
+      Storage.saveGifts(giftItems);
+      giftForceCapacity = capacity; // 沿用本次容量，保证交换后的格子一一对应
+      renderGiftShelf(true); // 静默重绘，不播报
+      box.scrollTop = keepScroll;
+
+      // 橱窗那件礼物从「橱窗」按钮飞进原来的收纳盒格子
+      const newCard = box.querySelector(`.gift-box-item[data-id="${shelfGift.id}"]`);
+      if (!newCard) {
+        giftSwapping = false;
+        return;
+      }
+      const nr = newCard.getBoundingClientRect();
+      const dx = b.left + b.width / 2 - (nr.left + nr.width / 2);
+      const dy = b.top + b.height / 2 - (nr.top + nr.height / 2);
+      newCard.style.transition = "none";
+      newCard.style.transform = `translate(${dx}px, ${dy}px) scale(0.3)`;
+      Sound.play("boxOut"); // 礼物从橱窗飞回收纳盒
+      requestAnimationFrame(() => {
+        newCard.style.transition = "transform 0.5s cubic-bezier(0.2, 1.1, 0.4, 1)";
+        newCard.style.transform = "";
+        setTimeout(() => {
+          newCard.style.transition = "";
+          giftSwapping = false;
+        }, 600);
+      });
+    }, 620);
   }
 
   // 交换两张卡片在 DOM 中的位置，并用 FLIP 动画让被交换的非拖拽卡片平滑滑到新位置
@@ -2211,6 +2382,7 @@
     updateScrollFade($("#gift-shelf"));
     updateScrollFade($("#gift-list"));
     updateScrollFade($("#gift-box"));
+    closeGiftBubble(); // 窗口尺寸变化后气泡位置失效
     scheduleGiftReflow(); // 展柜打开时按新窗口重新计算橱窗容量
   });
   // 汉字表小喇叭：先加载该字的语音（未缓存时显示进度条），就绪后再播放
@@ -2516,6 +2688,7 @@
     }
   });
   $("#btn-gifts-back").addEventListener("click", () => {
+    closeGiftBubble();
     show(giftsReturnView);
     if (giftsReturnView === "quiz") applyGridLayout();
   });
@@ -2535,16 +2708,29 @@
     item.classList.remove("fresh"); // 点开看过之后，新礼物特效消失
     zoomGift(gift.name, item);
   });
-  // 收纳盒：点礼物卡片 → 晃动 + 与橱窗一样放大展示（不支持拖拽/换位）
+  // 收纳盒：点礼物卡片 → 图标抖动，并在卡片上方弹出气泡（气泡里可一键放入橱窗）
   $("#gift-box").addEventListener("click", (e) => {
     const item = e.target.closest(".gift-box-item");
-    if (!item) return;
+    if (!item || giftSwapping) return;
     const gift = giftItems.find((g) => g.id === item.dataset.id);
     if (!gift) return;
     item.classList.remove("pop");
     void item.offsetWidth; // 强制重排，连续点击都能重新播放
     item.classList.add("pop");
-    zoomGift(gift.name, item);
+    Speaker.playGiftName(gift.name); // 报出礼物名字，与放大展示时一致
+    openGiftBubble(item);
+  });
+  // 收纳盒滚动时卡片会移出气泡箭头位置，直接收起（忽略点击卡片瞬间自身触发的滚动）
+  $("#gift-box").addEventListener("scroll", () => {
+    if (performance.now() - giftBubbleOpenedAt < 200) return;
+    closeGiftBubble();
+  });
+  // 点空白处收起气泡；点另一件收纳盒礼物时由卡片点击自己切换
+  document.addEventListener("click", (e) => {
+    if (!giftBubbleEl || !giftBubbleEl.classList.contains("show")) return;
+    if (e.target.closest(".gift-bubble")) return;
+    if (e.target.closest(".gift-box-item")) return;
+    closeGiftBubble();
   });
   // 点击大图上的礼物图标：左右晃动 + 点击音效（不会关闭大图）
   $("#gift-zoom-icon").addEventListener("click", (e) => {

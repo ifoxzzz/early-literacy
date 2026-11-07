@@ -2961,6 +2961,121 @@ body.hide-note .hint-bar {
   animation: gift-emoji-pop 0.55s ease-in-out;
 }
 
+/* 收纳盒礼物气泡：从卡片上方冒出的对话气泡（圆角框 + 下方倒三角），内含礼物图标与「放入橱窗」按钮 */
+.gift-bubble {
+  position: fixed;
+  z-index: 9700;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  /* 底部留出更多空白，避免倒三角压到按钮 */
+  padding: 16px 24px 18px;
+  background: #fffdf5;
+  border: 2px solid #f3e4c4;
+  border-radius: 18px;
+  box-shadow: 0 8px 20px rgba(160, 120, 70, 0.24);
+  transform: scale(0.6) translateY(6px);
+  transform-origin: 50% 100%;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.22s cubic-bezier(0.2, 1.2, 0.3, 1);
+}
+
+.gift-bubble.on {
+  display: flex;
+}
+
+.gift-bubble.show {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+/* 翻到卡片下方时，从顶部展开 */
+.gift-bubble.below {
+  transform-origin: 50% 0;
+}
+
+/* 气泡里的礼物图标：外层呼吸，内层负责点击晃动，互不干扰 */
+.gift-bubble-icon-wrap {
+  display: inline-flex;
+  position: relative;
+  z-index: 1; /* 位于倒三角之上，避免被遮挡 */
+  animation: gift-zoom-breathe 3.2s ease-in-out infinite;
+}
+
+.gift-bubble-icon {
+  display: inline-block;
+  font-size: clamp(52px, 11vmin, 72px);
+  line-height: 1.1;
+  transform-origin: center;
+}
+
+.gift-bubble-icon.shaking {
+  animation: gift-icon-shake 0.5s ease-in-out;
+}
+
+.gift-bubble-btn {
+  font-family: inherit;
+  position: relative;
+  z-index: 1; /* 位于倒三角之上，避免被遮挡 */
+  padding: 9px 24px;
+  border: none;
+  border-radius: 999px;
+  background: #f2a541;
+  color: #fff;
+  font-size: clamp(15px, 3.2vmin, 19px);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow: 0 2px 0 #d18a2e;
+  transition: transform 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.gift-bubble-btn:hover {
+  background: #f6b25c;
+}
+
+.gift-bubble-btn:active {
+  transform: translateY(1px) scale(0.96);
+  box-shadow: 0 1px 0 #d18a2e;
+}
+
+/* 气泡下方指向礼物的倒三角：旋转 45° 的方块，两条边沿用气泡边框色 */
+.gift-bubble-arrow {
+  position: absolute;
+  left: calc(var(--arrow-x, 50%) - 9px);
+  /* 方块中心对齐气泡底边：左右角与底边齐平，上半段咬进气泡，形成标准三角尾巴 */
+  bottom: -9px;
+  width: 18px;
+  height: 18px;
+  background: #fffdf5;
+  border-right: 2px solid #f3e4c4;
+  border-bottom: 2px solid #f3e4c4;
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+/* 气泡在卡片下方时，倒三角翻到顶部并朝上 */
+.gift-bubble.below .gift-bubble-arrow {
+  bottom: auto;
+  top: -9px;
+  transform: rotate(225deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gift-bubble {
+    transition: none;
+  }
+
+  .gift-bubble-icon-wrap,
+  .gift-bubble-icon.shaking {
+    animation: none;
+  }
+}
+
 /* 礼物在橱窗与收纳盒之间飞行的浮层卡片，动画结束由 JS 移除 */
 .gift-fly-ghost {
   position: fixed;

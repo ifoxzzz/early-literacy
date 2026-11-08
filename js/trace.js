@@ -309,10 +309,12 @@
   function completeStroke() {
     litPaths[idx].classList.add("on");
     progPath.setAttribute("d", "");
-    if (window.Sound) Sound.play("correct");
     idx++;
     prog = 0;
-    if (idx >= strokes.length) {
+    const finished = idx >= strokes.length;
+    // 整字写完播"流光"音（与金光特效同步），单笔完成仍是答对音
+    if (window.Sound) Sound.play(finished ? "sparkle" : "correct");
+    if (finished) {
       hideGuide();
       stopVoice();
       playStrokeGold(); // 整字写完：金色光丝沿笔画轮廓游走

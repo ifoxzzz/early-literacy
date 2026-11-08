@@ -90,6 +90,16 @@ const Sound = {
       this.tone(622, 0, 0.07, "sine", 0.14);
       this.tone(932, 0.08, 0.1, "sine", 0.14);
       this.tone(1245, 0.18, 0.12, "sine", 0.1);
+    } else if (name === "sparkle") {
+      // 临摹整字写完：配合金色流光的"流光"音，音高一路向上，尾部点缀细碎高音闪光
+      this.tone(784, 0, 0.3, "sine", 0.14);
+      this.tone(988, 0.22, 0.3, "sine", 0.13);
+      this.tone(1245, 0.46, 0.4, "sine", 0.12);
+      this.tone(1568, 0.72, 0.55, "sine", 0.1);
+      this.tone(1760, 1.05, 0.7, "triangle", 0.06);
+      this.tone(2093, 1.3, 0.18, "sine", 0.05);
+      this.tone(2349, 1.6, 0.18, "sine", 0.045);
+      this.tone(2637, 1.9, 0.24, "sine", 0.04);
     }
   },
 };

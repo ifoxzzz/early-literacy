@@ -66,6 +66,9 @@
   const svg = $("#trace-svg");
   const tipEl = $("#trace-tip");
   let flipG = null; // 字形层（翻转坐标）
+  let goldG = null; // 完成特效：金色光丝沿笔画轮廓游走
+  let goldPaths = []; // 轮廓副本（金色描边层）
+  let goldTimer = 0; // 光丝游走结束后收起的定时器
   let progPath = null; // 当前笔描画进度的粗线
   let guideG = null; // 手势引导动画层
 
@@ -192,6 +195,8 @@
     svg.innerHTML = "";
     litPaths = [];
     flipG = null;
+    goldG = null;
+    goldPaths = [];
     progPath = null;
     guideG = null;
   }
@@ -224,6 +229,21 @@
       el("path", { d, class: "trace-base" }, gBase);
       litPaths.push(el("path", { d, class: "trace-lit" }, gLit));
     });
+
+    // 完成特效：复制每笔轮廓做金色描边层，描边用短虚线 + 移动 dashoffset 形成游走光丝
+    goldG = el("g", { class: "trace-gold hidden" }, flipG);
+    // 总时长 = 单圈时长 × 圈数，与 CSS 动画及收尾定时器保持一致
+    goldG.style.setProperty("--gold-dur", GOLD_DURATION * GOLD_LOOPS + "s");
+    goldPaths = [];
+    strokes.forEach((d) => {
+      const p = el("path", { d, class: "trace-gold-path" }, goldG);
+      const len = p.getTotalLength() || 0;
+      const seg = Math.min(70, len * 0.45); // 光丝长度（占轮廓的一小段）
+      p.style.strokeDasharray = `${seg} ${Math.max(len - seg, 1)}`;
+      p.style.setProperty("--shift", String(-len * GOLD_LOOPS)); // 虚线偏移走完整圈 × 圈数
+      goldPaths.push(p);
+    });
+
     progPath = el("path", { d: "", class: "trace-prog" }, flipG);
     guideG = el("g", { class: "hidden" }, flipG);
   }
@@ -295,6 +315,7 @@
     if (idx >= strokes.length) {
       hideGuide();
       stopVoice();
+      playStrokeGold(); // 整字写完：金色光丝沿笔画轮廓游走
       tipEl.textContent = "写得真棒！点「重写」再来一遍吧";
     } else {
       tipStroke();
@@ -302,6 +323,28 @@
       scheduleVoice();
       showGuide();
     }
+  }
+
+  /* ---------- 完成特效：金色光丝沿每一笔的轮廓边缘游走两圈，第二圈逐渐透明消失 ---------- */
+  const GOLD_STAGGER = 0.06; // 笔与笔之间错开的秒数
+  const GOLD_DURATION = 1.6; // 单笔光丝走完一圈的秒数（放慢一点，显得从容）
+  const GOLD_LOOPS = 2; // 游走圈数
+
+  function playStrokeGold() {
+    if (!goldG || !goldPaths.length) return;
+    clearTimeout(goldTimer);
+    goldG.classList.remove("hidden");
+    goldPaths.forEach((p, i) => {
+      p.classList.remove("run");
+      p.style.animationDelay = (i * GOLD_STAGGER).toFixed(2) + "s";
+    });
+    void goldG.getBoundingClientRect(); // 强制重排，确保重复完成时动画能从头播放
+    goldPaths.forEach((p) => p.classList.add("run"));
+    // 全部走完后收起金色层，恢复干净的字形
+    goldTimer = setTimeout(() => {
+      goldG.classList.add("hidden");
+      goldPaths.forEach((p) => p.classList.remove("run"));
+    }, (goldPaths.length * GOLD_STAGGER + GOLD_DURATION * GOLD_LOOPS) * 1000 + 600);
   }
 
   /* ---------- 演示：开关式，开启后循环把整字一笔一画写出来，点任意位置停止 ---------- */
@@ -436,7 +479,15 @@
     }
   });
   const endPointer = (e) => {
-    if (e.pointerId === pointerId) pointerId = null;
+    if (e.pointerId !== pointerId) return;
+    pointerId = null;
+    if (!ready || demoOn) return;
+    if (idx >= strokes.length) return; // 整字已写完，不恢复手势
+    // 这一笔没写完就抬手（笔顺或轨迹不对）：清掉残笔痕迹，进度归零，
+    // 重新出现手势，让用户从起笔处重新写这一笔
+    prog = 0;
+    if (progPath) progPath.setAttribute("d", "");
+    showGuide();
   };
   svg.addEventListener("pointerup", endPointer);
   svg.addEventListener("pointercancel", endPointer);
@@ -447,6 +498,10 @@
     prog = 0;
     litPaths.forEach((p) => p.classList.remove("on"));
     if (progPath) progPath.setAttribute("d", "");
+    // 中断完成特效：收起金色光丝层
+    clearTimeout(goldTimer);
+    goldPaths.forEach((p) => p.classList.remove("run"));
+    if (goldG) goldG.classList.add("hidden");
   }
 
   function refreshToggleBtns() {

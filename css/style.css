@@ -3536,6 +3536,49 @@ body.hide-note .hint-bar {
   opacity: 1;
 }
 
+/* 整字写完的庆祝特效：金色光丝沿每一笔的轮廓边缘游走两圈，第二圈逐渐透明消失（字本身不动） */
+.trace-gold {
+  pointer-events: none;
+  filter: drop-shadow(0 0 8px rgba(255, 220, 130, 0.8))
+    drop-shadow(0 0 16px rgba(110, 210, 255, 0.35));
+}
+
+.trace-gold-path {
+  fill: none;
+  stroke: #ffd166;
+  stroke-width: 12;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+
+.trace-gold-path.run {
+  opacity: 1;
+  /* 时长由 trace.js 的 GOLD_DURATION × 圈数 通过 CSS 变量传入 */
+  animation: trace-gold-run var(--gold-dur, 3.2s) linear forwards;
+}
+
+@keyframes trace-gold-run {
+  0% {
+    /* 起笔：从透明快速显现 */
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+  10% {
+    /* 很快达到全亮 */
+    opacity: 1;
+  }
+  50% {
+    /* 第一圈结束：保持全亮 */
+    opacity: 1;
+  }
+  100% {
+    /* 第二圈边走边慢慢淡出 */
+    stroke-dashoffset: var(--shift);
+    opacity: 0;
+  }
+}
+
 /* 描画中的进度粗线：沿骨架高亮，给孩子即时反馈 */
 .trace-prog {
   fill: none;

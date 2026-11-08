@@ -510,7 +510,6 @@
   function refreshToggleBtns() {
     $("#btn-trace-gesture").classList.toggle("active", gestureOn);
     $("#btn-trace-voice").classList.toggle("active", voiceOn);
-    $("#btn-trace-demo").classList.toggle("active", demoOn);
   }
 
   function open(char) {

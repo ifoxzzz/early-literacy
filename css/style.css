@@ -1925,8 +1925,7 @@ body.hide-pinyin #view-card .card .pinyin {
 #btn-note,
 #btn-history-chars,
 #btn-trace-gesture,
-#btn-trace-voice,
-#btn-trace-demo {
+#btn-trace-voice {
   position: relative;
   overflow: hidden;
 }
@@ -1935,8 +1934,7 @@ body.hide-pinyin #view-card .card .pinyin {
 #btn-note:not(.active)::after,
 #btn-history-chars:not(.active)::after,
 #btn-trace-gesture:not(.active)::after,
-#btn-trace-voice:not(.active)::after,
-#btn-trace-demo:not(.active)::after {
+#btn-trace-voice:not(.active)::after {
   content: "";
   position: absolute;
   top: 50%;
@@ -3475,9 +3473,10 @@ body.hide-note .hint-bar {
 
 #view-trace {
   justify-content: flex-start;
-  /* 放宽容器，让田字格在平板/桌面端更大 */
+  /* 放宽容器，让田字格在平板/桌面端更大；田字格边长统一用这个变量，按钮定位也依赖它 */
   max-width: 900px;
   padding: 6px 6px 16px;
+  --trace-size: min(88vw, 58vh, 460px);
 }
 
 /* 状态行只有三点展开按钮：靠右对齐，与练习页一致 */
@@ -3485,7 +3484,24 @@ body.hide-note .hint-bar {
   justify-content: flex-end;
 }
 
+/* 演示 / 重写：参照练习页「再听一遍」，紧贴田字格上方；
+   用绝对定位而不挤占布局，保证田字格始终留在舞台正中 */
+.trace-bar {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  /* 上移：按钮自身高度 + 半个田字格 + 与田字格的间距 */
+  transform: translate(-50%, calc(-100% - var(--trace-size) / 2 - 14px));
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
 .trace-stage {
+  position: relative;
   flex: 1;
   width: 100%;
   min-height: 0;
@@ -3494,9 +3510,27 @@ body.hide-note .hint-bar {
   justify-content: center;
 }
 
+/* 屏幕矮（手机横屏等）：绝对定位的按钮可能顶到顶部按钮条，
+   改为与田字格一起流式居中，按钮仍在田字格正上方 */
+@media (max-height: 620px) {
+  #view-trace {
+    --trace-size: min(88vw, 52vh, 460px);
+  }
+
+  .trace-stage {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .trace-bar {
+    position: static;
+    transform: none;
+  }
+}
+
 /* 田字格容器：正方形，视觉沿用练习页卡片（米白底 + 主题色实线框） */
 .trace-frame-wrap {
-  width: min(88vw, 58vh, 460px);
+  width: var(--trace-size);
   aspect-ratio: 1;
   background: #fffdf5;
   border: 3px solid #d1603d;
@@ -3553,19 +3587,19 @@ body.hide-note .hint-bar {
 }
 
 .trace-gold-path.run {
-  opacity: 1;
-  /* 时长由 trace.js 的 GOLD_DURATION × 圈数 通过 CSS 变量传入 */
-  animation: trace-gold-run var(--gold-dur, 3.2s) linear forwards;
+  /* 用 both：延迟等待期间也套用 0% 关键帧（透明），避免错峰的笔画提前全亮出现；
+     时长由 trace.js 的 GOLD_DURATION × 圈数 通过 CSS 变量传入 */
+  animation: trace-gold-run var(--gold-dur, 3.2s) linear both;
 }
 
 @keyframes trace-gold-run {
   0% {
-    /* 起笔：从透明快速显现 */
+    /* 起笔：从透明开始 */
     stroke-dashoffset: 0;
     opacity: 0;
   }
-  10% {
-    /* 很快达到全亮 */
+  18% {
+    /* 逐渐显现到全亮（约 0.6 秒，能看清） */
     opacity: 1;
   }
   50% {

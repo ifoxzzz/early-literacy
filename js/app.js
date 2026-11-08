@@ -2648,6 +2648,23 @@
   $("#btn-card-read").addEventListener("click", () => {
     if (cardEntry) Speaker.readEntry(cardEntry);
   });
+  // 单字详情页：进入临摹页（写一写原型，逻辑在 trace.js）
+  // 与点册进入练习一致的加载体验：笔顺数据未就绪时先弹进度条，加载完毕才进入
+  $("#btn-card-trace").addEventListener("click", () => {
+    if (!cardEntry || !window.TraceView) return;
+    const char = cardEntry.char;
+    let loadingShown = false;
+    const showTimer = setTimeout(() => {
+      loadingShown = true;
+      showLoading(`正在准备「${char}」的笔顺`);
+      updateLoading(0, 1);
+    }, 150); // 数据已缓存时会瞬间完成，延迟显示避免进度条一闪而过
+    TraceView.load(char).then(() => {
+      clearTimeout(showTimer);
+      if (loadingShown) hideLoading();
+      TraceView.open(char); // 数据已在缓存，立即渲染
+    });
+  });
   $("#btn-card-back").addEventListener("click", () => {
     if (cardOnBack) cardOnBack();
   });

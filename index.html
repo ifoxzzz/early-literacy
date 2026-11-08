@@ -7,7 +7,7 @@
   <script>
     // 全局唯一版本号（同时用于缓存失效）：改动任何 css/js/音频后递增版本号，
     // 如 1.0.0 → 1.0.1，即可让全部缓存失效；首页右下角显示的也是这个版本
-    var CACHE_VERSION = "1.0.35";
+    var CACHE_VERSION = "1.0.41";
     window.APP_VERSION = CACHE_VERSION;
     // 站点图标：SVG 矢量图，任意尺寸都清晰；想换图标只需替换根目录的 favicon.svg
     document.write('<link rel="icon" type="image/svg+xml" href="favicon.svg?v=' + CACHE_VERSION + '">');
@@ -240,7 +240,7 @@
           <span class="setting-label">每日生字上限</span>
           <span class="setting-opts">
             <input class="setting-input" type="number" id="set-newlimit" min="5" max="50" step="1" />
-            <span class="setting-unit">5 ~ 50 个</span>
+            <span class="setting-unit">5 ~ 50 字</span>
           </span>
         </div>
         <p class="settings-tip">每天学到上限数量的生字后，接下来的练习只出学过的字。</p>
@@ -419,6 +419,7 @@
     </header>
     <div class="detail-read">
       <button class="btn btn-read" id="btn-card-read"><span class="read-icon">🔊</span> 读一读</button>
+      <button class="btn btn-read btn-trace-entry" id="btn-card-trace"><span class="read-icon">✏️</span> 写一写</button>
     </div>
     <main class="card-detail" id="card-grid"></main>
     <div class="detail-bottom">
@@ -427,6 +428,37 @@
         <p id="card-note"></p>
       </footer>
     </div>
+  </section>
+
+  <!-- 临摹页（写一写原型）：从单字详情页进入的独立页面，顶部按钮风格与练习页一致 -->
+  <section id="view-trace" class="view hidden">
+    <header class="quiz-header">
+      <div class="quiz-tools-wrap" id="trace-tools-wrap">
+        <div class="quiz-tools" id="trace-tools">
+          <div class="quiz-tools-btns">
+            <button class="btn btn-skip" id="btn-trace-gesture">手势</button>
+            <button class="btn btn-skip" id="btn-trace-voice">语音</button>
+            <button class="btn btn-skip" id="btn-trace-demo">演示</button>
+            <button class="btn btn-skip" id="btn-trace-reset">重写</button>
+            <button class="btn btn-skip" id="btn-trace-back">返回</button>
+          </div>
+          <button class="quiz-tools-close" id="btn-trace-tools-hide" aria-expanded="true"
+            aria-controls="trace-tools" aria-label="关闭顶部按钮">✕</button>
+        </div>
+      </div>
+      <div class="quiz-status">
+        <button class="btn-tools-show" id="btn-trace-tools-show"
+          aria-expanded="false" aria-controls="trace-tools" aria-label="显示顶部按钮">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        </button>
+      </div>
+    </header>
+    <main class="trace-stage">
+      <div class="trace-frame-wrap">
+        <svg id="trace-svg" viewBox="0 0 1024 1024" aria-label="临摹田字格"></svg>
+      </div>
+    </main>
+    <p class="trace-tip" id="trace-tip"></p>
   </section>
 
   <!-- 练习页 -->
@@ -535,6 +567,7 @@
       "assets/audio/gifts/index.js",
       "js/speaker.js",
       "js/sound.js",
+      "js/trace.js",
       "js/app.js",
     ];
     __boot.setTotal(bootScripts.length);

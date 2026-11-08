@@ -1920,17 +1920,23 @@ body.hide-pinyin #view-card .card .pinyin {
   box-shadow: 0 3px 0 #d18a2e;
 }
 
-/* 关闭状态：拼音 / 注解 / 练习记录「汉字」灰态时，左上到右下划一道斜线 */
+/* 关闭状态：拼音 / 注解 / 练习记录「汉字」/ 临摹页开关灰态时，左上到右下划一道斜线 */
 #btn-pinyin,
 #btn-note,
-#btn-history-chars {
+#btn-history-chars,
+#btn-trace-gesture,
+#btn-trace-voice,
+#btn-trace-demo {
   position: relative;
   overflow: hidden;
 }
 
 #btn-pinyin:not(.active)::after,
 #btn-note:not(.active)::after,
-#btn-history-chars:not(.active)::after {
+#btn-history-chars:not(.active)::after,
+#btn-trace-gesture:not(.active)::after,
+#btn-trace-voice:not(.active)::after,
+#btn-trace-demo:not(.active)::after {
   content: "";
   position: absolute;
   top: 50%;
@@ -3459,4 +3465,109 @@ body.hide-note .hint-bar {
 @keyframes cursorBubble {
   0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0.95; }
   100% { transform: translate(-50%, -160%) scale(1.2); opacity: 0; }
+}
+
+/* ---------- 临摹页（写一写原型） ---------- */
+/* 详情页「写一写」入口按钮：与「读一读」并排 */
+.detail-read .btn-trace-entry {
+  margin-left: 12px;
+}
+
+#view-trace {
+  justify-content: flex-start;
+  /* 放宽容器，让田字格在平板/桌面端更大 */
+  max-width: 900px;
+  padding: 6px 6px 16px;
+}
+
+/* 状态行只有三点展开按钮：靠右对齐，与练习页一致 */
+#view-trace .quiz-status {
+  justify-content: flex-end;
+}
+
+.trace-stage {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 田字格容器：正方形，视觉沿用练习页卡片（米白底 + 主题色实线框） */
+.trace-frame-wrap {
+  width: min(88vw, 58vh, 460px);
+  aspect-ratio: 1;
+  background: #fffdf5;
+  border: 3px solid #d1603d;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+#trace-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  /* 临摹时禁止浏览器滚屏/缩放手势，手指轨迹全部交给画布 */
+  touch-action: none;
+  cursor: crosshair;
+}
+
+/* 田字格中心十字虚线：与练习页卡片伪元素同款 */
+.trace-dash {
+  stroke: rgba(209, 96, 61, 0.35);
+  stroke-width: 5;
+  stroke-dasharray: 16 12;
+}
+
+/* 灰色底字（还没描到的笔画） */
+.trace-base {
+  fill: #e7dfcf;
+}
+
+/* 点亮层：描完一笔后该笔整体填充，颜色与练习页田字格汉字一致 */
+.trace-lit {
+  fill: #333;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.trace-lit.on {
+  opacity: 1;
+}
+
+/* 描画中的进度粗线：沿骨架高亮，给孩子即时反馈 */
+.trace-prog {
+  fill: none;
+  stroke: rgba(242, 165, 65, 0.85);
+  stroke-width: 64;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 手势引导小圆点：沿当前笔的骨架循环移动 */
+.trace-guide-dot {
+  fill: rgba(90, 158, 230, 0.45);
+  stroke: #5a9ee6;
+  stroke-width: 6;
+  animation: trace-guide-pulse 1s ease-in-out infinite;
+}
+
+/* 演示模式的笔尖圆点：主题色，沿骨架把整字写出来 */
+.trace-demo-dot {
+  fill: rgba(209, 96, 60, 0.55);
+  stroke: #d1603d;
+  stroke-width: 6;
+}
+
+@keyframes trace-guide-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+.trace-tip {
+  margin-top: 14px;
+  min-height: 1.5em;
+  font-size: clamp(16px, 3.4vmin, 22px);
+  color: #9b8669;
 }

@@ -313,7 +313,8 @@
     prog = 0;
     const finished = idx >= strokes.length;
     // 整字写完播"流光"音（与金光特效同步），单笔完成仍是答对音
-    if (window.Sound) Sound.play(finished ? "sparkle" : "correct");
+    // 注意：sound.js 用顶层 const 声明，不会有 window.Sound，只能用 typeof 探测
+    if (typeof Sound !== "undefined") Sound.play(finished ? "sparkle" : "correct");
     if (finished) {
       hideGuide();
       stopVoice();

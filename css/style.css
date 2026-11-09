@@ -1707,7 +1707,7 @@ body.hide-pinyin #view-card .card .pinyin {
 .quiz-tools-wrap {
   display: grid;
   grid-template-rows: 1fr;
-  transition: grid-template-rows 0.28s cubic-bezier(0.33, 0, 0.2, 1);
+  transition: grid-template-rows 0.24s ease;
 }
 
 .quiz-tools-wrap.collapsed {
@@ -1778,16 +1778,18 @@ body.hide-pinyin #view-card .card .pinyin {
   /* 白色底板放在按钮区里，收起时和按钮一起滑进右侧灰色关闭区 */
   background: rgba(255, 253, 245, 0.96);
   border-radius: 8px 0 0 8px;
-  transition: transform 0.28s cubic-bezier(0.33, 0, 0.2, 1);
+  transition: transform 0.2s cubic-bezier(0.33, 0, 0.2, 1);
 }
 
-/* 抽屉效果：收起时按钮连同白色底板整块向右滑进灰色关闭区（被 ✕ 遮住、超出面板的部分被裁掉），
-   展开时反过来从灰色区域里滑出来 */
+/* 抽屉效果：关闭时按钮连同白色底板整块向右滑进灰色关闭区（被 ✕ 遮住、超出面板的部分被裁掉），
+   滑完再由 .collapsed 折叠面板；展开时反过来从灰色区域里滑出来 */
+.quiz-tools-wrap.drawer-out .quiz-tools-btns,
 .quiz-tools-wrap.collapsed .quiz-tools-btns {
   transform: translateX(100%);
 }
 
 /* 底板滑走后不再保留外框阴影，避免空出一块只有阴影的区域 */
+.quiz-tools-wrap.drawer-out .quiz-tools,
 .quiz-tools-wrap.collapsed .quiz-tools {
   box-shadow: none;
 }

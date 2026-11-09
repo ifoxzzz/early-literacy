@@ -641,6 +641,10 @@
     $("#set-order")
       .querySelectorAll("button")
       .forEach((b) => b.classList.toggle("active", b.dataset.v === order));
+    const level = Storage.traceLevel(id);
+    $("#set-trace-level")
+      .querySelectorAll("button")
+      .forEach((b) => b.classList.toggle("active", b.dataset.v === level));
   }
 
   /* ---------- 通用单字详情页 ---------- */
@@ -2263,19 +2267,24 @@
   }
 
   // 练习页顶部悬浮面板展开/收起：按小朋友保存（默认展开）
+  let drawerTimer = 0;
+
   function refreshQuizTools() {
+    clearTimeout(drawerTimer);
+    drawerTimer = 0;
     const on = Storage.pref(Storage.PREF_KEYS.TOOLS);
     const wrap = $("#quiz-tools-wrap");
+    wrap.classList.remove("drawer-out");
     wrap.classList.toggle("collapsed", !on);
     $("#btn-tools-hide").setAttribute("aria-expanded", String(on));
     $("#btn-tools-show").setAttribute("aria-expanded", String(on));
   }
 
-  // 折叠/展开的 0.28s 内舞台高度持续变化，逐帧重算田字格尺寸才能平滑缩放
+  // 折叠/展开的 0.24s 内舞台高度持续变化，逐帧重算田字格尺寸才能平滑缩放
   let toolsResizeRaf = 0;
   function resizeWhileToolsAnimate() {
     cancelAnimationFrame(toolsResizeRaf);
-    const until = performance.now() + 300;
+    const until = performance.now() + 260;
     const tick = (now) => {
       if (views.quiz.classList.contains("hidden")) return;
       applyGridLayout();
@@ -2286,9 +2295,20 @@
 
   function setToolsExpanded(on) {
     Storage.setPref(Storage.PREF_KEYS.TOOLS, on);
-    // 一段式抽屉：按钮向右滑进灰色关闭区、面板同时折叠/展开（.collapsed 已含滑入位移）
-    refreshQuizTools();
-    resizeWhileToolsAnimate();
+    if (on) {
+      refreshQuizTools();
+      resizeWhileToolsAnimate();
+      return;
+    }
+    const wrap = $("#quiz-tools-wrap");
+    if (wrap.classList.contains("drawer-out")) return;
+    // 抽屉：按钮先整体向右滑进灰色关闭区，滑完再折叠面板
+    wrap.classList.add("drawer-out");
+    drawerTimer = setTimeout(() => {
+      drawerTimer = 0;
+      refreshQuizTools();
+      resizeWhileToolsAnimate();
+    }, 200);
   }
   $("#btn-tools-hide").addEventListener("click", () => setToolsExpanded(false));
   $("#btn-tools-show").addEventListener("click", () => setToolsExpanded(true));
@@ -2472,6 +2492,13 @@
     const btn = e.target.closest("button[data-v]");
     if (!btn) return;
     Storage.setQuizOrder(btn.dataset.v, Storage.currentId());
+    refreshSettings(Storage.currentUser());
+  });
+  // 临摹判定松紧：宽松 / 标准 / 严格（按小朋友保存，重新进入写一写时生效）
+  $("#set-trace-level").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-v]");
+    if (!btn) return;
+    Storage.setTraceLevel(btn.dataset.v, Storage.currentId());
     refreshSettings(Storage.currentUser());
   });
 

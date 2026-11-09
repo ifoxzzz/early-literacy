@@ -42,10 +42,28 @@
   let voiceOn = loadPref("voice", false); // 语音播报：默认关，避免意外出声
 
   /* ---------- 描画会话状态 ---------- */
-  const SAMPLE_STEP = 12; // 骨架重采样间距（1024 坐标系单位）
-  const TOLERANCE = 64; // 判定半径：笔尖离骨架多近算描到
-  const LOOKAHEAD = 8; // 每次事件最多向前推进的采样点数（防止跳笔作弊）
+  /* 判定松紧（可在「练习设置 → 临摹设置」里切换，按小朋友保存）
+     tolerance：判定半径，笔尖离骨架多近算描到（1024 坐标系单位，越大越宽松）
+     lookahead：每次指针事件最多向前推进的采样点数（越大越能容忍快速、跳跃的笔）
+     step     ：骨架重采样间距（越小点越密，判定越细腻） */
+  const TRACE_LEVELS = {
+    loose: { tolerance: 96, lookahead: 16, step: 10 }, // 宽松（默认，适合初学）
+    normal: { tolerance: 76, lookahead: 10, step: 12 }, // 标准
+    strict: { tolerance: 52, lookahead: 6, step: 12 }, // 严格
+  };
+  let SAMPLE_STEP = TRACE_LEVELS.loose.step;
+  let TOLERANCE = TRACE_LEVELS.loose.tolerance;
+  let LOOKAHEAD = TRACE_LEVELS.loose.lookahead;
   const VOICE_INTERVAL = 7000; // 语音开启时，多久没进展重复播报一次当前笔画
+
+  // 进入每个字前按当前小朋友的「临摹设置」应用一次
+  function applyLevel() {
+    const v = typeof Storage !== "undefined" ? Storage.traceLevel() : "loose";
+    const cfg = TRACE_LEVELS[v] || TRACE_LEVELS.loose;
+    SAMPLE_STEP = cfg.step;
+    TOLERANCE = cfg.tolerance;
+    LOOKAHEAD = cfg.lookahead;
+  }
 
   let strokes = []; // 每笔的 SVG path（轮廓，用于灰底与点亮）
   let samples = []; // 每笔重采样后的骨架点 [{x,y}...]
@@ -55,6 +73,7 @@
   let prog = 0; // 当前笔已描到的采样点下标
   let ready = false; // 数据是否就绪（就绪前忽略描画）
   let pointerId = null; // 当前跟踪的触摸点（单指）
+  let liftGate = false; // 一笔写完后必须抬手才能写下一笔，防止一次划动连续过掉多笔
   let voiceTimer = 0; // 语音定时播报
   let demo = null; // 演示动画单轮状态（非 null 表示本轮进行中）
   let demoOn = false; // 「演示」开关：开启后循环演示，直到用户点任意位置停止
@@ -209,6 +228,7 @@
   }
 
   function build(data) {
+    applyLevel();
     strokes = data.strokes;
     samples = data.medians.map((m) => resample(m, SAMPLE_STEP));
     strokeNames = data.medians.map((m) => inferStrokeName(m));
@@ -298,6 +318,16 @@
         break;
       }
     }
+    // 收笔容错：已经写到接近终点时，笔尖进入终点 1.5 倍判定半径就直接收笔，
+    // 避免"只差一点点"反复失败。没写到接近终点时不做这个放宽，
+    // 否则从起笔处划到终点附近就能跳过整笔（密集字会被一划带过）
+    if (prog < pts.length - 1 && pts.length - 1 - prog <= LOOKAHEAD) {
+      const last = pts[pts.length - 1];
+      const dx = p.x - last.x;
+      const dy = p.y - last.y;
+      const r = TOLERANCE * 1.5;
+      if (dx * dx + dy * dy <= r * r) prog = pts.length - 1;
+    }
     paintProg();
     if (prog >= pts.length - 1) {
       completeStroke();
@@ -312,6 +342,9 @@
     idx++;
     prog = 0;
     const finished = idx >= strokes.length;
+    // 一笔写完必须抬手再写下一笔：密集字里一次划动可能同时擦过后面几笔的骨架，
+    // 不拦住的话按住不放就能把整个字"划"完
+    liftGate = !finished;
     // 整字写完播"流光"音（与金光特效同步），单笔完成仍是答对音
     // 注意：sound.js 用顶层 const 声明，不会有 window.Sound，只能用 typeof 探测
     if (typeof Sound !== "undefined") Sound.play(finished ? "sparkle" : "correct");
@@ -464,6 +497,7 @@
     if (!ready || pointerId !== null || demoOn) return;
     e.preventDefault();
     pointerId = e.pointerId;
+    liftGate = false; // 新的一次落笔
     try {
       svg.setPointerCapture(pointerId);
     } catch (_) {}
@@ -474,9 +508,11 @@
   svg.addEventListener("pointermove", (e) => {
     if (e.pointerId !== pointerId || demoOn) return;
     e.preventDefault();
+    if (liftGate) return; // 上一笔已写完，等抬手后再写下一笔
     // 快速划动时浏览器会合并事件，取出合并的中间点避免漏判
     const evts = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
     for (const ev of evts.length ? evts : [e]) {
+      if (liftGate) break;
       const p = toData(ev);
       if (p) advance(p);
     }
@@ -484,6 +520,7 @@
   const endPointer = (e) => {
     if (e.pointerId !== pointerId) return;
     pointerId = null;
+    liftGate = false;
     if (!ready || demoOn) return;
     if (idx >= strokes.length) return; // 整字已写完，不恢复手势
     // 这一笔没写完就抬手（笔顺或轨迹不对）：清掉残笔痕迹，进度归零，
@@ -499,6 +536,7 @@
   function resetBlank() {
     idx = 0;
     prog = 0;
+    liftGate = false;
     litPaths.forEach((p) => p.classList.remove("on"));
     if (progPath) progPath.setAttribute("d", "");
     // 中断完成特效：收起金色光丝层
@@ -518,6 +556,7 @@
     tipEl.textContent = "正在加载笔顺…";
     ready = false;
     pointerId = null;
+    liftGate = false;
     demoOn = false;
     clearSvg();
     refreshToggleBtns();
@@ -577,16 +616,26 @@
     },
     true
   );
-  // 顶部按钮折叠 / 展开（与练习页一致）
+  // 顶部按钮折叠 / 展开（与练习页一致：按钮先滑进灰色关闭区，滑完再折叠面板）
   const toolsWrap = $("#trace-tools-wrap");
   const toolsHide = $("#btn-trace-tools-hide");
   const toolsShow = $("#btn-trace-tools-show");
+  let drawerTimer = 0;
   toolsHide.addEventListener("click", () => {
-    toolsWrap.classList.add("collapsed");
+    if (toolsWrap.classList.contains("drawer-out")) return;
+    toolsWrap.classList.add("drawer-out");
+    drawerTimer = setTimeout(() => {
+      drawerTimer = 0;
+      toolsWrap.classList.remove("drawer-out");
+      toolsWrap.classList.add("collapsed");
+    }, 200);
     toolsHide.setAttribute("aria-expanded", "false");
     toolsShow.setAttribute("aria-expanded", "true");
   });
   toolsShow.addEventListener("click", () => {
+    clearTimeout(drawerTimer);
+    drawerTimer = 0;
+    toolsWrap.classList.remove("drawer-out");
     toolsWrap.classList.remove("collapsed");
     toolsHide.setAttribute("aria-expanded", "true");
     toolsShow.setAttribute("aria-expanded", "false");

@@ -85,6 +85,7 @@ const Storage = {
     localStorage.removeItem(this.quizCountKey(id));
     localStorage.removeItem(this.dailyNewLimitKey(id));
     localStorage.removeItem(this.quizOrderKey(id));
+    localStorage.removeItem(this.traceLevelKey(id));
     localStorage.removeItem(this.lastVolumeKey(id));
     localStorage.removeItem(this.giftsKey(id));
     localStorage.removeItem(this.giftLogKey(id));
@@ -117,6 +118,10 @@ const Storage = {
 
   quizOrderKey(id) {
     return `early-literacy-quiz-order:${id || this.currentId()}`;
+  },
+
+  traceLevelKey(id) {
+    return `early-literacy-trace-level:${id || this.currentId()}`;
   },
 
   lastVolumeKey(id) {
@@ -383,6 +388,24 @@ const Storage = {
     return order;
   },
 
+  // 临摹判定松紧：loose（宽松，默认）/ normal（标准）/ strict（严格）
+  TRACE_LEVELS: ["loose", "normal", "strict"],
+
+  traceLevel(id) {
+    const raw = localStorage.getItem(this.traceLevelKey(id));
+    if (raw == null) return "loose";
+    if (!this.TRACE_LEVELS.includes(raw)) {
+      throw new Error(`临摹设置（判定松紧）值非法：${raw}`);
+    }
+    return raw;
+  },
+
+  setTraceLevel(v, id) {
+    const level = this.TRACE_LEVELS.includes(v) ? v : "loose";
+    localStorage.setItem(this.traceLevelKey(id), level);
+    return level;
+  },
+
   // ---------- 数据导入 / 导出 ----------
   // 备份文件结构：{ format, version, exportedAt, user, data }
   // data 内含该小朋友的全部本地数据：学习进度、练习记录、礼物、设置与显示开关
@@ -414,6 +437,7 @@ const Storage = {
         quizCount: safeRead(() => this.quizCount(uid), 10),
         dailyNewLimit: safeRead(() => this.dailyNewLimit(uid), 30),
         quizOrder: safeRead(() => this.quizOrder(uid), "review"),
+        traceLevel: safeRead(() => this.traceLevel(uid), "loose"),
         lastVolume: this.lastVolume(uid),
         prefs: {
           pinyin: this.pref(this.PREF_KEYS.PINYIN, uid),
@@ -550,6 +574,10 @@ const Storage = {
     localStorage.setItem(this.quizCountKey(uid), String(d.quizCount));
     localStorage.setItem(this.dailyNewLimitKey(uid), String(d.dailyNewLimit));
     localStorage.setItem(this.quizOrderKey(uid), d.quizOrder);
+    localStorage.setItem(
+      this.traceLevelKey(uid),
+      this.TRACE_LEVELS.includes(d.traceLevel) ? d.traceLevel : "loose"
+    );
     if (d.lastVolume) this.setLastVolume(d.lastVolume, uid);
     else localStorage.removeItem(this.lastVolumeKey(uid));
     // 显示开关缺省为开启，与 Storage.pref 的默认行为一致

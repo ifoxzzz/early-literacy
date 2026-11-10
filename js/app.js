@@ -2401,7 +2401,7 @@
     if (q) markDone(q);
     nextQuestion();
   });
-  // 点击小朋友的名字：先加载全局资源（内置字体、提示语、名字语音、星星播报），
+  // 点击小朋友的名字：先加载全局资源（内置楷体、提示语、名字语音、星星播报、礼物语音），
   // 全部就绪后才进入选册页；题目语音留到点册/答题过程中按需加载
   let enteringUser = false;
   $("#user-list").addEventListener("click", (e) => {

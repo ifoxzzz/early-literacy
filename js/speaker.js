@@ -113,12 +113,12 @@ const Speaker = {
     return out ? out + tone : "";
   },
 
-  // 音频地址用内容哈希（data/audio-manifest.js）而非全局版本号：
+  // 音频地址用内容哈希（data/asset-manifest.js）而非全局版本号：
   // 文件没改 → hash 不变 → URL 不变，浏览器缓存直接命中；文件改了 → 只换这一个 URL。
   // 清单里查不到（新文件尚未生成清单）时退回全局版本号，保证仍能加载。
   // 额外带一个资源缓存标记：在应用设置里清理资源缓存后会更换，让客户端重新下载更新后的资源
   audioUrl(rel) {
-    const hash = (window.AUDIO_HASH || {})[rel];
+    const hash = (window.ASSET_HASH || {})[rel];
     const ver = hash || window.APP_VERSION || "1";
     const epoch = this.resourceEpoch();
     return `${this.AUDIO}${rel}?h=${ver}${epoch ? `&c=${epoch}` : ""}`;
@@ -357,13 +357,22 @@ const Speaker = {
       if (u) urls.push(u);
     });
     for (let i = 0; i <= 20; i++) urls.push(this.audioUrl(`phrases/stars${i}.mp3`));
-    // 字体与语音并行加载；不支持 Font Loading API 或超时都不阻塞进入
+    // 内置楷体与语音并行加载：用内容哈希地址，未改动不重复下载；
+    // 不支持 FontFace 或超时（8s）都不阻塞进入，CSS 回退到系统楷体。
+    const fontHash = (window.ASSET_HASH || {})["fonts/kaiti.woff2"];
+    const fontVer = fontHash || (window.APP_VERSION || "1");
+    let fontUrl = `assets/fonts/kaiti.woff2?h=${fontVer}`;
+    if (typeof window.resourceUrl === "function") fontUrl = window.resourceUrl(fontUrl);
     const fontReady =
-      "fonts" in document && document.fonts.load
+      typeof FontFace !== "undefined"
         ? Promise.race([
-            document.fonts.load('32px "Kaiti Web"', "字").catch(() => {}),
+            (() => {
+              const face = new FontFace("Kaiti Web", `url("${fontUrl}") format("woff2")`);
+              face.display = "swap";
+              return face.load().then((f) => document.fonts.add(f));
+            })(),
             new Promise((resolve) => setTimeout(resolve, 8000)),
-          ])
+          ]).catch(() => {})
         : Promise.resolve();
     return Promise.all([this.preloadAll(urls, onProgress), fontReady]);
   },

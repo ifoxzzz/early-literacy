@@ -17,8 +17,9 @@
       const hit = window.STROKES_DATA && window.STROKES_DATA[char];
       if (hit) return resolve(hit);
       const s = document.createElement("script");
-      s.src =
-        "assets/strokes/" + encodeURIComponent(char) + ".js?v=" + (window.APP_VERSION || "");
+      s.src = resourceUrl(
+        "assets/strokes/" + encodeURIComponent(char) + ".js?v=" + (window.APP_VERSION || "")
+      );
       s.onload = () => resolve((window.STROKES_DATA && window.STROKES_DATA[char]) || null);
       s.onerror = () => resolve(null);
       document.head.appendChild(s);

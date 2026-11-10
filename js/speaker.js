@@ -4,7 +4,7 @@
 // - 播放采用队列 + 版本号（tokens）机制：新语音会立即打断旧语音
 const Speaker = {
   AUDIO: "assets/audio/",
-  AUDIO_EPOCH_KEY: "early-literacy-audio-cache", // 音频缓存标记：清理后更换，迫使浏览器重新下载
+  RESOURCE_EPOCH_KEY: "early-literacy-resource-cache", // 资源缓存标记：与 index.html 顶部保持一致
   current: null, // 当前播放的 Audio 实例
   tokens: 0, // 播放序列版本号，用于打断旧序列
   lastPraise: "", // 上一次播放的夸奖语键，避免连续两次抽到同一条
@@ -116,17 +116,19 @@ const Speaker = {
   // 音频地址用内容哈希（data/audio-manifest.js）而非全局版本号：
   // 文件没改 → hash 不变 → URL 不变，浏览器缓存直接命中；文件改了 → 只换这一个 URL。
   // 清单里查不到（新文件尚未生成清单）时退回全局版本号，保证仍能加载。
-  // 额外带一个缓存标记：在应用设置里清理音频缓存后会更换，让客户端重新下载更新后的音频
+  // 额外带一个资源缓存标记：在应用设置里清理资源缓存后会更换，让客户端重新下载更新后的资源
   audioUrl(rel) {
-    const epoch = this.audioEpoch();
     const hash = (window.AUDIO_HASH || {})[rel];
     const ver = hash || window.APP_VERSION || "1";
+    const epoch = this.resourceEpoch();
     return `${this.AUDIO}${rel}?h=${ver}${epoch ? `&c=${epoch}` : ""}`;
   },
 
-  audioEpoch() {
+  // 资源缓存标记：音频、字体、笔顺、图片共用，清理后所有资源 URL 一起失效
+  resourceEpoch() {
+    const key = window.RESOURCE_EPOCH_KEY || this.RESOURCE_EPOCH_KEY;
     try {
-      return localStorage.getItem(this.AUDIO_EPOCH_KEY) || "";
+      return localStorage.getItem(key) || "";
     } catch (e) {
       return "";
     }
@@ -227,9 +229,10 @@ const Speaker = {
   jobs: [], // 待下载队列 [{ url, entry }]
   running: 0, // 当前正在下载的数量
 
-  // 清理本地音频缓存：停止播放、释放内存中的 blob，并更换缓存标记，
-  // 之后 audioUrl 会带上新的参数，浏览器与 audio 元素都会重新下载最新音频
-  clearAudioCache() {
+  // 清理资源缓存：停止播放、释放内存中的音频副本，并更换资源标记。
+  // 之后音频、字体、笔顺、图片等资源 URL 都会带上新标记，客户端会重新下载最新资源
+  // （已加载进当前页面的字体、笔顺数据需要刷新后才会重新请求）
+  clearResourceCache() {
     this.stop();
     this.cache.forEach((entry) => {
       if (entry.blobUrl) URL.revokeObjectURL(entry.blobUrl);
@@ -237,7 +240,7 @@ const Speaker = {
     this.cache.clear();
     this.jobs.length = 0; // 排队中的任务一并作废
     try {
-      localStorage.setItem(this.AUDIO_EPOCH_KEY, Date.now().toString(36));
+      localStorage.setItem(this.RESOURCE_EPOCH_KEY, Date.now().toString(36));
     } catch (e) {}
   },
 

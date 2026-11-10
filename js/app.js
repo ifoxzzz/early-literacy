@@ -3089,14 +3089,15 @@
     Storage.setUiFont(UI_FONT_LEVELS[idx].key);
     applyUiFont();
   });
-  // 清理音频缓存（应用设置）：释放本地缓存的音频并让后续请求重新下载
-  $("#btn-clear-audio-cache").addEventListener("click", () => {
-    Speaker.clearAudioCache();
-    const btn = $("#btn-clear-audio-cache");
+  // 清理资源缓存（应用设置）：释放内存中的音频副本，并更换资源标记，
+  // 让音频、字体、笔顺、图片等资源在后续加载时重新下载
+  $("#btn-clear-resource-cache").addEventListener("click", () => {
+    Speaker.clearResourceCache();
+    const btn = $("#btn-clear-resource-cache");
     btn.textContent = "已清理";
     btn.disabled = true;
     setTimeout(() => {
-      btn.textContent = "清理音频缓存";
+      btn.textContent = "清理资源缓存";
       btn.disabled = false;
     }, 1200);
   });
@@ -3108,7 +3109,7 @@
       )
     )
       return;
-    Speaker.clearAudioCache();
+    Speaker.clearResourceCache();
     Storage.clearAll();
     location.reload();
   });

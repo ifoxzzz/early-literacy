@@ -7,11 +7,19 @@
 :root {
   /* 田字格与汉字表里的汉字统一使用内置楷体，保证各设备字形一致 */
   --kaiti: "Kaiti Web", "Kaiti SC", "KaiTi", "STKaiti", "楷体", serif;
+  /* 界面字号缩放系数：应用设置的「界面字号」× 系统字体放大的自动补偿，由 app.js 写入 */
+  --fs: 1;
 }
 
 html,
 body {
   height: 100%;
+}
+
+html {
+  /* 禁止手机浏览器 / 内置 WebView 自动放大文字，字号统一由 --fs 控制 */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -56,7 +64,7 @@ body {
 }
 
 .app-title {
-  font-size: clamp(36px, 9vmin, 64px);
+  font-size: calc(clamp(36px, 9vmin, 64px) * var(--fs));
   color: #d1603d;
   margin-bottom: 24px;
   letter-spacing: 0.1em;
@@ -68,7 +76,7 @@ body {
   border-radius: 999px;
   cursor: pointer;
   padding: 14px 48px;
-  font-size: clamp(20px, 4.5vmin, 28px);
+  font-size: calc(clamp(20px, 4.5vmin, 28px) * var(--fs));
   transition: transform 0.15s;
 }
 
@@ -83,7 +91,7 @@ body {
 }
 
 .home-stats {
-  font-size: clamp(18px, 4vmin, 26px);
+  font-size: calc(clamp(18px, 4vmin, 26px) * var(--fs));
   margin-bottom: 40px;
   color: #8a7a63;
 }
@@ -91,7 +99,7 @@ body {
 .btn-danger {
   margin-top: 18px;
   padding: 8px 26px;
-  font-size: clamp(15px, 3.2vmin, 20px);
+  font-size: calc(clamp(15px, 3.2vmin, 20px) * var(--fs));
   background: #f0e3e0;
   color: #b0544a;
   box-shadow: 0 3px 0 #d5b5af;
@@ -100,7 +108,7 @@ body {
 .btn-ghost {
   margin-top: 18px;
   padding: 8px 26px;
-  font-size: clamp(15px, 3.2vmin, 20px);
+  font-size: calc(clamp(15px, 3.2vmin, 20px) * var(--fs));
   background: #e8dcc8;
   color: #8a7a63;
   box-shadow: 0 3px 0 #cbbfa5;
@@ -117,7 +125,7 @@ body {
 }
 
 .volume-owner {
-  font-size: clamp(15px, 3.2vmin, 19px);
+  font-size: calc(clamp(15px, 3.2vmin, 19px) * var(--fs));
   color: #b09a7d;
 }
 
@@ -139,7 +147,7 @@ body {
 }
 
 .volume-gift .gift-icon {
-  font-size: clamp(30px, 6.6vmin, 42px);
+  font-size: calc(clamp(30px, 6.6vmin, 42px) * var(--fs));
 }
 
 /* 选册页底部：左「练习记录」、中「退出」（与其他页面返回按钮同色）、右「练习设置」
@@ -316,12 +324,12 @@ body {
 }
 
 .volume-name {
-  font-size: clamp(20px, 4.6vmin, 28px);
+  font-size: calc(clamp(20px, 4.6vmin, 28px) * var(--fs));
   color: #d1603d;
 }
 
 .volume-meta {
-  font-size: clamp(13px, 3vmin, 17px);
+  font-size: calc(clamp(13px, 3vmin, 17px) * var(--fs));
   color: #9b8669;
 }
 
@@ -335,7 +343,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: clamp(20px, 4.5vmin, 26px);
+  font-size: calc(clamp(20px, 4.5vmin, 26px) * var(--fs));
   line-height: 1;
   background: #fff3d6;
   border: 2px solid #f2a541;
@@ -445,7 +453,7 @@ body {
   background: #fdf6e9;
   border-bottom: 2px solid #eadfc8;
   color: #b09a7d;
-  font-size: clamp(13px, 2.6vmin, 17px);
+  font-size: calc(clamp(13px, 2.6vmin, 17px) * var(--fs));
   font-weight: 700;
   text-align: center;
 }
@@ -477,7 +485,7 @@ body {
 .word-play {
   width: 40px;
   height: 40px;
-  font-size: 18px;
+  font-size: calc(18px * var(--fs));
   line-height: 1;
   background: #fff3d6;
   border: 2px solid #f2a541;
@@ -498,21 +506,21 @@ body {
 .word-char {
   text-align: center;
   font-family: var(--kaiti);
-  font-size: clamp(26px, 6vmin, 36px);
+  font-size: calc(clamp(26px, 6vmin, 36px) * var(--fs));
   line-height: 1.2;
   color: #333;
 }
 
 .word-pinyin {
   font-family: Arial, "Segoe UI", sans-serif;
-  font-size: clamp(16px, 3.6vmin, 22px);
+  font-size: calc(clamp(16px, 3.6vmin, 22px) * var(--fs));
   color: #b09a7d;
   /* 极窄屏时宁可折行也不要撑出横向滚动条 */
   overflow-wrap: anywhere;
 }
 
 .word-words {
-  font-size: clamp(16px, 3.4vmin, 22px);
+  font-size: calc(clamp(16px, 3.4vmin, 22px) * var(--fs));
   line-height: 1.4;
   color: #6b5b45;
   overflow-wrap: anywhere;
@@ -520,7 +528,7 @@ body {
 
 /* 注解列：字号略小、颜色略淡，与组词区分开 */
 .word-note {
-  font-size: clamp(14px, 3vmin, 19px);
+  font-size: calc(clamp(14px, 3vmin, 19px) * var(--fs));
   line-height: 1.45;
   color: #8a7a63;
   overflow-wrap: anywhere;
@@ -532,7 +540,7 @@ body {
   border-radius: 999px;
   background: #eef6e9;
   color: #5f8a4f;
-  font-size: clamp(12px, 2.6vmin, 15px);
+  font-size: calc(clamp(12px, 2.6vmin, 15px) * var(--fs));
   white-space: nowrap;
 }
 
@@ -547,7 +555,7 @@ body {
   .word-head {
     /* 左 16 / 右 24 = 列表内边距 8 + 行内边距 8 + 预留滚动条 8 */
     padding: 6px 24px 5px 16px;
-    font-size: clamp(11px, 2.8vmin, 15px);
+    font-size: calc(clamp(11px, 2.8vmin, 15px) * var(--fs));
   }
 
   .word-item {
@@ -557,28 +565,28 @@ body {
   .word-play {
     width: 26px;
     height: 26px;
-    font-size: 13px;
+    font-size: calc(13px * var(--fs));
   }
 
   .word-char {
-    font-size: clamp(22px, 6vmin, 30px);
+    font-size: calc(clamp(22px, 6vmin, 30px) * var(--fs));
   }
 
   .word-pinyin {
-    font-size: clamp(12px, 3.2vmin, 16px);
+    font-size: calc(clamp(12px, 3.2vmin, 16px) * var(--fs));
   }
 
   .word-words {
-    font-size: clamp(13px, 3.4vmin, 19px);
+    font-size: calc(clamp(13px, 3.4vmin, 19px) * var(--fs));
   }
 
   .word-note {
-    font-size: clamp(12px, 3vmin, 17px);
+    font-size: calc(clamp(12px, 3vmin, 17px) * var(--fs));
   }
 
   .word-level {
     padding: 2px 6px;
-    font-size: clamp(11px, 2.6vmin, 13px);
+    font-size: calc(clamp(11px, 2.6vmin, 13px) * var(--fs));
   }
 }
 
@@ -611,7 +619,7 @@ body {
   border: none;
   border-radius: 999px;
   padding: 0.55em 1.25em;
-  font-size: calc(clamp(24px, 5.5vmin, 34px) * var(--bscale, 1));
+  font-size: calc(calc(clamp(24px, 5.5vmin, 34px) * var(--bscale, 1)) * var(--fs));
   line-height: 1.25;
   color: #fff;
   cursor: pointer;
@@ -700,14 +708,14 @@ body {
 }
 
 .dialog-title {
-  font-size: clamp(18px, 4vmin, 24px);
+  font-size: calc(clamp(18px, 4vmin, 24px) * var(--fs));
   color: #6b5b45;
   margin-bottom: 16px;
 }
 
 /* 确认类对话框的说明文字（位于标题与按钮之间） */
 .dialog-note {
-  font-size: clamp(13px, 2.9vmin, 16px);
+  font-size: calc(clamp(13px, 2.9vmin, 16px) * var(--fs));
   line-height: 1.6;
   color: #b09a7d;
   text-align: left;
@@ -716,7 +724,7 @@ body {
 .dialog-input {
   width: 100%;
   font-family: inherit;
-  font-size: clamp(20px, 4.5vmin, 26px);
+  font-size: calc(clamp(20px, 4.5vmin, 26px) * var(--fs));
   padding: 10px 14px;
   text-align: center;
   color: #4a3b2a;
@@ -740,7 +748,7 @@ body {
 .dialog-btns .btn {
   margin-top: 0;
   padding: 10px 28px;
-  font-size: clamp(16px, 3.5vmin, 20px);
+  font-size: calc(clamp(16px, 3.5vmin, 20px) * var(--fs));
 }
 
 /* ---------- 进入练习前的资源加载 ---------- */
@@ -749,7 +757,7 @@ body {
 }
 
 .loading-tip {
-  font-size: clamp(15px, 3.5vmin, 18px);
+  font-size: calc(clamp(15px, 3.5vmin, 18px) * var(--fs));
   color: #8c7a63;
 }
 
@@ -782,7 +790,7 @@ body {
   left: 0;
   bottom: 9px; /* 骑在进度条上方，只留一点点重叠，像车贴着跑道跑 */
   margin-left: -12px; /* 让图标中心对准进度前端 */
-  font-size: 24px;
+  font-size: calc(24px * var(--fs));
   line-height: 1;
   white-space: nowrap;
   pointer-events: auto;
@@ -851,7 +859,7 @@ body {
 }
 
 .loading-count {
-  font-size: clamp(14px, 3.2vmin, 16px);
+  font-size: calc(clamp(14px, 3.2vmin, 16px) * var(--fs));
   color: #9a8b74;
   font-variant-numeric: tabular-nums;
 }
@@ -861,7 +869,7 @@ body {
   position: fixed;
   right: 14px;
   bottom: 12px;
-  font-size: clamp(11px, 2.4vmin, 13px);
+  font-size: calc(clamp(11px, 2.4vmin, 13px) * var(--fs));
   line-height: 1.5;
   color: #c2b49c;
   font-variant-numeric: tabular-nums;
@@ -875,7 +883,7 @@ body {
   transform: translateX(-50%);
   padding: 4px 8px;
   font-family: inherit;
-  font-size: clamp(11px, 2.4vmin, 13px);
+  font-size: calc(clamp(11px, 2.4vmin, 13px) * var(--fs));
   line-height: 1.5;
   color: #c2b49c;
   background: transparent;
@@ -921,7 +929,7 @@ body {
 
 .about-title {
   margin-bottom: 14px;
-  font-size: clamp(18px, 4vmin, 24px);
+  font-size: calc(clamp(18px, 4vmin, 24px) * var(--fs));
   font-weight: normal;
   color: #6b5b45;
   text-align: center;
@@ -937,7 +945,7 @@ body {
   display: flex;
   gap: 12px;
   align-items: baseline;
-  font-size: clamp(14px, 3.2vmin, 17px);
+  font-size: calc(clamp(14px, 3.2vmin, 17px) * var(--fs));
 }
 
 .about-row dt {
@@ -964,7 +972,7 @@ body {
   display: block;
   margin: 18px auto 0;
   padding: 8px 32px;
-  font-size: clamp(15px, 3.4vmin, 18px);
+  font-size: calc(clamp(15px, 3.4vmin, 18px) * var(--fs));
 }
 
 @keyframes about-fade {
@@ -986,7 +994,7 @@ body {
   left: 14px;
   bottom: 12px;
   padding: 8px 10px;
-  font-size: 22px;
+  font-size: calc(22px * var(--fs));
   line-height: 1;
   color: #c2b49c;
   background: transparent;
@@ -1037,7 +1045,7 @@ body {
 }
 
 .admin-title {
-  font-size: clamp(16px, 3.2vmin, 19px);
+  font-size: calc(clamp(16px, 3.2vmin, 19px) * var(--fs));
   font-weight: 600;
   color: #8a7a63;
   margin-bottom: 10px;
@@ -1061,12 +1069,12 @@ body {
 }
 
 .admin-user-name {
-  font-size: clamp(18px, 4vmin, 24px);
+  font-size: calc(clamp(18px, 4vmin, 24px) * var(--fs));
   color: #4a3b2a;
 }
 
 .admin-tip {
-  font-size: clamp(14px, 3vmin, 17px);
+  font-size: calc(clamp(14px, 3vmin, 17px) * var(--fs));
   line-height: 1.6;
   color: #b09a7d;
 }
@@ -1082,13 +1090,13 @@ body {
 }
 
 .settings-owner {
-  font-size: clamp(15px, 3.2vmin, 19px);
+  font-size: calc(clamp(15px, 3.2vmin, 19px) * var(--fs));
   color: #b09a7d;
   margin-bottom: 14px;
 }
 
 .settings-tip {
-  font-size: clamp(13px, 2.9vmin, 16px);
+  font-size: calc(clamp(13px, 2.9vmin, 16px) * var(--fs));
   line-height: 1.6;
   color: #b09a7d;
   margin: 14px 0 18px;
@@ -1109,7 +1117,7 @@ body {
 }
 
 .setting-label {
-  font-size: clamp(15px, 3.2vmin, 19px);
+  font-size: calc(clamp(15px, 3.2vmin, 19px) * var(--fs));
   color: #6b5b45;
 }
 
@@ -1123,7 +1131,7 @@ body {
 .setting-input {
   width: 76px;
   font-family: inherit;
-  font-size: clamp(16px, 3.5vmin, 20px);
+  font-size: calc(clamp(16px, 3.5vmin, 20px) * var(--fs));
   text-align: center;
   color: #4a3b2a;
   background: #fff;
@@ -1138,7 +1146,7 @@ body {
 }
 
 .setting-unit {
-  font-size: clamp(13px, 2.8vmin, 16px);
+  font-size: calc(clamp(13px, 2.8vmin, 16px) * var(--fs));
   color: #b09a7d;
 }
 
@@ -1157,7 +1165,7 @@ body {
   border: none;
   background: transparent;
   color: #8a7a63;
-  font-size: clamp(14px, 3vmin, 18px);
+  font-size: calc(clamp(14px, 3vmin, 18px) * var(--fs));
   border-radius: 999px;
   cursor: pointer;
   transition: all 0.2s;
@@ -1181,7 +1189,7 @@ body {
 .btn-small {
   margin-top: 0;
   padding: 5px 14px;
-  font-size: clamp(13px, 2.8vmin, 16px);
+  font-size: calc(clamp(13px, 2.8vmin, 16px) * var(--fs));
   box-shadow: 0 2px 0 #d5b5af;
 }
 
@@ -1196,7 +1204,7 @@ body {
 }
 
 .history-owner {
-  font-size: clamp(15px, 3.2vmin, 19px);
+  font-size: calc(clamp(15px, 3.2vmin, 19px) * var(--fs));
   color: #b09a7d;
   margin-bottom: 14px;
 }
@@ -1211,7 +1219,7 @@ body {
 }
 
 .history-legend {
-  font-size: clamp(12px, 2.6vmin, 15px);
+  font-size: calc(clamp(12px, 2.6vmin, 15px) * var(--fs));
   color: #b09a7d;
 }
 
@@ -1265,7 +1273,7 @@ body {
 .history-date {
   flex-shrink: 0;
   font-family: Arial, "Segoe UI", sans-serif;
-  font-size: clamp(13px, 2.8vmin, 16px);
+  font-size: calc(clamp(13px, 2.8vmin, 16px) * var(--fs));
   color: #b09a7d;
 }
 
@@ -1273,7 +1281,7 @@ body {
 .history-stars {
   flex: 1;
   text-align: left;
-  font-size: clamp(22px, 5vmin, 32px);
+  font-size: calc(clamp(22px, 5vmin, 32px) * var(--fs));
   line-height: 1.3;
   letter-spacing: 2px;
   word-break: break-all;
@@ -1281,7 +1289,7 @@ body {
 
 .history-stars.none {
   font-family: inherit;
-  font-size: clamp(14px, 3vmin, 18px);
+  font-size: calc(clamp(14px, 3vmin, 18px) * var(--fs));
   letter-spacing: 0;
   color: #b09a7d;
 }
@@ -1305,7 +1313,7 @@ body {
   justify-content: center;
   font-family: var(--kaiti);
   text-align: center;
-  font-size: clamp(22px, 5.2vmin, 32px);
+  font-size: calc(clamp(22px, 5.2vmin, 32px) * var(--fs));
   line-height: 1;
   border-radius: 6px;
   border: 1px solid rgba(176, 154, 125, 0.4);
@@ -1349,7 +1357,7 @@ body {
 }
 
 .history-chars-empty {
-  font-size: clamp(13px, 2.8vmin, 16px);
+  font-size: calc(clamp(13px, 2.8vmin, 16px) * var(--fs));
   color: #b09a7d;
 }
 
@@ -1362,7 +1370,7 @@ body.hide-history-chars .history-legend {
 .history-empty {
   margin-top: 30vh;
   text-align: center;
-  font-size: clamp(16px, 3.6vmin, 22px);
+  font-size: calc(clamp(16px, 3.6vmin, 22px) * var(--fs));
   color: #b09a7d;
 }
 
@@ -1465,7 +1473,7 @@ body.hide-pinyin #view-card .card .pinyin {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-size: clamp(18px, 4vmin, 26px);
+  font-size: calc(clamp(18px, 4vmin, 26px) * var(--fs));
   color: #8a7a63;
   padding: 8px 8px 0;
 }
@@ -1497,7 +1505,7 @@ body.hide-pinyin #view-card .card .pinyin {
   position: absolute;
   top: 50%;
   padding: 10px 18px;
-  font-size: clamp(15px, 2.6vmin, 20px);
+  font-size: calc(clamp(15px, 2.6vmin, 20px) * var(--fs));
   white-space: nowrap;
   pointer-events: auto;
 }
@@ -1527,7 +1535,7 @@ body.hide-pinyin #view-card .card .pinyin {
 
 .btn-read {
   padding: 10px 34px;
-  font-size: clamp(20px, 4.6vmin, 30px);
+  font-size: calc(clamp(20px, 4.6vmin, 30px) * var(--fs));
   background: #fff3d6;
   color: #d1603d;
   border: 3px solid #f2a541;
@@ -1541,7 +1549,7 @@ body.hide-pinyin #view-card .card .pinyin {
 /* 帮帮我：尺寸略小于「再听一遍」，用蓝紫色与橙色/绿色区分开 */
 .btn-help {
   padding: 8px 26px;
-  font-size: clamp(17px, 4vmin, 24px);
+  font-size: calc(clamp(17px, 4vmin, 24px) * var(--fs));
   background: #e7ecfb;
   color: #4b5aa6;
   border: 2px solid #8f9ed6;
@@ -1566,12 +1574,12 @@ body.hide-pinyin #view-card .card .pinyin {
 
   .btn-read {
     padding: 8px 18px;
-    font-size: clamp(16px, 4.2vmin, 22px);
+    font-size: calc(clamp(16px, 4.2vmin, 22px) * var(--fs));
   }
 
   .btn-help {
     padding: 7px 14px;
-    font-size: clamp(14px, 3.6vmin, 19px);
+    font-size: calc(clamp(14px, 3.6vmin, 19px) * var(--fs));
   }
 }
 
@@ -1615,7 +1623,7 @@ body.hide-pinyin #view-card .card .pinyin {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: #b09a7d;
-  font-size: clamp(13px, 3vmin, 17px);
+  font-size: calc(clamp(13px, 3vmin, 17px) * var(--fs));
 }
 
 /* 练习页最底部：当前小朋友与册名 */
@@ -1624,11 +1632,11 @@ body.hide-pinyin #view-card .card .pinyin {
   text-align: center;
   margin-top: 6px;
   color: #b09a7d;
-  font-size: clamp(13px, 3vmin, 17px);
+  font-size: calc(clamp(13px, 3vmin, 17px) * var(--fs));
 }
 
 .result-user {
-  font-size: clamp(18px, 4vmin, 24px);
+  font-size: calc(clamp(18px, 4vmin, 24px) * var(--fs));
   color: #d1603d;
   margin-bottom: 14px;
 }
@@ -1638,7 +1646,7 @@ body.hide-pinyin #view-card .card .pinyin {
   align-items: center;
   gap: 4px;
   color: #f2a541;
-  font-size: clamp(20px, 4.6vmin, 28px);
+  font-size: calc(clamp(20px, 4.6vmin, 28px) * var(--fs));
   font-weight: 700;
   line-height: 1;
 }
@@ -1697,7 +1705,7 @@ body.hide-pinyin #view-card .card .pinyin {
 
 .btn-skip {
   padding: 6px 16px;
-  font-size: clamp(16px, 3.5vmin, 22px);
+  font-size: calc(clamp(16px, 3.5vmin, 22px) * var(--fs));
   background: #e8dcc8;
   color: #8a7a63;
   box-shadow: 0 3px 0 #cbbfa5;
@@ -1743,7 +1751,7 @@ body.hide-pinyin #view-card .card .pinyin {
   background: #e2dac9;
   color: #8b7c65;
   font-family: inherit;
-  font-size: clamp(18px, 4vmin, 24px);
+  font-size: calc(clamp(18px, 4vmin, 24px) * var(--fs));
   line-height: 1;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
@@ -1827,7 +1835,7 @@ body.hide-pinyin #view-card .card .pinyin {
 
 .gift-icon {
   display: inline-block;
-  font-size: clamp(22px, 5vmin, 30px);
+  font-size: calc(clamp(22px, 5vmin, 30px) * var(--fs));
   line-height: 1;
   transform-origin: 50% 60%;
   animation: gift-wiggle 2.6s ease-in-out infinite;
@@ -2187,7 +2195,7 @@ body.hide-pinyin #view-card .card .pinyin {
   z-index: 1;
   /* 田字格里的汉字使用内置楷体，保证各设备字形一致 */
   font-family: var(--kaiti);
-  font-size: calc(var(--card-size) * 0.58);
+  font-size: calc(calc(var(--card-size) * 0.58) * min(var(--fs), 1));
   line-height: 1;
   color: #333;
 }
@@ -2201,7 +2209,7 @@ body.hide-pinyin #view-card .card .pinyin {
   z-index: 1;
   text-align: center;
   font-family: Arial, "Segoe UI", sans-serif;
-  font-size: max(13px, calc(var(--card-size) * 0.15));
+  font-size: calc(max(13px, calc(var(--card-size) * 0.15)) * min(var(--fs), 1));
   color: #b09a7d;
 }
 
@@ -2259,7 +2267,7 @@ body.hide-pinyin .card .pinyin {
   --dy: 0px;
   position: fixed;
   z-index: 99;
-  font-size: 64px;
+  font-size: calc(64px * var(--fs));
   pointer-events: none;
   animation: starPop 1s ease-out forwards;
 }
@@ -2303,7 +2311,7 @@ body.hide-pinyin .card .pinyin {
   position: absolute;
   left: 0;
   top: 0;
-  font-size: 24px;
+  font-size: calc(24px * var(--fs));
   line-height: 1;
   transform: translate(-50%, -50%);
 }
@@ -2342,14 +2350,14 @@ body.hide-pinyin .card .pinyin {
 /* 底部提示条：第一行组词（「」包起来），第二行注解 */
 #hint-words,
 #card-words {
-  font-size: clamp(20px, 4.5vmin, 30px);
+  font-size: calc(clamp(20px, 4.5vmin, 30px) * var(--fs));
   color: #4a3b2a;
   text-align: center;
 }
 
 #hint-note,
 #card-note {
-  font-size: clamp(16px, 3.4vmin, 22px);
+  font-size: calc(clamp(16px, 3.4vmin, 22px) * var(--fs));
   line-height: 1.45;
   color: #8a7a63;
   text-align: center;
@@ -2367,7 +2375,7 @@ body.hide-note .hint-bar {
   flex-wrap: wrap;
   justify-content: center;
   gap: 6px;
-  font-size: clamp(28px, 7vmin, 46px);
+  font-size: calc(clamp(28px, 7vmin, 46px) * var(--fs));
   line-height: 1.2;
   margin-bottom: 20px;
 }
@@ -2416,7 +2424,7 @@ body.hide-note .hint-bar {
 }
 
 .result-line {
-  font-size: clamp(20px, 4.5vmin, 30px);
+  font-size: calc(clamp(20px, 4.5vmin, 30px) * var(--fs));
   margin-bottom: 16px;
   color: #6b5b45;
 }
@@ -2433,7 +2441,7 @@ body.hide-note .hint-bar {
 }
 
 .result-new-label {
-  font-size: clamp(16px, 3.4vmin, 22px);
+  font-size: calc(clamp(16px, 3.4vmin, 22px) * var(--fs));
   color: #6b5b45;
 }
 
@@ -2444,7 +2452,7 @@ body.hide-note .hint-bar {
   align-items: center;
   justify-content: center;
   font-family: var(--kaiti);
-  font-size: clamp(20px, 5vmin, 30px);
+  font-size: calc(clamp(20px, 5vmin, 30px) * var(--fs));
   line-height: 1;
   color: #3b7a3e;
   background-color: #eaf7e6;
@@ -2469,7 +2477,7 @@ body.hide-note .hint-bar {
 
 /* 结束页底部：用户名 · 册名 */
 .result-footer {
-  font-size: clamp(13px, 3vmin, 17px);
+  font-size: calc(clamp(13px, 3vmin, 17px) * var(--fs));
   color: #b09a7d;
   margin: 14px 0 2px;
 }
@@ -2495,14 +2503,14 @@ body.hide-note .hint-bar {
 
 .gift-reward-tip {
   color: #b0782e;
-  font-size: clamp(15px, 3.4vmin, 19px);
+  font-size: calc(clamp(15px, 3.4vmin, 19px) * var(--fs));
   line-height: 1.5;
 }
 
 #view-result .gift-reward .btn {
   margin-top: 0;
   padding: 10px 26px;
-  font-size: clamp(16px, 3.5vmin, 20px);
+  font-size: calc(clamp(16px, 3.5vmin, 20px) * var(--fs));
 }
 
 /* 展柜页：页面本身不滚动，橱窗内容过多时在内部滚动，垃圾篓与返回按钮固定在底部 */
@@ -2523,12 +2531,12 @@ body.hide-note .hint-bar {
 
 #view-gifts .app-title {
   margin-bottom: 6px;
-  font-size: clamp(30px, 7vmin, 52px);
+  font-size: calc(clamp(30px, 7vmin, 52px) * var(--fs));
 }
 
 .gift-owner {
   color: #b09a7d;
-  font-size: clamp(14px, 3vmin, 18px);
+  font-size: calc(clamp(14px, 3vmin, 18px) * var(--fs));
   margin-bottom: 16px;
 }
 
@@ -2641,7 +2649,7 @@ body.hide-note .hint-bar {
 .gift-shelf-icon {
   display: inline-block;
   transform-origin: 50% 60%;
-  font-size: clamp(30px, 7vmin, 46px);
+  font-size: calc(clamp(30px, 7vmin, 46px) * var(--fs));
   line-height: 1.1;
   /* 与大图一样的缓慢呼吸效果 */
   animation: gift-zoom-breathe 3.2s ease-in-out infinite;
@@ -2649,12 +2657,12 @@ body.hide-note .hint-bar {
 
 .gift-shelf-name {
   color: #6b5b45;
-  font-size: clamp(13px, 3vmin, 16px);
+  font-size: calc(clamp(13px, 3vmin, 16px) * var(--fs));
 }
 
 .gift-empty {
   color: #b09a7d;
-  font-size: clamp(16px, 3.6vmin, 20px);
+  font-size: calc(clamp(16px, 3.6vmin, 20px) * var(--fs));
   text-align: center;
   line-height: 1.6;
   margin: 10px 0 22px;
@@ -2766,7 +2774,7 @@ body.hide-note .hint-bar {
 .gift-trash {
   position: absolute;
   left: 0;
-  font-size: clamp(30px, 7vmin, 44px);
+  font-size: calc(clamp(30px, 7vmin, 44px) * var(--fs));
   line-height: 1;
   padding: 10px 14px;
   border: 2px dashed #d8c9ae;
@@ -2824,7 +2832,7 @@ body.hide-note .hint-bar {
   border: none;
   background: transparent;
   color: #8a7a63;
-  font-size: clamp(14px, 3vmin, 18px);
+  font-size: calc(clamp(14px, 3vmin, 18px) * var(--fs));
   border-radius: 999px;
   cursor: pointer;
   transition: all 0.2s;
@@ -2856,22 +2864,22 @@ body.hide-note .hint-bar {
   margin-bottom: 8px;
 }
 .gift-list-icon {
-  font-size: clamp(26px, 6vmin, 36px);
+  font-size: calc(clamp(26px, 6vmin, 36px) * var(--fs));
   line-height: 1;
 }
 .gift-list-name {
   flex: 1;
   color: #6b5b45;
-  font-size: clamp(15px, 3.2vmin, 18px);
+  font-size: calc(clamp(15px, 3.2vmin, 18px) * var(--fs));
 }
 .gift-list-stars {
   color: #d1603d;
-  font-size: clamp(13px, 2.8vmin, 16px);
+  font-size: calc(clamp(13px, 2.8vmin, 16px) * var(--fs));
   font-weight: 600;
 }
 .gift-list-time {
   color: #b09a7d;
-  font-size: clamp(12px, 2.5vmin, 14px);
+  font-size: calc(clamp(12px, 2.5vmin, 14px) * var(--fs));
 }
 
 /* 收纳盒：橱窗装不下的礼物在这里紧凑展示，只有图标，内容多时内部滚动 */
@@ -2955,7 +2963,7 @@ body.hide-note .hint-bar {
 
 .gift-box-icon {
   display: inline-block;
-  font-size: clamp(26px, 5.6vmin, 36px);
+  font-size: calc(clamp(26px, 5.6vmin, 36px) * var(--fs));
   line-height: 1;
   transform-origin: center;
 }
@@ -3011,7 +3019,7 @@ body.hide-note .hint-bar {
 
 .gift-bubble-icon {
   display: inline-block;
-  font-size: clamp(52px, 11vmin, 72px);
+  font-size: calc(clamp(52px, 11vmin, 72px) * var(--fs));
   line-height: 1.1;
   transform-origin: center;
 }
@@ -3029,7 +3037,7 @@ body.hide-note .hint-bar {
   border-radius: 999px;
   background: #f2a541;
   color: #fff;
-  font-size: clamp(15px, 3.2vmin, 19px);
+  font-size: calc(clamp(15px, 3.2vmin, 19px) * var(--fs));
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
@@ -3098,13 +3106,13 @@ body.hide-note .hint-bar {
 }
 
 .gift-fly-icon {
-  font-size: clamp(30px, 7vmin, 46px);
+  font-size: calc(clamp(30px, 7vmin, 46px) * var(--fs));
   line-height: 1;
 }
 
 .gift-fly-name {
   color: #7c6a52;
-  font-size: clamp(12px, 2.8vmin, 16px);
+  font-size: calc(clamp(12px, 2.8vmin, 16px) * var(--fs));
   white-space: nowrap;
 }
 
@@ -3166,7 +3174,7 @@ body.hide-note .hint-bar {
 
 .gift-zoom-icon {
   display: inline-block;
-  font-size: clamp(90px, 24vmin, 180px);
+  font-size: calc(clamp(90px, 24vmin, 180px) * var(--fs));
   line-height: 1;
   transform-origin: center;
 }
@@ -3203,12 +3211,12 @@ body.hide-note .hint-bar {
 }
 .gift-zoom-name {
   color: #d1603d;
-  font-size: clamp(22px, 5vmin, 34px);
+  font-size: calc(clamp(22px, 5vmin, 34px) * var(--fs));
   font-weight: 600;
 }
 .gift-zoom-count {
   color: #8a7a63;
-  font-size: clamp(16px, 3.5vmin, 22px);
+  font-size: calc(clamp(16px, 3.5vmin, 22px) * var(--fs));
 }
 @media (prefers-reduced-motion: reduce) {
   .gift-zoom-inner {
@@ -3247,7 +3255,7 @@ body.hide-note .hint-bar {
   align-items: center;
   justify-content: center;
   padding: 0;
-  font-size: 22px;
+  font-size: calc(22px * var(--fs));
   line-height: 1;
   background: #fff3d6;
   border: 2px solid #e4d8c2;
@@ -3262,7 +3270,7 @@ body.hide-note .hint-bar {
 
 .gift-pick-tip {
   color: #8c7a63;
-  font-size: clamp(14px, 3vmin, 17px);
+  font-size: calc(clamp(14px, 3vmin, 17px) * var(--fs));
   margin-bottom: 10px;
 }
 
@@ -3337,7 +3345,7 @@ body.hide-note .hint-bar {
 
 .gift-emoji {
   display: inline-block;
-  font-size: clamp(26px, 6vmin, 36px);
+  font-size: calc(clamp(26px, 6vmin, 36px) * var(--fs));
   line-height: 1.1;
   transform-origin: center;
 }
@@ -3387,13 +3395,13 @@ body.hide-note .hint-bar {
 
 .gift-name {
   color: #6b5b45;
-  font-size: clamp(12px, 2.8vmin, 15px);
+  font-size: calc(clamp(12px, 2.8vmin, 15px) * var(--fs));
   line-height: 1.3;
 }
 
 .gift-owned {
   color: #b09a7d;
-  font-size: clamp(10px, 2.4vmin, 12px);
+  font-size: calc(clamp(10px, 2.4vmin, 12px) * var(--fs));
 }
 
 .gift-item.selected {
@@ -3413,7 +3421,7 @@ body.hide-note .hint-bar {
   border-radius: 50%;
   background: #f2a541;
   color: #fff;
-  font-size: 13px;
+  font-size: calc(13px * var(--fs));
   line-height: 20px;
   text-align: center;
 }
@@ -3556,7 +3564,7 @@ body.hide-note .hint-bar {
     position: absolute;
     top: 50%;
     padding: 10px 18px;
-    font-size: clamp(15px, 2.6vmin, 20px);
+    font-size: calc(clamp(15px, 2.6vmin, 20px) * var(--fs));
     white-space: nowrap;
     pointer-events: auto;
   }
@@ -3699,6 +3707,6 @@ body.hide-note .hint-bar {
 .trace-tip {
   margin-top: 14px;
   min-height: 1.5em;
-  font-size: clamp(16px, 3.4vmin, 22px);
+  font-size: calc(clamp(16px, 3.4vmin, 22px) * var(--fs));
   color: #9b8669;
 }

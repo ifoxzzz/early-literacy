@@ -615,6 +615,7 @@
       box.appendChild(row);
     });
     refreshClickSound();
+    refreshUiFont();
     show("admin");
     updateScrollFade($("#admin-scroll"));
   }
@@ -2266,6 +2267,63 @@
     btn.setAttribute("aria-pressed", String(on));
   }
 
+  /* ---------- 界面字号（全局设置） ---------- */
+  // 档位系数：小字号用于抵消系统大字体，大字号让眼睛不好的家长也能看清
+  const UI_FONT_SCALE = { small: 0.85, normal: 1, large: 1.15 };
+  // 系统字体放大倍数（只在启动时测量一次；未放大为 1）
+  let systemFontScale = 0;
+
+  // 手机把系统字体调大后，浏览器 / WebView 会把页面文字整体放大，排版会被撑坏。
+  // 用 canvas 排版宽度与真实渲染宽度对比得到放大倍数，再用 --fs 反向抵消。
+  function detectSystemFontScale() {
+    if (systemFontScale) return systemFontScale;
+    systemFontScale = 1;
+    try {
+      const ctx = document.createElement("canvas").getContext("2d");
+      if (!ctx) return systemFontScale;
+      const text = "国国国";
+      ctx.font = '100px "Microsoft YaHei", "PingFang SC", sans-serif';
+      const expect = ctx.measureText(text).width;
+      // canvas 字体设置失败时宽度会明显偏小，这种测量结果直接作废
+      if (expect < 150) return systemFontScale;
+      const probe = document.createElement("span");
+      probe.textContent = text;
+      probe.style.cssText =
+        "position:absolute;left:-9999px;top:0;visibility:hidden;white-space:nowrap;" +
+        "font-size:100px;line-height:1;letter-spacing:0;";
+      document.body.appendChild(probe);
+      const actual = probe.getBoundingClientRect().width;
+      probe.remove();
+      if (actual > 0) {
+        const ratio = actual / expect;
+        // 只有明显放大才补偿，避免测量误差把正常界面缩小
+        if (ratio > 1.05) systemFontScale = Math.min(2, ratio);
+      }
+    } catch (e) {
+      systemFontScale = 1;
+    }
+    return systemFontScale;
+  }
+
+  // 把「家长选的档位 ÷ 系统放大倍数」写进 --fs，CSS 里所有字号都乘这个系数
+  function applyUiFont() {
+    const pref = Storage.uiFont();
+    const scale = (UI_FONT_SCALE[pref] || 1) / detectSystemFontScale();
+    document.documentElement.style.setProperty("--fs", scale.toFixed(3));
+    refreshUiFont(pref);
+  }
+
+  function refreshUiFont(pref) {
+    const val = pref || Storage.uiFont();
+    $("#ui-font-opts")
+      .querySelectorAll("button[data-v]")
+      .forEach((b) => {
+        const on = b.dataset.v === val;
+        b.classList.toggle("active", on);
+        b.setAttribute("aria-pressed", String(on));
+      });
+  }
+
   // 练习页顶部悬浮面板展开/收起：按小朋友保存（默认展开）
   let drawerTimer = 0;
 
@@ -3013,6 +3071,13 @@
     Storage.setPref(Storage.PREF_KEYS.CLICK, !Storage.pref(Storage.PREF_KEYS.CLICK));
     refreshClickSound();
   });
+  // 界面字号（全局设置）：小 / 标准 / 大，点一下立即生效
+  $("#ui-font-opts").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-v]");
+    if (!btn) return;
+    Storage.setUiFont(btn.dataset.v);
+    applyUiFont();
+  });
   // 清理音频缓存（应用设置）：释放本地缓存的音频并让后续请求重新下载
   $("#btn-clear-audio-cache").addEventListener("click", () => {
     Speaker.clearAudioCache();
@@ -3061,6 +3126,8 @@
     if (e.target === aboutMask) closeAbout();
   });
 
+  // 先按设置与系统字体放大倍数确定界面字号，再渲染首页，避免首屏字号跳变
+  applyUiFont();
   renderHome();
   // 首屏就绪：收起加载遮罩
   if (window.__boot) window.__boot.finish();

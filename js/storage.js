@@ -25,6 +25,10 @@ const Storage = {
     return [this.PREF_KEYS.PINYIN, this.PREF_KEYS.NOTE, this.PREF_KEYS.TOOLS];
   },
 
+  // 界面字号（全局设置）：小 / 标准 / 大
+  UI_FONT_KEY: "early-literacy-ui-font",
+  UI_FONT_VALUES: ["small", "normal", "large"],
+
   // 练习设置（按小朋友独立保存，见 quizOptionsKey / quizCountKey / dailyNewLimitKey）
   OPTION_VALUES: [2, 3, 4, 6, 8, 9], // 每题候选字数可选值
 
@@ -318,6 +322,19 @@ const Storage = {
 
   setPref(key, on, id) {
     localStorage.setItem(this.prefKey(key, id), on ? "1" : "0");
+  },
+
+  // ---------- 界面字号（全局设置） ----------
+  // 返回 small / normal / large；未设置过或值非法时按 normal 处理
+  uiFont() {
+    const raw = localStorage.getItem(this.UI_FONT_KEY);
+    return this.UI_FONT_VALUES.includes(raw) ? raw : "normal";
+  },
+
+  setUiFont(v) {
+    const val = this.UI_FONT_VALUES.includes(v) ? v : "normal";
+    localStorage.setItem(this.UI_FONT_KEY, val);
+    return val;
   },
 
   // ---------- 练习设置（按小朋友独立保存） ----------

@@ -113,11 +113,15 @@ const Speaker = {
     return out ? out + tone : "";
   },
 
-  // 给音频路径加版本参数：与 index.html 的 CACHE_VERSION 保持一致，避免浏览器缓存旧语音
+  // 音频地址用内容哈希（data/audio-manifest.js）而非全局版本号：
+  // 文件没改 → hash 不变 → URL 不变，浏览器缓存直接命中；文件改了 → 只换这一个 URL。
+  // 清单里查不到（新文件尚未生成清单）时退回全局版本号，保证仍能加载。
   // 额外带一个缓存标记：在应用设置里清理音频缓存后会更换，让客户端重新下载更新后的音频
   audioUrl(rel) {
     const epoch = this.audioEpoch();
-    return `${this.AUDIO}${rel}?v=${window.APP_VERSION || "1"}${epoch ? `&c=${epoch}` : ""}`;
+    const hash = (window.AUDIO_HASH || {})[rel];
+    const ver = hash || window.APP_VERSION || "1";
+    return `${this.AUDIO}${rel}?h=${ver}${epoch ? `&c=${epoch}` : ""}`;
   },
 
   audioEpoch() {
@@ -266,7 +270,8 @@ const Speaker = {
   // 带缓存的 fetch：浏览器 HTTP 缓存里已有该文件（无论是否过期）就直接取本地副本，
   // 没有才发起网络请求。内存里的 blob 缓存只活一个页面会话，刷新/关闭后就没了；
   // 之前不带 cache 选项，缓存过期后 300 多个文件每次重进都要逐个回源验证，像重新下载。
-  // 音频地址自带 ?v= 版本号与缓存标记，更新资源时 URL 变化，旧缓存自然失效，不必担心拿到旧文件
+  // 音频地址自带内容哈希（?h=）与清理标记，文件改动时 URL 才变化，旧缓存自然失效，
+  // 未改动的文件永远不会被重新下载
   fetchCached(url) {
     try {
       return fetch(url, { cache: "force-cache" });

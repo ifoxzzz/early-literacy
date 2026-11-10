@@ -25,9 +25,9 @@ const Storage = {
     return [this.PREF_KEYS.PINYIN, this.PREF_KEYS.NOTE, this.PREF_KEYS.TOOLS];
   },
 
-  // 界面字号（全局设置）：小 / 标准 / 大
+  // 界面字号（全局设置）：更小 / 小 / 标准 / 大 / 更大
   UI_FONT_KEY: "early-literacy-ui-font",
-  UI_FONT_VALUES: ["small", "normal", "large"],
+  UI_FONT_VALUES: ["xsmall", "small", "normal", "large", "xlarge"],
 
   // 练习设置（按小朋友独立保存，见 quizOptionsKey / quizCountKey / dailyNewLimitKey）
   OPTION_VALUES: [2, 3, 4, 6, 8, 9], // 每题候选字数可选值

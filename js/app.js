@@ -2268,10 +2268,23 @@
   }
 
   /* ---------- 界面字号（全局设置） ---------- */
-  // 档位系数：小字号用于抵消系统大字体，大字号让眼睛不好的家长也能看清
-  const UI_FONT_SCALE = { small: 0.85, normal: 1, large: 1.15 };
+  // 五档字号，滑块从左到右：更小 / 小 / 标准 / 大 / 更大
+  // 小字号用来抵消系统大字体，大字号让眼睛不好的家长也能看清
+  const UI_FONT_LEVELS = [
+    { key: "xsmall", label: "更小", scale: 0.8 },
+    { key: "small", label: "小", scale: 0.9 },
+    { key: "normal", label: "标准", scale: 1 },
+    { key: "large", label: "大", scale: 1.12 },
+    { key: "xlarge", label: "更大", scale: 1.25 },
+  ];
+  const UI_FONT_DEFAULT_INDEX = 2;
   // 系统字体放大倍数（只在启动时测量一次；未放大为 1）
   let systemFontScale = 0;
+
+  function uiFontIndex(key) {
+    const i = UI_FONT_LEVELS.findIndex((l) => l.key === key);
+    return i < 0 ? UI_FONT_DEFAULT_INDEX : i;
+  }
 
   // 手机把系统字体调大后，浏览器 / WebView 会把页面文字整体放大，排版会被撑坏。
   // 用 canvas 排版宽度与真实渲染宽度对比得到放大倍数，再用 --fs 反向抵消。
@@ -2307,21 +2320,20 @@
 
   // 把「家长选的档位 ÷ 系统放大倍数」写进 --fs，CSS 里所有字号都乘这个系数
   function applyUiFont() {
-    const pref = Storage.uiFont();
-    const scale = (UI_FONT_SCALE[pref] || 1) / detectSystemFontScale();
+    const idx = uiFontIndex(Storage.uiFont());
+    const scale = UI_FONT_LEVELS[idx].scale / detectSystemFontScale();
     document.documentElement.style.setProperty("--fs", scale.toFixed(3));
-    refreshUiFont(pref);
+    refreshUiFont(idx);
   }
 
-  function refreshUiFont(pref) {
-    const val = pref || Storage.uiFont();
-    $("#ui-font-opts")
-      .querySelectorAll("button[data-v]")
-      .forEach((b) => {
-        const on = b.dataset.v === val;
-        b.classList.toggle("active", on);
-        b.setAttribute("aria-pressed", String(on));
-      });
+  // 滑块位置、当前档位文字、下方五个标签的高亮
+  function refreshUiFont(idx) {
+    const i = typeof idx === "number" ? idx : uiFontIndex(Storage.uiFont());
+    $("#ui-font-range").value = String(i);
+    $("#ui-font-now").textContent = UI_FONT_LEVELS[i].label;
+    $("#ui-font-labels")
+      .querySelectorAll("span")
+      .forEach((el, n) => el.classList.toggle("active", n === i));
   }
 
   // 练习页顶部悬浮面板展开/收起：按小朋友保存（默认展开）
@@ -3071,11 +3083,10 @@
     Storage.setPref(Storage.PREF_KEYS.CLICK, !Storage.pref(Storage.PREF_KEYS.CLICK));
     refreshClickSound();
   });
-  // 界面字号（全局设置）：小 / 标准 / 大，点一下立即生效
-  $("#ui-font-opts").addEventListener("click", (e) => {
-    const btn = e.target.closest("button[data-v]");
-    if (!btn) return;
-    Storage.setUiFont(btn.dataset.v);
+  // 界面字号（全局设置）：五档滑块，拖动时立即生效
+  $("#ui-font-range").addEventListener("input", (e) => {
+    const idx = Number(e.target.value);
+    Storage.setUiFont(UI_FONT_LEVELS[idx].key);
     applyUiFont();
   });
   // 清理音频缓存（应用设置）：释放本地缓存的音频并让后续请求重新下载

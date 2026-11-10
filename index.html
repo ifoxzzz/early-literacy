@@ -7,7 +7,7 @@
   <script>
     // 全局唯一版本号（同时用于缓存失效）：改动任何 css/js/音频后递增版本号，
     // 如 1.0.0 → 1.0.1，即可让全部缓存失效；首页右下角显示的也是这个版本
-    var CACHE_VERSION = "1.0.67";
+    var CACHE_VERSION = "1.0.69";
     window.APP_VERSION = CACHE_VERSION;
     // 站点图标：SVG 矢量图，任意尺寸都清晰；想换图标只需替换根目录的 favicon.svg
     document.write('<link rel="icon" type="image/svg+xml" href="favicon.svg?v=' + CACHE_VERSION + '">');
@@ -301,15 +301,17 @@
       </section>
       <section class="admin-block">
         <h2 class="admin-title">界面字号</h2>
-        <div class="setting-row">
-          <span class="setting-label">字号大小</span>
-          <span class="setting-opts" id="ui-font-opts">
-            <button class="btn btn-skip" data-v="small">小</button>
-            <button class="btn btn-skip" data-v="normal">标准</button>
-            <button class="btn btn-skip" data-v="large">大</button>
-          </span>
+        <div class="font-slider">
+          <div class="font-slider-head">
+            <span class="setting-label">字号大小</span>
+            <span class="font-slider-value" id="ui-font-now">标准</span>
+          </div>
+          <input class="font-slider-range" id="ui-font-range" type="range" min="0" max="4" step="1" value="2" aria-label="界面字号">
+          <div class="font-slider-labels" id="ui-font-labels">
+            <span>更小</span><span>小</span><span class="active">标准</span><span>大</span><span>更大</span>
+          </div>
         </div>
-        <p class="settings-tip">手机系统字体调大后，界面文字可能挤在一起甚至显示不全，此时选「小」即可恢复。此设置对所有小朋友生效。</p>
+        <p class="settings-tip">手机系统字体调大后，界面文字可能挤在一起甚至显示不全，把滑块拖到「更小」即可恢复。此设置对所有小朋友生效。</p>
       </section>
       <section class="admin-block">
         <h2 class="admin-title">缓存清理</h2>
@@ -592,6 +594,7 @@
       "assets/audio/note/index.js",
       "assets/audio/users/index.js",
       "assets/audio/gifts/index.js",
+      "data/audio-manifest.js",
       "js/speaker.js",
       "js/sound.js",
       "js/trace.js",

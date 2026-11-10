@@ -1128,6 +1128,82 @@ body {
   gap: 8px;
 }
 
+/* 界面字号滑块（应用设置页使用） */
+.font-slider {
+  padding: 6px 2px 0;
+}
+
+.font-slider-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.font-slider-value {
+  font-size: calc(clamp(15px, 3.2vmin, 19px) * var(--fs));
+  font-weight: 600;
+  color: #f2a541;
+}
+
+.font-slider-range {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 30px;
+  margin: 4px 0 0;
+  padding: 0;
+  background: transparent;
+  outline: none;
+  touch-action: manipulation;
+}
+
+.font-slider-range::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  background: #ece0c8;
+}
+
+.font-slider-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -9px;
+  border: 3px solid #f2a541;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 5px rgba(120, 90, 50, 0.18);
+}
+
+.font-slider-range::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: #ece0c8;
+}
+
+.font-slider-range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 3px solid #f2a541;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 5px rgba(120, 90, 50, 0.18);
+}
+
+.font-slider-labels {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 2px;
+  font-size: calc(clamp(12px, 2.7vmin, 15px) * var(--fs));
+  color: #b09a7d;
+}
+
+.font-slider-labels .active {
+  font-weight: 600;
+  color: #f2a541;
+}
+
 .setting-input {
   width: 76px;
   font-family: inherit;

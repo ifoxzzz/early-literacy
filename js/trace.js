@@ -1,5 +1,7 @@
-// 临摹页（写一写原型）：从单字详情页进入的独立页面，只新增不改现有逻辑。
-// 布局与练习页一致：顶部一排 btn-skip 风格按钮（手势/语音开关 + 演示/重写/返回）。
+// 临摹页（写一写）：从单字详情页进入的独立页面。
+// 布局参考练习页：顶部抽屉按钮条（手势 / 语音开关 + 返回，✕ 可收起），
+// 田字格上方是「演示 / 重写」按钮，下方是提示条。
+// 判定参数来自「练习设置 → 临摹设置」的三档松紧，按小朋友保存在 localStorage。
 // 数据来自 assets/strokes/<字>.js（tools/生成笔顺数据.bat 生成），按需用 <script> 标签加载，
 // 兼容 file:// 直开（fetch 读本地文件会被浏览器拦截）。
 (function () {
@@ -55,6 +57,7 @@
   let TOLERANCE = TRACE_LEVELS.loose.tolerance;
   let LOOKAHEAD = TRACE_LEVELS.loose.lookahead;
   const VOICE_INTERVAL = 7000; // 语音开启时，多久没进展重复播报一次当前笔画
+  const GUIDE_SPEED = 460; // 手势圆点沿骨架移动的速度（1024 坐标单位/秒）
 
   // 进入每个字前按当前小朋友的「临摹设置」应用一次
   function applyLevel() {
@@ -211,6 +214,7 @@
 
   /* ---------- 渲染 ---------- */
   function clearSvg() {
+    stopGuide();
     svg.innerHTML = "";
     litPaths = [];
     flipG = null;
@@ -218,6 +222,8 @@
     goldPaths = [];
     progPath = null;
     guideG = null;
+    guideDot = null;
+    guidePts = null;
   }
 
   function el(tag, attrs, parent) {
@@ -269,26 +275,51 @@
   }
 
   /* ---------- 手势引导：蓝色圆点沿当前笔骨架循环走一遍（「手势」开关控制） ---------- */
+  let guideDot = null;
+  let guidePts = null;
+  let guideLen = 0;
+  let guideStart = 0;
+  let guideRAF = 0;
+
   function showGuide() {
     if (!ready || demo || !gestureOn || idx >= strokes.length || !guideG) return;
-    const pts = samples[idx];
-    const d = "M" + pts.map((p) => `${p.x} ${p.y}`).join(" L");
+    stopGuide();
     guideG.innerHTML = "";
-    const dot = el("circle", { r: 46, class: "trace-guide-dot" }, guideG);
-    // 用 SMIL animateMotion 沿骨架循环，删掉重建即可从头再播
-    el(
-      "animateMotion",
-      {
-        dur: Math.max(0.8, pathLen(pts) / 460).toFixed(2) + "s",
-        repeatCount: "indefinite",
-        path: d,
-      },
-      dot
-    );
+    guidePts = samples[idx];
+    guideLen = pathLen(guidePts);
+    guideDot = el("circle", { r: 46, class: "trace-guide-dot" }, guideG);
+    placeGuide(0); // 先把圆点放在起笔处，避免出现从别处滑过来的过渡
+    guideStart = 0;
     guideG.classList.remove("hidden");
+    guideRAF = requestAnimationFrame(guideStep);
+  }
+
+  // 用 rAF 逐帧算位置，而不是 SMIL：animateMotion 的 begin 参照文档时间原点，
+  // 元素晚插入时会从已流逝的相位开始；且动画内部状态不可见，出问题时难以排查。
+  // 逐帧计算后，每次重建都确定从起笔处出发。
+  function placeGuide(dist) {
+    if (!guideDot || !guidePts) return;
+    const p = pointAt(guidePts, Math.max(0, Math.min(dist, guideLen)));
+    guideDot.setAttribute("cx", p.x);
+    guideDot.setAttribute("cy", p.y);
+  }
+
+  function guideStep(ts) {
+    guideRAF = 0;
+    if (!guideDot || !guideG || guideG.classList.contains("hidden")) return;
+    if (!guideStart) guideStart = ts;
+    const dist = guideLen > 1 ? (((ts - guideStart) / 1000) * GUIDE_SPEED) % guideLen : 0;
+    placeGuide(dist);
+    guideRAF = requestAnimationFrame(guideStep);
+  }
+
+  function stopGuide() {
+    if (guideRAF) cancelAnimationFrame(guideRAF);
+    guideRAF = 0;
   }
 
   function hideGuide() {
+    stopGuide();
     if (guideG) guideG.classList.add("hidden");
   }
 
@@ -357,7 +388,8 @@
       tipStroke();
       announceName(idx);
       scheduleVoice();
-      showGuide();
+      // 不在这里显示手势：手指可能还按着，等抬手由 endPointer 显示，
+      // 否则圆点会在拖动途中就开始走下一笔，抬手重建时看起来像被拉回起点
     }
   }
 
@@ -410,7 +442,6 @@
     if (!ready || demoOn) return;
     stopVoice();
     hideGuide();
-    clearTimeout(finishTimer);
     demoOn = true;
     refreshToggleBtns();
     beginRound();
@@ -523,8 +554,9 @@
     liftGate = false;
     if (!ready || demoOn) return;
     if (idx >= strokes.length) return; // 整字已写完，不恢复手势
-    // 这一笔没写完就抬手（笔顺或轨迹不对）：清掉残笔痕迹，进度归零，
-    // 重新出现手势，让用户从起笔处重新写这一笔
+    // 一笔结束（无论写完还是没写完）：清掉残笔痕迹、进度归零，
+    // 从下一笔的起笔处重新显示手势。手势只在这里出现，
+    // 不在拖动途中就显示，避免圆点沿下一笔走了半截后又被重建拉回起点
     prog = 0;
     if (progPath) progPath.setAttribute("d", "");
     showGuide();
@@ -557,9 +589,9 @@
     ready = false;
     pointerId = null;
     liftGate = false;
-    demoOn = false;
+    stopDemo(false); // 若上一轮演示的 rAF 仍在跑，先停掉并清场（含 finishTimer、演示圆点）
+    stopVoice();
     clearSvg();
-    refreshToggleBtns();
     loadChar(char).then((data) => {
       if ($("#view-trace").classList.contains("hidden")) return; // 已退出，丢弃结果
       if (!data) {
@@ -576,9 +608,12 @@
   }
 
   function close() {
-    stopDemo(false);
-    clearTimeout(finishTimer);
+    stopDemo(false); // 停演示、清残笔与金色光丝层
+    clearTimeout(drawerTimer); // 抽屉若正处于折叠延时中，退出后不再改动原页面
+    drawerTimer = 0;
     stopVoice();
+    hideGuide();
+    ready = false;
     pointerId = null;
     $("#view-trace").classList.add("hidden");
     $("#view-card").classList.remove("hidden"); // 回到单字详情页（内容保持原样）
@@ -642,9 +677,7 @@
   });
   $("#btn-trace-reset").addEventListener("click", () => {
     if (!ready) return;
-    stopDemo(false);
-    clearTimeout(finishTimer);
-    resetBlank();
+    stopDemo(false); // 已含 resetBlank：清点亮、进度、金色光丝与演示状态
     tipStroke();
     showGuide();
     announceName(0);

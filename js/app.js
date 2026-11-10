@@ -2466,7 +2466,7 @@
     if (loadingWordAudio) return;
     const urls = Speaker.entryUrls(entry);
     // 全部已缓存时直接播放，不弹加载框
-    if (urls.every((u) => Speaker.cache.has(u))) {
+    if (urls.every((u) => Resource.cache.has(u))) {
       Speaker.readEntry(entry);
       return;
     }
@@ -3092,7 +3092,7 @@
   // 清理资源缓存（应用设置）：释放内存中的音频副本，并更换资源标记，
   // 让音频、字体、笔顺、图片等资源在后续加载时重新下载
   $("#btn-clear-resource-cache").addEventListener("click", () => {
-    Speaker.clearResourceCache();
+    Resource.clearCache();
     const btn = $("#btn-clear-resource-cache");
     btn.textContent = "已清理";
     btn.disabled = true;
@@ -3109,7 +3109,7 @@
       )
     )
       return;
-    Speaker.clearResourceCache();
+    Resource.clearCache();
     Storage.clearAll();
     location.reload();
   });

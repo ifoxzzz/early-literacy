@@ -2,9 +2,10 @@
 // 设计要点：
 // - 所有音频路径都由"拼音键"推导，同音字共享文件，避免重复占用空间
 // - 播放采用队列 + 版本号（tokens）机制：新语音会立即打断旧语音
+// - 预下载与 blob 缓存由 Resource 统一管理（音频/字体/图片共用一条管线），
+//   Speaker 只负责播放，进度条也由 Resource 统一统计
 const Speaker = {
   AUDIO: "assets/audio/",
-  RESOURCE_EPOCH_KEY: "early-literacy-resource-cache", // 资源缓存标记：与 index.html 顶部保持一致
   current: null, // 当前播放的 Audio 实例
   tokens: 0, // 播放序列版本号，用于打断旧序列
   lastPraise: "", // 上一次播放的夸奖语键，避免连续两次抽到同一条
@@ -116,22 +117,10 @@ const Speaker = {
   // 音频地址用内容哈希（data/asset-manifest.js）而非全局版本号：
   // 文件没改 → hash 不变 → URL 不变，浏览器缓存直接命中；文件改了 → 只换这一个 URL。
   // 清单里查不到（新文件尚未生成清单）时退回全局版本号，保证仍能加载。
-  // 额外带一个资源缓存标记：在应用设置里清理资源缓存后会更换，让客户端重新下载更新后的资源
+  // 额外带资源缓存标记（Resource.url）：清理资源缓存后会更换，让客户端重新下载更新后的资源
   audioUrl(rel) {
-    const hash = (window.ASSET_HASH || {})[rel];
-    const ver = hash || window.APP_VERSION || "1";
-    const epoch = this.resourceEpoch();
-    return `${this.AUDIO}${rel}?h=${ver}${epoch ? `&c=${epoch}` : ""}`;
-  },
-
-  // 资源缓存标记：音频、字体、笔顺、图片共用，清理后所有资源 URL 一起失效
-  resourceEpoch() {
-    const key = window.RESOURCE_EPOCH_KEY || this.RESOURCE_EPOCH_KEY;
-    try {
-      return localStorage.getItem(key) || "";
-    } catch (e) {
-      return "";
-    }
+    const ver = Resource.hash(rel) || window.APP_VERSION || "1";
+    return Resource.url(`${this.AUDIO}${rel}?h=${ver}`);
   },
 
   // 单字发音路径：同音字共享一个文件（清单见 assets/audio/syllables/index.js）
@@ -217,125 +206,18 @@ const Speaker = {
       .join("，");
   },
 
-  // ---------- 预下载 ----------
-  // 发布到网站后音频需要联网下载，第一次播放时边下边播容易“没声音”。
-  // 这里提前 fetch 成 blob 存在内存里，播放时直接用本地 blob 地址。
-  // file:// 下 fetch 会被浏览器拦截，失败时自动退回原始地址，不影响离线使用。
-  cache: new Map(), // 原始地址 -> { promise, blobUrl }
-  // 下载队列：手机浏览器每个域名只允许 6 个并发连接，一次性发起几十个请求会让
-  // 后面的请求长时间排队——而 8 秒超时是从请求"真正开始"才算，否则排队的文件会
-  // 在没下载前就超时、永久退化成边下边播，首次进入因此卡顿。这里限制并发数。
-  MAX_PARALLEL: 4,
-  jobs: [], // 待下载队列 [{ url, entry }]
-  running: 0, // 当前正在下载的数量
-
-  // 清理资源缓存：停止播放、释放内存中的音频副本，并更换资源标记。
-  // 之后音频、字体、笔顺、图片等资源 URL 都会带上新标记，客户端会重新下载最新资源
-  // （已加载进当前页面的字体、笔顺数据需要刷新后才会重新请求）
-  clearResourceCache() {
-    this.stop();
-    this.cache.forEach((entry) => {
-      if (entry.blobUrl) URL.revokeObjectURL(entry.blobUrl);
-    });
-    this.cache.clear();
-    this.jobs.length = 0; // 排队中的任务一并作废
-    try {
-      localStorage.setItem(this.RESOURCE_EPOCH_KEY, Date.now().toString(36));
-    } catch (e) {}
-  },
-
+  // ---------- 预下载（委托 Resource） ----------
+  // 预下载与 blob 缓存由 Resource 统一管理（音频/字体/图片共用一条管线，
+  // 加载进度条也统一统计）。Speaker 只保留薄封装，app.js 现有调用无需改动。
   preload(urls) {
-    (Array.isArray(urls) ? urls : [urls]).forEach((url) => {
-      if (!url || this.cache.has(url)) return;
-      // 先把 promise 建好（preloadAll 与 resolveSrc 会立刻用到），再排队等下载
-      const entry = { blobUrl: null, promise: null };
-      entry.promise = new Promise((resolve) => {
-        entry.resolve = resolve;
-      });
-      this.cache.set(url, entry);
-      this.jobs.push({ url, entry });
-    });
-    this.pump();
+    return Resource.preload(urls);
   },
-
-  // 按并发上限依次启动下载任务
-  pump() {
-    while (this.running < this.MAX_PARALLEL && this.jobs.length > 0) {
-      const job = this.jobs.shift();
-      this.running += 1;
-      this.download(job.url, job.entry).then(() => {
-        this.running -= 1;
-        this.pump();
-      });
-    }
-  },
-
-  // 带缓存的 fetch：浏览器 HTTP 缓存里已有该文件（无论是否过期）就直接取本地副本，
-  // 没有才发起网络请求。内存里的 blob 缓存只活一个页面会话，刷新/关闭后就没了；
-  // 之前不带 cache 选项，缓存过期后 300 多个文件每次重进都要逐个回源验证，像重新下载。
-  // 音频地址自带内容哈希（?h=）与清理标记，文件改动时 URL 才变化，旧缓存自然失效，
-  // 未改动的文件永远不会被重新下载
-  fetchCached(url) {
-    try {
-      return fetch(url, { cache: "force-cache" });
-    } catch (e) {
-      return fetch(url); // 个别老浏览器不认识 cache 选项会同步抛错，退回普通请求
-    }
-  },
-
-  // 实际下载：超时从此刻开始计（而不是入队时），保证排队的文件不会"还没开始就超时"。
-  // 超时后请求仍在后台继续，晚到的文件照样换成 blob，之后播放直接用本地地址
-  download(url, entry) {
-    const request =
-      typeof fetch === "function"
-        ? this.fetchCached(url)
-            .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(r.status))))
-            .then((blob) => {
-              entry.blobUrl = URL.createObjectURL(blob);
-              return entry.blobUrl;
-            })
-            .catch(() => url)
-        : Promise.resolve(url);
-    entry.request = request; // resolveSrc 用它判断"还在下载"
-    const timeout = new Promise((resolve) => setTimeout(() => resolve(url), 8000));
-    return Promise.race([request, timeout]).then((src) => {
-      entry.resolve(src);
-      return src;
-    });
-  },
-
-  // 批量预加载并按“已完成文件数”回调进度；失败/超时的文件也会计入完成，
-  // 保证加载界面不会一直卡住。返回 Promise，全部就绪后 resolve
   preloadAll(urls, onProgress) {
-    const list = [...new Set((urls || []).filter(Boolean))];
-    let done = 0;
-    if (onProgress) onProgress(0, list.length);
-    return Promise.all(
-      list.map((url) => {
-        this.preload(url);
-        return this.cache.get(url).promise.then(() => {
-          done += 1;
-          if (onProgress) onProgress(done, list.length);
-        });
-      })
-    );
-  },
-
-  // 播放前取地址：已预下载的直接用 blob；还在下载就等一小会儿（最多 600ms），
-  // 拿不到就先播原始地址，避免两句语音之间出现长时间空白
-  resolveSrc(url) {
-    const entry = this.cache.get(url);
-    if (!entry) return Promise.resolve(url);
-    if (entry.blobUrl) return Promise.resolve(entry.blobUrl);
-    const wait = entry.request || entry.promise;
-    const fallback = new Promise((resolve) =>
-      setTimeout(() => resolve(entry.blobUrl || url), 600)
-    );
-    return Promise.race([wait, fallback]);
+    return Resource.preload(urls, onProgress);
   },
 
   // 进入选册页前的全局预热：提示语、名字语音、30 条夸奖语、星星播报、礼物提示，
-  // 以及内置楷体字体文件。全部就绪后才放行，避免练习/结算页边下边播。
+  // 以及内置楷体字体文件。所有资源一起交给 Resource 预载，进度条统一统计。
   // 题目相关的单字/组词/注解语音不在这里加载（由 app.js 按首题阻塞 + 后台滑窗预取）
   preloadGlobal(name, onProgress) {
     const phrases = ["welcome", "done", "cheer"];
@@ -357,24 +239,11 @@ const Speaker = {
       if (u) urls.push(u);
     });
     for (let i = 0; i <= 20; i++) urls.push(this.audioUrl(`phrases/stars${i}.mp3`));
-    // 内置楷体与语音并行加载：用内容哈希地址，未改动不重复下载；
-    // 不支持 FontFace 或超时（8s）都不阻塞进入，CSS 回退到系统楷体。
-    const fontHash = (window.ASSET_HASH || {})["fonts/kaiti.woff2"];
-    const fontVer = fontHash || (window.APP_VERSION || "1");
-    let fontUrl = `assets/fonts/kaiti.woff2?h=${fontVer}`;
-    if (typeof window.resourceUrl === "function") fontUrl = window.resourceUrl(fontUrl);
-    const fontReady =
-      typeof FontFace !== "undefined"
-        ? Promise.race([
-            (() => {
-              const face = new FontFace("Kaiti Web", `url("${fontUrl}") format("woff2")`);
-              face.display = "swap";
-              return face.load().then((f) => document.fonts.add(f));
-            })(),
-            new Promise((resolve) => setTimeout(resolve, 8000)),
-          ]).catch(() => {})
-        : Promise.resolve();
-    return Promise.all([this.preloadAll(urls, onProgress), fontReady]);
+    // 楷体字体也加入同一批预载，进度条自动把它算进去；下载完成后再安装字体
+    const fontUrl = Resource.fontUrl();
+    return Resource.preload([...urls, fontUrl], onProgress).then(() =>
+      Resource.loadKaitiFont()
+    );
   },
 
   // ---------- 播放 ----------
@@ -392,7 +261,7 @@ const Speaker = {
         if (onDone) onDone();
         return;
       }
-      this.resolveSrc(list[i]).then((src) => {
+      Resource.resolveSrc(list[i]).then((src) => {
         if (token !== this.tokens) return;
         // 复用同一个 Audio 元素：微信里解锁后才能继续自动播放
         const a = this.ensurePlayer();

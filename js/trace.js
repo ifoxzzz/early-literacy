@@ -71,7 +71,7 @@
 
   let strokes = []; // 每笔的 SVG path（轮廓，用于灰底与点亮）
   let samples = []; // 每笔重采样后的骨架点 [{x,y}...]
-  let strokeNames = []; // 每笔名称（横竖撇捺点提折，由骨架几何推断）
+  let strokeNames = []; // 每笔名称（优先取 data/stroke-names.js 的规范名称，缺失时按骨架几何推断）
   let litPaths = []; // 点亮层 path 元素
   let idx = 0; // 当前要写第几笔
   let prog = 0; // 当前笔已描到的采样点下标
@@ -146,6 +146,15 @@
     return { x: pts[pts.length - 1].x, y: pts[pts.length - 1].y, upto };
   }
 
+  /* ---------- 笔画名称：优先用 data/stroke-names.js 的规范名称 ---------- */
+  // 该文件由 tools/生成笔画名称.bat 用 cnchar-order 生成，含横折钩、竖弯钩等细分名称；
+  // 字库里新增了还没生成名称的字，退回下面的几何推断（只能分到横竖撇捺点提折）
+  function pickNames(char, medians) {
+    const list = (window.STROKE_NAMES || {})[char];
+    if (Array.isArray(list) && list.length === medians.length) return list.slice();
+    return medians.map((m) => inferStrokeName(m));
+  }
+
   /* ---------- 笔画名称推断：按骨架的方向、长短、转折粗分为 横竖撇捺点提折 ---------- */
   function inferStrokeName(points) {
     const pts = points.map((p) => ({ x: p[0], y: p[1] }));
@@ -180,23 +189,24 @@
     return "横";
   }
 
-  // 笔画名 -> 拼音：优先复用音节语音库（与应用同款发音），缺的走系统语音
-  const STROKE_PINYIN = {
-    横: "héng",
-    竖: "shù",
-    撇: "piě",
-    捺: "nà",
-    点: "diǎn",
-    提: "tí",
-    折: "zhé",
-  };
-
+  // 笔画名称语音：优先播放预生成的笔画名称语音（assets/audio/strokes），缺的走系统语音
   function announceName(i) {
     if (!voiceOn || typeof Speaker === "undefined" || i >= strokeNames.length) return;
     const name = strokeNames[i];
-    const url = Speaker.syllableAudio(STROKE_PINYIN[name]);
+    const url = Speaker.strokeAudio(name);
     if (url) Speaker.play([url]);
     else Speaker.speak(name);
+  }
+
+  // 当前字的笔画名称语音一次性预取（最多十几种、体积很小），避免第一笔播报延迟
+  function preloadNames() {
+    if (typeof Speaker === "undefined") return;
+    const urls = [];
+    strokeNames.forEach((name) => {
+      const url = Speaker.strokeAudio(name);
+      if (url && urls.indexOf(url) < 0) urls.push(url);
+    });
+    if (urls.length) Speaker.preload(urls);
   }
 
   function scheduleVoice() {
@@ -234,11 +244,12 @@
     return node;
   }
 
-  function build(data) {
+  function build(data, char) {
     applyLevel();
     strokes = data.strokes;
     samples = data.medians.map((m) => resample(m, SAMPLE_STEP));
-    strokeNames = data.medians.map((m) => inferStrokeName(m));
+    strokeNames = pickNames(char, data.medians);
+    preloadNames();
     idx = 0;
     prog = 0;
     clearSvg();
@@ -599,7 +610,7 @@
         tipEl.textContent = `抱歉，「${char}」还没有笔顺数据`;
         return;
       }
-      build(data);
+      build(data, char);
       ready = true;
       tipStroke();
       showGuide();

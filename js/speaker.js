@@ -155,6 +155,13 @@ const Speaker = {
     return this.audioUrl(`gifts/${encodeURIComponent(name)}.mp3`);
   },
 
+  // 笔画名称语音路径：strokes/<名称>.mp3（清单见 assets/audio/strokes/index.js）
+  strokeAudio(name) {
+    if (!this.strokeSet) this.strokeSet = new Set(window.STROKE_AUDIO || []);
+    if (!this.strokeSet.has(name)) return null;
+    return this.audioUrl(`strokes/${encodeURIComponent(name)}.mp3`);
+  },
+
   // 勾选礼物：播报「你挑选了：<礼物名称>」；名称语音缺失时只播前缀
   playGiftPick(name) {
     const list = [this.audioUrl("phrases/chose.mp3")];

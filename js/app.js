@@ -675,58 +675,281 @@
   /* ---------- 练习记录 ---------- */
   // 当前记录页里每个可点击汉字对应的字库条目
   let historyEntries = [];
+  let historyTab = "record"; // 记录页当前标签：record（默认）/ stats
+  let statsEntries = []; // 统计页每个可点击错字对应的字库条目
 
   // 每条作答记录自带拼音、组词与注解，直接取出展示
   function entryOfAnswer(a) {
     return { char: a.c, pinyin: a.pinyin, words: a.words, note: a.note };
   }
 
+  // 从选册页进入时总是回到「记录」标签
+  function openHistory() {
+    historyTab = "record";
+    renderHistory();
+  }
+
+  // 按当前标签渲染：记录列表 / 统计面板
   function renderHistory() {
     const user = Storage.currentUser();
     $("#history-owner").textContent = user ? `${user.name} 的练习记录` : "";
-    const list = Storage.loadHistory().slice().reverse(); // 最近一次在最上面
+    const list = Storage.loadHistory();
+    const isStats = historyTab === "stats";
+    document.querySelectorAll("#history-tab .setting-switch-btn").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.v === historyTab);
+    });
+    // 图例与「汉字」开关只对记录列表有意义
+    $("#history-toolbar").classList.toggle("hidden", isStats);
     const box = $("#history-list");
-    historyEntries = [];
-    if (list.length === 0) {
-      box.innerHTML = `<p class="history-empty">还没有练习记录，快去练一组吧！</p>`;
+    if (isStats) {
+      renderStats(box, list);
     } else {
-      box.innerHTML = list
-        .map((r) => {
-          const d = new Date(r.date);
-          const when = `${d.getMonth() + 1}月${d.getDate()}日 ${String(
-            d.getHours()
-          ).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}${
-            r.volume ? ` · ${r.volume}` : ""
-          }`;
-          // 星星不用数字，得几颗就画几颗
-          const stars =
-            r.stars > 0
-              ? `<span class="history-stars">${"⭐".repeat(r.stars)}</span>`
-              : `<span class="history-stars none">还没有星星</span>`;
-          // 本组学过的字：绿色答对、红色答错；每个字都可点击查看详情
-          const chars = r.chars
-            .map((a) => {
-              const idx = historyEntries.length;
-              historyEntries.push(entryOfAnswer(a));
-              return `<button class="hchar ${a.ok ? "ok" : "no"}" data-idx="${idx}">${
-                a.c
-              }</button>`;
-            })
-            .join("");
-          const charsRow = chars
-            ? `<div class="history-chars">${chars}</div>`
-            : `<div class="history-chars"><span class="history-chars-empty">本组没有作答记录</span></div>`;
-          return `<div class="history-item">
-            <div class="history-head"><span class="history-date">${when}</span>${stars}</div>
-            ${charsRow}
-          </div>`;
-        })
-        .join("");
+      renderRecordList(box, list);
     }
-    // 没有记录时不显示「清除记录」
-    $("#btn-reset").classList.toggle("hidden", list.length === 0);
+    // 进度或记录任一存在就保留「清除记录」
+    const hasData = list.length > 0 || Object.keys(Storage.loadAll()).length > 0;
+    $("#btn-reset").classList.toggle("hidden", !hasData);
     show("history");
     updateScrollFade($("#history-list"));
+  }
+
+  function renderRecordList(box, list) {
+    const reversed = list.slice().reverse(); // 最近一次在最上面
+    historyEntries = [];
+    if (reversed.length === 0) {
+      box.innerHTML = `<p class="history-empty">还没有练习记录，快去练一组吧！</p>`;
+      return;
+    }
+    box.innerHTML = reversed
+      .map((r) => {
+        const d = new Date(r.date);
+        const when = `${d.getMonth() + 1}月${d.getDate()}日 ${String(
+          d.getHours()
+        ).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}${
+          r.volume ? ` · ${r.volume}` : ""
+        }`;
+        // 星星不用数字，得几颗就画几颗
+        const stars =
+          r.stars > 0
+            ? `<span class="history-stars">${"⭐".repeat(r.stars)}</span>`
+            : `<span class="history-stars none">还没有星星</span>`;
+        // 本组学过的字：绿色答对、红色答错；每个字都可点击查看详情
+        const chars = r.chars
+          .map((a) => {
+            const idx = historyEntries.length;
+            historyEntries.push(entryOfAnswer(a));
+            return `<button class="hchar ${a.ok ? "ok" : "no"}" data-idx="${idx}">${
+              a.c
+            }</button>`;
+          })
+          .join("");
+        const charsRow = chars
+          ? `<div class="history-chars">${chars}</div>`
+          : `<div class="history-chars"><span class="history-chars-empty">本组没有作答记录</span></div>`;
+        return `<div class="history-item">
+          <div class="history-head"><span class="history-date">${when}</span>${stars}</div>
+          ${charsRow}
+        </div>`;
+      })
+      .join("");
+  }
+
+  // 字库条目索引：把进度里的「汉字|拼音」还原成可打开详情页的条目
+  let charEntryIndex = null;
+  function charEntryOf(char) {
+    if (!charEntryIndex) {
+      charEntryIndex = new Map();
+      (window.VOLUMES || []).forEach((v) => {
+        (v.entries || []).forEach((e) => {
+          if (!charEntryIndex.has(e.char)) charEntryIndex.set(e.char, e);
+        });
+      });
+    }
+    return charEntryIndex.get(char) || { char, pinyin: "", words: "", note: "" };
+  }
+
+  function renderStats(box, history) {
+    const progress = Storage.loadAll();
+    const now = Date.now();
+
+    // 多音字按汉字合并：答对/答错求和，等级取最高，任一读音到期即算到期
+    const chars = new Map();
+    Object.keys(progress).forEach((key) => {
+      const r = progress[key];
+      if (!r) return;
+      const c = key.split("|")[0];
+      const cur = chars.get(c) || { correct: 0, wrong: 0, level: 0, due: false };
+      cur.correct += r.correct || 0;
+      cur.wrong += r.wrong || 0;
+      cur.level = Math.max(cur.level, r.level || 0);
+      if (r.nextReview && r.nextReview <= now) cur.due = true;
+      chars.set(c, cur);
+    });
+
+    const learned = [];
+    const wrongRows = [];
+    chars.forEach((r, c) => {
+      if (r.correct > 0) learned.push(r);
+      if (r.wrong > 0) wrongRows.push({ char: c, wrong: r.wrong });
+    });
+    wrongRows.sort((a, b) => b.wrong - a.wrong);
+
+    // 首答正确率只看练习记录里真正作答的题：跳过、求助不计入
+    let answered = 0;
+    let firstOk = 0;
+    history.forEach((r) => {
+      (r.chars || []).forEach((a) => {
+        answered += 1;
+        if (a.ok) firstOk += 1;
+      });
+    });
+
+    if (learned.length === 0 && history.length === 0) {
+      box.innerHTML = `<p class="history-empty">还没有学习数据，快去练一组吧！</p>`;
+      return;
+    }
+
+    const stars = history.reduce((sum, r) => sum + (r.stars || 0), 0);
+    const rate = answered ? Math.round((firstOk / answered) * 100) : null;
+    const cards = [
+      {
+        value: `${learned.length}<small>字</small>`,
+        label: "学过的字",
+        hint: "首次答对过的字",
+      },
+      {
+        value: rate === null ? "—" : `${rate}<small>%</small>`,
+        label: "首答正确率",
+        hint: answered ? `${firstOk} / ${answered} 题` : "还没有作答",
+      },
+      {
+        value: `${wrongRows.length}<small>个</small>`,
+        label: "出错的字",
+        hint: wrongRows.length ? "按错误次数排序" : "保持下去",
+      },
+      {
+        value: `${history.length}<small>组</small>`,
+        label: "练习组数",
+        hint: `⭐ ${stars}`,
+      },
+    ];
+    const gridHtml = `<div class="stats-grid">${cards
+      .map(
+        (c) => `<div class="stats-card">
+          <span class="stats-value">${c.value}</span>
+          <span class="stats-label">${c.label}</span>
+          <span class="stats-hint">${c.hint}</span>
+        </div>`
+      )
+      .join("")}</div>`;
+
+    // 掌握程度：初学 0~1 级 / 熟悉 2~3 级 / 掌握 4~6 级
+    const mastery = [0, 0, 0];
+    learned.forEach((r) => {
+      mastery[r.level <= 1 ? 0 : r.level <= 3 ? 1 : 2] += 1;
+    });
+    const totalLearned = learned.length;
+    const pct = (n) => (totalLearned ? (n / totalLearned) * 100 : 0);
+    const due = learned.filter((r) => r.due).length;
+    const masteryHtml = `<section class="stats-block">
+      <h2 class="stats-title">掌握程度</h2>
+      <div class="mastery-bar">
+        <span class="mastery-seg low" style="width:${pct(mastery[0]).toFixed(1)}%"></span>
+        <span class="mastery-seg mid" style="width:${pct(mastery[1]).toFixed(1)}%"></span>
+        <span class="mastery-seg high" style="width:${pct(mastery[2]).toFixed(1)}%"></span>
+      </div>
+      <div class="mastery-legend">
+        <span class="mastery-item"><i class="mastery-dot low"></i>初学 <b>${mastery[0]}</b></span>
+        <span class="mastery-item"><i class="mastery-dot mid"></i>熟悉 <b>${mastery[1]}</b></span>
+        <span class="mastery-item"><i class="mastery-dot high"></i>掌握 <b>${mastery[2]}</b></span>
+      </div>
+      <p class="stats-note">到期待复习 <b>${due}</b> 字</p>
+    </section>`;
+
+    // 易错字：错误次数从多到少，点击进入单字详情
+    statsEntries = wrongRows.map((row) => {
+      const e = charEntryOf(row.char);
+      return { char: row.char, pinyin: e.pinyin, words: e.words, note: e.note || "" };
+    });
+    const wrongHtml = wrongRows.length
+      ? `<div class="stats-wrong">${wrongRows
+          .map(
+            (row, i) =>
+              `<button class="stats-wchar" data-idx="${i}" title="错 ${row.wrong} 次">${
+                row.char
+              }<span class="stats-badge">${row.wrong}</span></button>`
+          )
+          .join("")}</div>`
+      : `<p class="stats-empty">还没有出错的字，真棒！</p>`;
+    const wrongHtmlSection = `<section class="stats-block">
+      <h2 class="stats-title">出错的字</h2>
+      ${wrongHtml}
+    </section>`;
+
+    // 首答正确率：最近 7 组（逐组）+ 最近 7 天（按天合并）
+    let trendSection = "";
+    if (history.length > 0) {
+      const col = (label, ok, total, title) => {
+        const value = total ? Math.round((ok / total) * 100) : null;
+        return `<div class="trend-col" title="${title}">
+          <span class="trend-value">${value === null ? "—" : `${value}%`}</span>
+          <span class="trend-track"><span class="trend-bar${
+            value === null ? " empty" : ""
+          }" style="height:${value === null ? 0 : Math.max(value, 4)}%"></span></span>
+          <span class="trend-label">${label}</span>
+        </div>`;
+      };
+
+      // 逐组：最近 7 组，每组一根柱子
+      const recent = history.slice(-7);
+      const groupCols = recent
+        .map((r) => {
+          const d = new Date(r.date);
+          const answers = r.chars || [];
+          const ok = answers.filter((a) => a.ok).length;
+          return col(
+            `${d.getMonth() + 1}/${d.getDate()}`,
+            ok,
+            answers.length,
+            `${ok} / ${answers.length} 题首答正确`
+          );
+        })
+        .join("");
+
+      // 按天：最近 7 个自然日，同一天的多组练习合并计算
+      const dayMap = new Map();
+      history.forEach((r) => {
+        const d = new Date(r.date);
+        d.setHours(0, 0, 0, 0);
+        const ts = d.getTime();
+        const cur = dayMap.get(ts) || { ok: 0, total: 0 };
+        (r.chars || []).forEach((a) => {
+          cur.total += 1;
+          if (a.ok) cur.ok += 1;
+        });
+        dayMap.set(ts, cur);
+      });
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const dayCols = [];
+      for (let i = 6; i >= 0; i -= 1) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        const v = dayMap.get(d.getTime()) || { ok: 0, total: 0 };
+        const label = i === 0 ? "今天" : `${d.getMonth() + 1}/${d.getDate()}`;
+        dayCols.push(col(label, v.ok, v.total, `${v.ok} / ${v.total} 题首答正确`));
+      }
+
+      trendSection = `<section class="stats-block">
+        <h2 class="stats-title">首答正确率</h2>
+        <p class="stats-subtitle">最近 7 组</p>
+        <div class="trend-chart">${groupCols}</div>
+        <p class="stats-subtitle">最近 7 天</p>
+        <div class="trend-chart">${dayCols.join("")}</div>
+      </section>`;
+    }
+
+    box.innerHTML = gridHtml + masteryHtml + wrongHtmlSection + trendSection;
   }
 
   /* ---------- 练习 ---------- */
@@ -2696,7 +2919,7 @@
     }
   });
 
-  $("#btn-history").addEventListener("click", renderHistory);
+  $("#btn-history").addEventListener("click", openHistory);
   // 结束本组练习（已作答的记录保留），回到该小朋友的册目选择页
   // 不用系统 confirm：手机端 WebView 的系统对话框可能触发返回或关闭页面等不一致行为；
   // 改为应用内对话框，点「确定」才结束，点屏幕其他位置直接关闭对话框
@@ -2716,10 +2939,23 @@
     Speaker.stop();
     backToVolumes();
   });
+  // 练习记录页顶部的「记录｜统计」胶囊
+  $("#history-tab").addEventListener("click", (e) => {
+    const btn = e.target.closest(".setting-switch-btn");
+    if (!btn || btn.dataset.v === historyTab) return;
+    historyTab = btn.dataset.v;
+    renderHistory();
+  });
   // 练习记录从"选册页"进入，返回时回到该小朋友的选册页
   $("#btn-history-back").addEventListener("click", backToVolumes);
-  // 练习记录里的汉字：点击进入通用单字详情页，返回时回到记录页
+  // 记录里的汉字、统计里的错字：点击进入通用单字详情页，返回时回到当前标签
   $("#history-list").addEventListener("click", (e) => {
+    const wchar = e.target.closest(".stats-wchar");
+    if (wchar) {
+      const entry = statsEntries[Number(wchar.dataset.idx)];
+      if (entry) openCharCard(entry, { onBack: renderHistory });
+      return;
+    }
     const el = e.target.closest(".hchar");
     if (!el) return;
     const entry = historyEntries[Number(el.dataset.idx)];

@@ -1450,6 +1450,264 @@ body.hide-history-chars .history-legend {
   color: #b09a7d;
 }
 
+/* ---------- 记录页：记录 / 统计 胶囊 ---------- */
+.history-tabs {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+/* ---------- 统计页 ---------- */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.stats-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: #fffdf5;
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 2px 0 #eadfc8;
+}
+
+.stats-value {
+  font-family: Arial, "Segoe UI", sans-serif;
+  font-weight: 700;
+  font-size: calc(clamp(24px, 6vmin, 34px) * var(--fs));
+  line-height: 1.1;
+  color: #6b5a42;
+}
+
+.stats-value small {
+  margin-left: 3px;
+  font-family: inherit;
+  font-size: calc(clamp(12px, 2.6vmin, 15px) * var(--fs));
+  font-weight: 400;
+  color: #b09a7d;
+}
+
+.stats-label {
+  font-size: calc(clamp(12px, 2.6vmin, 15px) * var(--fs));
+  color: #b09a7d;
+}
+
+.stats-hint {
+  font-size: calc(clamp(11px, 2.4vmin, 14px) * var(--fs));
+  color: #c4b49d;
+}
+
+.stats-block {
+  background: #fffdf5;
+  border-radius: 12px;
+  padding: 12px 16px;
+  box-shadow: 0 2px 0 #eadfc8;
+}
+
+.stats-title {
+  margin: 0 0 10px;
+  font-size: calc(clamp(14px, 3vmin, 18px) * var(--fs));
+  font-weight: 600;
+  color: #6b5a42;
+}
+
+/* 掌握程度：一条三色堆叠条 + 图例 */
+.mastery-bar {
+  display: flex;
+  width: 100%;
+  height: 14px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #f1e7d3;
+}
+
+.mastery-seg {
+  height: 100%;
+  transition: width 0.3s;
+}
+
+.mastery-seg.low {
+  background: #f6d08a;
+}
+
+.mastery-seg.mid {
+  background: #f2a541;
+}
+
+.mastery-seg.high {
+  background: #7fbf6a;
+}
+
+.mastery-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 10px;
+  font-size: calc(clamp(12px, 2.6vmin, 15px) * var(--fs));
+  color: #8a7a63;
+}
+
+.mastery-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.mastery-item b {
+  color: #6b5a42;
+}
+
+.mastery-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.mastery-dot.low {
+  background: #f6d08a;
+}
+
+.mastery-dot.mid {
+  background: #f2a541;
+}
+
+.mastery-dot.high {
+  background: #7fbf6a;
+}
+
+.stats-note {
+  margin: 8px 0 0;
+  font-size: calc(clamp(12px, 2.6vmin, 15px) * var(--fs));
+  color: #b09a7d;
+}
+
+.stats-note b {
+  color: #d18a2e;
+}
+
+/* 易错字：红色小田字格 + 右上角错误次数 */
+.stats-wrong {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.stats-wchar {
+  position: relative;
+  width: clamp(38px, 9vmin, 50px);
+  height: clamp(38px, 9vmin, 50px);
+  padding: 0;
+  font-family: var(--kaiti);
+  font-size: calc(clamp(24px, 5.6vmin, 34px) * var(--fs));
+  line-height: 1;
+  color: #b8342f;
+  background-color: #fdeceb;
+  border: 1px solid rgba(217, 83, 79, 0.4);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.stats-wchar:hover {
+  transform: translateY(-2px);
+}
+
+.stats-wchar:active {
+  transform: scale(0.94);
+}
+
+.stats-badge {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  box-sizing: border-box;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #d9534f;
+  color: #fff;
+  font-family: Arial, "Segoe UI", sans-serif;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.stats-empty {
+  margin: 0;
+  font-size: calc(clamp(13px, 2.8vmin, 16px) * var(--fs));
+  color: #b09a7d;
+}
+
+/* 最近 7 组 / 最近 7 天：只靠 CSS 的迷你柱状图 */
+.stats-subtitle {
+  margin: 0 0 8px;
+  font-size: calc(clamp(12px, 2.6vmin, 15px) * var(--fs));
+  color: #8a7a63;
+}
+
+.trend-chart + .stats-subtitle {
+  margin-top: 16px;
+}
+
+.trend-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 116px;
+}
+
+.trend-col {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.trend-value {
+  font-family: Arial, "Segoe UI", sans-serif;
+  font-size: calc(clamp(10px, 2.2vmin, 13px) * var(--fs));
+  color: #b09a7d;
+}
+
+.trend-track {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  max-width: 34px;
+  border-radius: 6px;
+  background: #f7efdf;
+  overflow: hidden;
+}
+
+.trend-bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  border-radius: 6px 6px 0 0;
+  background: linear-gradient(#f7b955, #f2a541);
+}
+
+.trend-bar.empty {
+  background: #e8ddc9;
+}
+
+.trend-label {
+  font-family: Arial, "Segoe UI", sans-serif;
+  font-size: calc(clamp(10px, 2.2vmin, 13px) * var(--fs));
+  color: #c4b49d;
+  white-space: nowrap;
+}
+
 /* ---------- 通用单字详情页 ---------- */
 #view-card {
   position: relative;

@@ -163,4 +163,39 @@ const Quiz = {
       options: this.buildOptions(target, entries, optionCount),
     }));
   },
+
+  // 写字页：挑出 10 个推荐字，其余作为「其他汉字」
+  // - 同一册里的多音字只保留一张田字格（临摹的是字形，按汉字去重）
+  // - 优先推荐 level="书写" 的字；临摹次数达到阈值的字降级，让位给还没练够的字
+  // - 分组优先级：书写未达标 > 认识未达标 > 书写已达标 > 认识已达标，组内保持字库原顺序
+  // - scope="write" 时整页只使用要求书写的字
+  pickWriting(entries, counts, limit, scope, recommendCount) {
+    const max = Math.max(1, limit || 10);
+    const want = Math.max(1, recommendCount || 10);
+    const seen = new Set();
+    const pool = [];
+    (entries || []).forEach((e) => {
+      if (!e || seen.has(e.char)) return;
+      seen.add(e.char);
+      pool.push(e);
+    });
+    const list = scope === "write" ? pool.filter((e) => e.level === "书写") : pool;
+    const countOf = (e) => {
+      const n = counts && counts[e.char];
+      return Number.isInteger(n) && n > 0 ? n : 0;
+    };
+    const rank = (e) => {
+      const full = countOf(e) >= max;
+      if (e.level === "书写") return full ? 2 : 0;
+      return full ? 3 : 1;
+    };
+    // Array.prototype.sort 在现代浏览器是稳定排序，组内自然保持字库顺序
+    const sorted = list.slice().sort((a, b) => rank(a) - rank(b));
+    const recommend = sorted.slice(0, want);
+    const picked = new Set(recommend.map((e) => e.char));
+    return {
+      recommend,
+      others: list.filter((e) => !picked.has(e.char)),
+    };
+  },
 };

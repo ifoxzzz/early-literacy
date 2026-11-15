@@ -124,9 +124,10 @@ body {
   margin-bottom: 16px;
 }
 
-.volume-owner {
-  font-size: calc(clamp(15px, 3.2vmin, 19px) * var(--fs));
-  color: #b09a7d;
+/* 认字 | 写字 切换：复用练习设置的胶囊样式，点击区域略放大 */
+.volume-mode .setting-switch-btn {
+  padding: 8px 18px;
+  font-size: calc(clamp(16px, 3.4vmin, 20px) * var(--fs));
 }
 
 /* 礼物入口：沿用练习页的晃动动画，图标尺寸更大 */
@@ -1432,6 +1433,28 @@ body {
   color: #b8342f;
 }
 
+/* 写字记录：中性橙色田字格 + 累计次数，不使用认字对错的红绿色 */
+.history-write-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  border-top: 1px dashed #eadfc8;
+  padding-top: 8px;
+}
+
+.hchar.write {
+  flex: none;
+  background-color: #fff7e8;
+  border-color: rgba(209, 96, 61, 0.35);
+  color: #b65a34;
+}
+
+.history-write-meta {
+  font-size: calc(clamp(14px, 3vmin, 18px) * var(--fs));
+  color: #9b8669;
+}
+
 .history-chars-empty {
   font-size: calc(clamp(13px, 2.8vmin, 16px) * var(--fs));
   color: #b09a7d;
@@ -2267,7 +2290,9 @@ body.hide-pinyin #view-card .card .pinyin {
 #btn-note,
 #btn-history-chars,
 #btn-trace-gesture,
-#btn-trace-voice {
+#btn-trace-voice,
+#btn-writing-gesture,
+#btn-writing-voice {
   position: relative;
   overflow: hidden;
 }
@@ -2276,7 +2301,9 @@ body.hide-pinyin #view-card .card .pinyin {
 #btn-note:not(.active)::after,
 #btn-history-chars:not(.active)::after,
 #btn-trace-gesture:not(.active)::after,
-#btn-trace-voice:not(.active)::after {
+#btn-trace-voice:not(.active)::after,
+#btn-writing-gesture:not(.active)::after,
+#btn-writing-voice:not(.active)::after {
   content: "";
   position: absolute;
   top: 50%;
@@ -3815,9 +3842,14 @@ body.hide-note .hint-bar {
 
 #view-trace {
   justify-content: flex-start;
-  /* 放宽容器，让田字格在平板/桌面端更大；田字格边长统一用这个变量，按钮定位也依赖它 */
+  /* 放宽容器，让田字格在平板/桌面端更大 */
   max-width: 900px;
   padding: 6px 6px 16px;
+}
+
+/* 临摹容器（独立页 #view-trace 与写字页模态框面板共用）：
+   田字格边长统一用这个变量，演示/重写按钮定位也依赖它；模态框可覆盖该变量 */
+.trace-host {
   --trace-size: min(88vw, 58vh, 460px);
 }
 
@@ -3863,7 +3895,7 @@ body.hide-note .hint-bar {
 /* 屏幕矮（手机横屏等）：绝对定位的按钮可能顶到顶部按钮条，
    改为与田字格一起流式居中，按钮仍在田字格正上方 */
 @media (max-height: 620px) {
-  #view-trace {
+  .trace-host {
     --trace-size: min(88vw, 52vh, 460px);
   }
 
@@ -3881,7 +3913,7 @@ body.hide-note .hint-bar {
 /* 宽屏横屏：参照练习页 quiz-side，「演示」「重写」移到田字格左右两侧垂直居中，
    纵向空间全部留给田字格，田字格因此可以更大 */
 @media (orientation: landscape) and (min-width: 760px) {
-  #view-trace {
+  .trace-host {
     --trace-size: min(calc(88vw - 340px), 72vh, 560px);
   }
 
@@ -4043,4 +4075,313 @@ body.hide-note .hint-bar {
   min-height: 1.5em;
   font-size: calc(clamp(16px, 3.4vmin, 22px) * var(--fs));
   color: #9b8669;
+}
+
+/* ---------- 写字页 ---------- */
+/* 上方推荐练习大田字格，下方其他汉字小田字格；内容多时内部滚动，返回按钮固定在底部 */
+#view-writing {
+  justify-content: flex-start;
+  padding-bottom: 12px;
+}
+
+/* 顶部抽屉按钮条：状态行只有三点展开按钮，靠右对齐（与临摹页一致） */
+#view-writing .quiz-status {
+  justify-content: flex-end;
+}
+
+/* 底部居中显示册名（如「一年级上册 · 写一写」） */
+.writing-footer {
+  text-align: center;
+  margin-top: 10px;
+  margin-bottom: 0;
+}
+
+.writing-scroll {
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 2px 2px 8px;
+  margin-bottom: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.writing-scroll.scrolling {
+  scrollbar-color: #e0cba8 transparent;
+}
+
+.writing-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.writing-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.writing-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+}
+
+.writing-scroll.scrolling::-webkit-scrollbar-thumb {
+  background: #e0cba8;
+}
+
+.writing-scroll.fade-top {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 20px);
+  mask-image: linear-gradient(to bottom, transparent, #000 20px);
+}
+
+.writing-scroll.fade-bottom {
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 20px);
+  mask-image: linear-gradient(to top, transparent, #000 20px);
+}
+
+.writing-scroll.fade-top.fade-bottom {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 20px, #000 calc(100% - 20px), transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 20px, #000 calc(100% - 20px), transparent);
+}
+
+.writing-section {
+  margin: 12px 0 8px;
+  font-weight: normal;
+  color: #b09a7d;
+  font-size: calc(clamp(16px, 3.4vmin, 20px) * var(--fs));
+}
+
+.writing-grid {
+  width: 100%;
+  display: grid;
+  gap: 10px;
+}
+
+/* 推荐区固定在滚动区外，5 列两行，不参与其他汉字列表的滚动 */
+.writing-grid-main {
+  flex: none;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+/* 其他汉字：小格子，按可用宽度自动排布 */
+.writing-grid-mini {
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  gap: 7px;
+}
+
+/* 田字格：视觉沿用练习页卡片（米白底 + 橙色实线框 + 虚线十字） */
+.wcell {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font: inherit;
+  color: #333;
+  background: #fffdf5;
+  border: 2px solid #d1603d;
+  border-radius: 8px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.15s, box-shadow 0.2s, background 0.2s, border-color 0.2s;
+}
+
+.wcell::before {
+  content: "";
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  top: 50%;
+  border-top: 1.5px dashed rgba(209, 96, 61, 0.35);
+  pointer-events: none;
+}
+
+.wcell::after {
+  content: "";
+  position: absolute;
+  top: 6%;
+  bottom: 6%;
+  left: 50%;
+  border-left: 1.5px dashed rgba(209, 96, 61, 0.35);
+  pointer-events: none;
+}
+
+.wcell .wchar {
+  position: relative;
+  z-index: 1;
+  line-height: 1;
+  font-family: var(--kaiti);
+}
+
+.writing-grid-main .wchar {
+  font-size: calc(clamp(26px, 7.6vmin, 50px) * min(var(--fs), 1));
+}
+
+.writing-grid-mini .wchar {
+  font-size: calc(clamp(18px, 4.6vmin, 26px) * min(var(--fs), 1));
+}
+
+/* 临摹次数徽章：白字圆角框；--count-hue 由 JS 按次数从 32（橙）降到 4（红） */
+.wcell .wcount {
+  --count-hue: 32;
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  z-index: 2;
+  min-width: 22px;
+  min-height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 7px;
+  color: #fff;
+  background: linear-gradient(
+    135deg,
+    hsl(var(--count-hue), 92%, 56%),
+    hsl(calc(var(--count-hue) - 6), 82%, 45%)
+  );
+  box-shadow: 0 2px 5px rgba(112, 45, 24, 0.24);
+  font-size: calc(clamp(10px, 2.2vmin, 13px) * var(--fs));
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* 其他汉字格子较小：次数用更淡的纯色半透明徽章，避免抢走汉字的视觉重点 */
+.writing-grid-mini .wcell .wcount {
+  right: 2px;
+  bottom: 2px;
+  min-width: 16px;
+  min-height: 14px;
+  padding: 1px 4px;
+  border: 0;
+  border-radius: 5px;
+  color: rgba(255, 255, 255, 0.88);
+  background: hsla(var(--count-hue), 72%, 52%, 0.58);
+  box-shadow: none;
+  font-size: calc(clamp(9px, 1.8vmin, 11px) * var(--fs));
+  font-weight: 400;
+}
+
+.wcell:active {
+  transform: scale(0.95);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .wcell:hover {
+    transform: scale(1.05);
+    border-color: #f2a541;
+    background: #fff9e8;
+    box-shadow: 0 8px 20px rgba(209, 96, 61, 0.25);
+  }
+}
+
+.writing-empty {
+  padding: 24px 0;
+  text-align: center;
+  color: #b09a7d;
+  font-size: calc(clamp(15px, 3.2vmin, 19px) * var(--fs));
+}
+
+/* ---------- 写字页临摹模态框 ---------- */
+/* 与礼物放大框一致：暗遮罩渐入，内容从源格子缩小/半透明状态过渡到中央 */
+.trace-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0);
+  touch-action: none; /* 阻止滚动/缩放手势穿透到写字页 */
+  transition: background 0.28s ease;
+}
+
+.trace-modal.hidden {
+  display: none;
+}
+
+.trace-modal.active {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+/* 面板与外侧按钮作为一个整体缩放，保证按钮始终附着在面板上方 */
+.trace-modal-inner {
+  position: relative;
+  transform: scale(0.6);
+  transform-origin: center center;
+  opacity: 0;
+  transition: transform 0.32s cubic-bezier(0.2, 1.2, 0.3, 1), opacity 0.25s ease;
+}
+
+.trace-modal.active .trace-modal-inner {
+  transform: scale(1);
+  opacity: 1;
+}
+
+/* 内容只有田字格与下方提示，不再使用固定高度，整体接近正方形 */
+.trace-modal-panel {
+  --trace-size: min(70vw, 46vh, 380px);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: calc(var(--trace-size) + 34px); /* 左右各 14px 内边距 + 3px 边框 */
+  padding: 14px;
+  background: #fdf6e9;
+  border: 3px solid #d1603d;
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(60, 40, 20, 0.35);
+}
+
+.trace-modal-panel .trace-stage {
+  flex: none;
+  width: 100%;
+  height: var(--trace-size);
+}
+
+.trace-modal-panel .trace-tip {
+  width: 100%;
+  margin: 10px 0 0;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* 演示/重写附着于面板上方外侧，不计入面板尺寸；覆盖独立临摹页的两侧定位 */
+.trace-modal-actions {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 12px);
+  z-index: 2;
+  transform: translateX(-50%);
+}
+
+.trace-modal-actions .trace-bar {
+  position: static;
+  display: flex;
+  gap: 12px;
+  transform: none;
+}
+
+#trace-modal-actions #btn-trace-demo,
+#trace-modal-actions #btn-trace-reset {
+  position: static;
+  inset: auto;
+  padding: 10px clamp(18px, 4vw, 34px);
+  transform: none;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+#trace-modal-actions #btn-trace-demo:active,
+#trace-modal-actions #btn-trace-reset:active {
+  transform: scale(0.94);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trace-modal,
+  .trace-modal-inner {
+    transition: none;
+  }
 }

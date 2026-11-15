@@ -84,10 +84,15 @@
   let demoRaf = 0;
   let demoDot = null;
   let finishTimer = 0; // 一轮演示结束后下一轮开演的定时器
+  let currentChar = ""; // 当前临摹的汉字
+  let openOpts = null; // 本次进入的附加参数 { mount, onBack, onComplete }
+  let openToken = 0; // 会话令牌：每次 open/close 自增，作废进行中的笔顺加载回调
 
   /* ---------- DOM ---------- */
   const svg = $("#trace-svg");
   const tipEl = $("#trace-tip");
+  // 临摹舞台（演示/重写/田字格）：作为可移动单元，独立页与写字页模态框间按需挂载
+  const stageEl = $(".trace-stage");
   let flipG = null; // 字形层（翻转坐标）
   let goldG = null; // 完成特效：金色光丝沿笔画轮廓游走
   let goldPaths = []; // 轮廓副本（金色描边层）
@@ -396,6 +401,11 @@
       stopVoice();
       playStrokeGold(); // 整字写完：金色光丝沿笔画轮廓游走
       tipEl.textContent = "写得真棒！点「重写」再来一遍吧";
+      // 整字写完通知调用方（写字页/单字详情页据此累加临摹次数）；
+      // 「重写」后重新写完会再次触发，符合“每临摹一遍算一次”
+      if (openOpts && typeof openOpts.onComplete === "function") {
+        openOpts.onComplete(currentChar);
+      }
     } else {
       tipStroke();
       announceName(idx);
@@ -594,9 +604,29 @@
     $("#btn-trace-voice").classList.toggle("active", voiceOn);
   }
 
-  function open(char) {
-    document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
-    $("#view-trace").classList.remove("hidden");
+  // 把临摹单元（田字格舞台 + 提示条）挂载到目标容器；独立页与模态框共用同一套 DOM。
+  // 模态框把演示/重写按钮放到面板上方外侧；回到独立页时再收进舞台顶部。
+  function mountTraceTo(container, actionMount) {
+    const barEl = $(".trace-bar");
+    if (actionMount) actionMount.appendChild(barEl);
+    else if (barEl.parentNode !== stageEl) stageEl.insertBefore(barEl, stageEl.firstChild);
+    container.appendChild(stageEl);
+    container.appendChild(tipEl);
+  }
+
+  function open(char, opts) {
+    currentChar = char;
+    openOpts = opts || null;
+    const token = ++openToken;
+    const mount = (openOpts && openOpts.mount) || $("#view-trace");
+    const isModal = mount !== $("#view-trace");
+    if (!isModal) {
+      // 独立页：隐藏其它视图，显示临摹页
+      document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
+      $("#view-trace").classList.remove("hidden");
+    }
+    // 模态框模式：由调用方负责显示模态框，这里只挂载临摹单元
+    mountTraceTo(mount, openOpts && openOpts.actions);
     tipEl.textContent = "正在加载笔顺…";
     ready = false;
     pointerId = null;
@@ -605,7 +635,7 @@
     stopVoice();
     clearSvg();
     loadChar(char).then((data) => {
-      if ($("#view-trace").classList.contains("hidden")) return; // 已退出，丢弃结果
+      if (token !== openToken) return; // 已退出或换了字，丢弃结果
       if (!data) {
         tipEl.textContent = `抱歉，「${char}」还没有笔顺数据`;
         return;
@@ -620,6 +650,7 @@
   }
 
   function close() {
+    openToken++; // 作废进行中的笔顺加载回调
     stopDemo(false); // 停演示、清残笔与金色光丝层
     clearTimeout(drawerTimer); // 抽屉若正处于折叠延时中，退出后不再改动原页面
     drawerTimer = 0;
@@ -627,20 +658,29 @@
     hideGuide();
     ready = false;
     pointerId = null;
-    $("#view-trace").classList.add("hidden");
-    $("#view-card").classList.remove("hidden"); // 回到单字详情页（内容保持原样）
+    const opts = openOpts;
+    openOpts = null;
+    const isModal = opts && opts.mount && opts.mount !== $("#view-trace");
+    if (!isModal) $("#view-trace").classList.add("hidden");
+    // 模态框模式由调用方自行关闭模态框；独立页默认回到单字详情页
+    if (opts && typeof opts.onBack === "function") {
+      opts.onBack();
+    } else if (!isModal) {
+      $("#view-card").classList.remove("hidden");
+    }
   }
 
   /* ---------- 顶部按钮（风格与练习页一致） ---------- */
-  $("#btn-trace-gesture").addEventListener("click", () => {
-    gestureOn = !gestureOn;
+  // 手势 / 语音开关：独立页按钮与写字页模态框外的按钮共用同一份状态与存储
+  function setGesture(on) {
+    gestureOn = !!on;
     savePref("gesture", gestureOn);
     refreshToggleBtns();
     if (gestureOn) showGuide();
     else hideGuide();
-  });
-  $("#btn-trace-voice").addEventListener("click", () => {
-    voiceOn = !voiceOn;
+  }
+  function setVoice(on) {
+    voiceOn = !!on;
     savePref("voice", voiceOn);
     refreshToggleBtns();
     if (voiceOn) {
@@ -649,14 +689,17 @@
     } else {
       stopVoice();
     }
-  });
+  }
+  $("#btn-trace-gesture").addEventListener("click", () => setGesture(!gestureOn));
+  $("#btn-trace-voice").addEventListener("click", () => setVoice(!voiceOn));
   $("#btn-trace-demo").addEventListener("click", () => {
     // 「演示」是开关：开 = 循环演示，关（或点页面任意位置）= 停止
     if (demoOn) stopDemo(true);
     else startDemo();
   });
   // 演示中点页面任意位置终止（「演示」按钮本身除外，它走自己的开关逻辑）
-  $("#view-trace").addEventListener(
+  // 监听绑在可移动的临摹舞台上，独立页与写字页模态框内都生效
+  stageEl.addEventListener(
     "pointerdown",
     (e) => {
       if (demoOn && !e.target.closest("#btn-trace-demo")) stopDemo(true);
@@ -697,5 +740,14 @@
   });
   $("#btn-trace-back").addEventListener("click", close);
 
-  window.TraceView = { open, load: loadChar };
+  window.TraceView = {
+    open,
+    close,
+    load: loadChar,
+    // 手势 / 语音开关（写字页顶部按钮与独立页共享同一份状态）
+    setGesture,
+    setVoice,
+    getGesture: () => gestureOn,
+    getVoice: () => voiceOn,
+  };
 })();

@@ -8,7 +8,8 @@ const Storage = {
   // ---------- localStorage 键 ----------
   USERS_KEY: "early-literacy-users", // [{ id, name }]
   CURRENT_KEY: "early-literacy-current", // 当前用户 id
-  HISTORY_MAX: 50, // 每个用户只保留最近 50 组记录
+  HISTORY_MAX: 50, // 每个用户只保留最近 50 组认字记录
+  TRACE_HISTORY_MAX: 200, // 写字逐字记录较多，每个用户保留最近 200 条
 
   // 显示开关（默认开启，存 "0" 表示关闭）
   PREF_KEYS: {
@@ -91,6 +92,11 @@ const Storage = {
     localStorage.removeItem(this.quizOrderKey(id));
     localStorage.removeItem(this.traceLevelKey(id));
     localStorage.removeItem(this.lastVolumeKey(id));
+    localStorage.removeItem(this.learnModeKey(id));
+    localStorage.removeItem(this.traceCountKey(id));
+    localStorage.removeItem(this.traceHistoryKey(id));
+    localStorage.removeItem(this.traceLimitKey(id));
+    localStorage.removeItem(this.writingScopeKey(id));
     localStorage.removeItem(this.giftsKey(id));
     localStorage.removeItem(this.giftLogKey(id));
     // 拼音、注解开关也按小朋友保存，删除时一并清理
@@ -130,6 +136,26 @@ const Storage = {
 
   lastVolumeKey(id) {
     return `early-literacy-last-volume:${id || this.currentId()}`;
+  },
+
+  learnModeKey(id) {
+    return `early-literacy-learn-mode:${id || this.currentId()}`;
+  },
+
+  traceCountKey(id) {
+    return `early-literacy-trace-count:${id || this.currentId()}`;
+  },
+
+  traceHistoryKey(id) {
+    return `early-literacy-trace-history:${id || this.currentId()}`;
+  },
+
+  traceLimitKey(id) {
+    return `early-literacy-trace-limit:${id || this.currentId()}`;
+  },
+
+  writingScopeKey(id) {
+    return `early-literacy-writing-scope:${id || this.currentId()}`;
   },
 
   giftsKey(id) {
@@ -214,6 +240,81 @@ const Storage = {
 
   setLastVolume(volumeId, id) {
     localStorage.setItem(this.lastVolumeKey(id), String(volumeId));
+  },
+
+  // ---------- 学习模式（认字 / 写字，按小朋友独立保存） ----------
+  learnMode(id) {
+    return localStorage.getItem(this.learnModeKey(id)) === "write" ? "write" : "read";
+  },
+
+  setLearnMode(v, id) {
+    const mode = v === "write" ? "write" : "read";
+    localStorage.setItem(this.learnModeKey(id), mode);
+    return mode;
+  },
+
+  // ---------- 临摹次数（按汉字记录，按小朋友独立保存） ----------
+  // 数据结构：{ "汉字": 次数 }；临摹的是字形，多音字只记一次
+  traceCounts(id) {
+    const raw = this.readJSON(this.traceCountKey(id), {});
+    return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  },
+
+  addTraceCount(char, id) {
+    if (!char) return 0;
+    const data = this.traceCounts(id);
+    const n = (Number.isInteger(data[char]) ? data[char] : 0) + 1;
+    data[char] = n;
+    this.writeJSON(this.traceCountKey(id), data);
+    return n;
+  },
+
+  clearTraceCounts(id) {
+    localStorage.removeItem(this.traceCountKey(id));
+  },
+
+  // ---------- 写字记录（每完整临摹一个字一遍记一条） ----------
+  // 数据结构：[{ char, volume, count, date }]；count 是完成后该字的累计次数
+  loadTraceHistory(id) {
+    return this.readJSON(this.traceHistoryKey(id), []);
+  },
+
+  addTraceHistory(record, id) {
+    const list = this.loadTraceHistory(id);
+    list.push({ ...record, date: Date.now() });
+    this.writeJSON(this.traceHistoryKey(id), list.slice(-this.TRACE_HISTORY_MAX));
+  },
+
+  clearTraceHistory(id) {
+    localStorage.removeItem(this.traceHistoryKey(id));
+  },
+
+  // 推荐换字阈值：1 ~ 50；未设置时默认 10
+  traceLimit(id) {
+    const raw = localStorage.getItem(this.traceLimitKey(id));
+    if (raw == null) return 10;
+    const v = parseInt(raw, 10);
+    if (!(v >= 1 && v <= 50)) {
+      throw new Error(`写字设置（换字阈值）值非法：${raw}`);
+    }
+    return v;
+  },
+
+  setTraceLimit(v, id) {
+    const n = Math.max(1, Math.min(50, parseInt(v, 10) || 10));
+    localStorage.setItem(this.traceLimitKey(id), String(n));
+    return n;
+  },
+
+  // 写字页展现范围：all（全部字，默认）/ write（只展现要求书写的字）
+  writingScope(id) {
+    return localStorage.getItem(this.writingScopeKey(id)) === "write" ? "write" : "all";
+  },
+
+  setWritingScope(v, id) {
+    const scope = v === "write" ? "write" : "all";
+    localStorage.setItem(this.writingScopeKey(id), scope);
+    return scope;
   },
 
   // ---------- 学习进度 ----------
@@ -301,10 +402,21 @@ const Storage = {
     this.writeJSON(this.historyKey(), list.slice(-this.HISTORY_MAX));
   },
 
-  // 清空当前用户的进度与记录
-  clearUserData() {
+  // 记录页按模式清理，避免清除认字数据时误删写字数据，反之亦然
+  clearReadData() {
     localStorage.removeItem(this.progressKey());
     localStorage.removeItem(this.historyKey());
+  },
+
+  clearTraceData() {
+    this.clearTraceCounts();
+    this.clearTraceHistory();
+  },
+
+  // 全量学习数据重置：认字与写字一并清空，不影响礼物和设置
+  clearUserData() {
+    this.clearReadData();
+    this.clearTraceData();
   },
 
   // ---------- 显示开关（拼音 / 注解 / 记录汉字） ----------
@@ -427,7 +539,7 @@ const Storage = {
   // 备份文件结构：{ format, version, exportedAt, user, data }
   // data 内含该小朋友的全部本地数据：学习进度、练习记录、礼物、设置与显示开关
   EXPORT_FORMAT: "early-literacy-backup",
-  EXPORT_VERSION: 1,
+  EXPORT_VERSION: 3,
 
   exportUserData(id) {
     const uid = id || this.currentId();
@@ -455,6 +567,11 @@ const Storage = {
         dailyNewLimit: safeRead(() => this.dailyNewLimit(uid), 30),
         quizOrder: safeRead(() => this.quizOrder(uid), "review"),
         traceLevel: safeRead(() => this.traceLevel(uid), "loose"),
+        learnMode: this.learnMode(uid),
+        traceCounts: this.traceCounts(uid),
+        traceHistory: this.loadTraceHistory(uid),
+        traceLimit: safeRead(() => this.traceLimit(uid), 10),
+        writingScope: this.writingScope(uid),
         lastVolume: this.lastVolume(uid),
         prefs: {
           pinyin: this.pref(this.PREF_KEYS.PINYIN, uid),
@@ -563,6 +680,40 @@ const Storage = {
       fail("每日生字上限设置无效。");
     }
     if (d.quizOrder !== "review" && d.quizOrder !== "new") fail("每日出题顺序设置无效。");
+    // 写字相关：v1 备份没有这些字段，缺省时按默认值导入
+    if (d.learnMode != null && d.learnMode !== "read" && d.learnMode !== "write") {
+      fail("学习模式设置无效。");
+    }
+    if (d.traceCounts != null) {
+      if (!isObj(d.traceCounts)) fail("临摹次数格式不正确。");
+      Object.keys(d.traceCounts).forEach((ch) => {
+        if (!isNonNegInt(d.traceCounts[ch])) fail(`「${ch}」的临摹次数无效。`);
+      });
+    }
+    // v1/v2 备份没有写字历史，缺省时按空数组导入
+    if (d.traceHistory != null) {
+      if (!Array.isArray(d.traceHistory)) fail("写字记录格式不正确。");
+      d.traceHistory.forEach((h, i) => {
+        const no = i + 1;
+        if (!isObj(h) || typeof h.char !== "string" || !h.char) {
+          fail(`第 ${no} 条写字记录的汉字无效。`);
+        }
+        if (typeof h.volume !== "string") fail(`第 ${no} 条写字记录所属册目无效。`);
+        if (!Number.isInteger(h.count) || h.count < 1) {
+          fail(`第 ${no} 条写字记录的累计次数无效。`);
+        }
+        if (!isNonNegNum(h.date)) fail(`第 ${no} 条写字记录的时间无效。`);
+      });
+    }
+    if (
+      d.traceLimit != null &&
+      (!Number.isInteger(d.traceLimit) || d.traceLimit < 1 || d.traceLimit > 50)
+    ) {
+      fail("临摹换字阈值设置无效。");
+    }
+    if (d.writingScope != null && d.writingScope !== "all" && d.writingScope !== "write") {
+      fail("写字页展现范围设置无效。");
+    }
     if (typeof d.lastVolume !== "string") fail("最近选中的册格式不正确。");
     if (d.prefs != null) {
       if (!isObj(d.prefs)) fail("显示开关格式不正确。");
@@ -582,9 +733,11 @@ const Storage = {
     const d = this.validateUserData(raw);
     // 与正常写入保持一致的上限，避免一次导入塞入过多历史
     const history = d.history.slice(-this.HISTORY_MAX);
+    const traceHistory = (d.traceHistory || []).slice(-this.TRACE_HISTORY_MAX);
     const giftLog = d.giftLog.slice(-500);
     this.writeJSON(this.progressKey(uid), d.progress);
     this.writeJSON(this.historyKey(uid), history);
+    this.writeJSON(this.traceHistoryKey(uid), traceHistory);
     this.writeJSON(this.giftsKey(uid), d.gifts);
     this.writeJSON(this.giftLogKey(uid), giftLog);
     localStorage.setItem(this.quizOptionsKey(uid), String(d.quizOptions));
@@ -597,6 +750,12 @@ const Storage = {
     );
     if (d.lastVolume) this.setLastVolume(d.lastVolume, uid);
     else localStorage.removeItem(this.lastVolumeKey(uid));
+    // 写字相关数据；旧备份缺少字段时按默认值处理
+    this.setLearnMode(d.learnMode, uid);
+    if (d.traceCounts) this.writeJSON(this.traceCountKey(uid), d.traceCounts);
+    else localStorage.removeItem(this.traceCountKey(uid));
+    this.setTraceLimit(d.traceLimit, uid);
+    this.setWritingScope(d.writingScope, uid);
     // 显示开关缺省为开启，与 Storage.pref 的默认行为一致
     const prefs = { pinyin: true, note: true, tools: true };
     if (d.prefs) {
@@ -610,6 +769,7 @@ const Storage = {
     return {
       progress: Object.keys(d.progress).length,
       history: history.length,
+      traceHistory: traceHistory.length,
       gifts: d.gifts.length,
       giftLog: giftLog.length,
     };

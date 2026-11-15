@@ -42,6 +42,7 @@
     history: $("#view-history"),
     card: $("#view-card"),
     volumeWords: $("#view-volume-words"),
+    writing: $("#view-writing"),
     quiz: $("#view-quiz"),
     result: $("#view-result"),
     gifts: $("#view-gifts"),
@@ -532,9 +533,12 @@
   function renderVolumes(user) {
     // 拼音 / 注解开关按小朋友保存，切换小朋友后要重新应用
     refreshDisplaySwitches();
-    // 标题用小朋友的名字做个人空间入口；名字已在标题里，副标题只留动作提示
+    // 标题用小朋友的名字做个人空间入口；中间胶囊切换「认字 / 写字」（按小朋友保存）
     $("#volumes-title").textContent = user ? `${user.name}的小书架` : "我的小书架";
-    $("#volume-owner").textContent = user ? "想学哪一册？" : "";
+    const mode = user ? Storage.learnMode(user.id) : "read";
+    document.querySelectorAll("#volume-mode .setting-switch-btn").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.v === mode);
+    });
     const list = $("#volume-list");
     list.innerHTML = "";
     // 最近点开过的册排到第一项，并用不同配色 + 分隔线与其他册区分（按小朋友保存）
@@ -545,11 +549,16 @@
     if (recentIndex > 0) volumes.unshift(volumes.splice(recentIndex, 1)[0]);
     volumes.forEach((v, i) => {
       const s = Storage.statsFor(v.entries);
+      const writeCount = v.entries.filter((e) => e.level === "书写").length;
+      const meta =
+        mode === "write"
+          ? `共 ${s.total} 字 · 书写 ${writeCount} 字`
+          : `共 ${s.total} 字 · 已学 ${s.learned} · 待复习 ${s.due}`;
       const card = document.createElement("button");
       card.className = hasRecent && i === 0 ? "volume-card recent" : "volume-card";
       card.dataset.id = v.id;
       card.innerHTML = `<span class="volume-name">${v.title}</span>
-        <span class="volume-meta">共 ${s.total} 字 · 已学 ${s.learned} · 待复习 ${s.due}</span>
+        <span class="volume-meta">${meta}</span>
         <span class="volume-icon" role="img" aria-label="查看本册汉字" title="查看本册汉字">📖</span>`;
       list.appendChild(card);
       if (hasRecent && i === 0) {
@@ -591,6 +600,123 @@
         .join("");
     show("volumeWords");
     updateScrollFade($("#word-list"), $("#word-sheet"));
+  }
+
+  /* ---------- 写字页：推荐练习 + 其他汉字 ---------- */
+  let writingVolume = null; // 当前写字页对应的册（从临摹页返回时重新渲染）
+
+  function renderWriting(volume) {
+    writingVolume = volume;
+    const id = Storage.currentId();
+    const counts = Storage.traceCounts(id);
+    const limit = Storage.traceLimit(id);
+    const scope = Storage.writingScope(id);
+    const pick = Quiz.pickWriting(volume.entries, counts, limit, scope);
+    $("#writing-subtitle").textContent = `${volume.title} · 写一写`;
+    refreshWritingToggles(); // 同步顶部手势/语音按钮高亮
+    renderWritingCells($("#writing-recommend"), pick.recommend, counts, limit);
+    renderWritingCells($("#writing-others"), pick.others, counts, limit);
+    const empty = !pick.recommend.length && !pick.others.length;
+    $("#writing-recommend-title").classList.toggle("hidden", !pick.recommend.length);
+    $("#writing-others-title").classList.toggle("hidden", !pick.others.length);
+    $("#writing-empty").classList.toggle("hidden", !empty);
+    show("writing");
+    updateScrollFade($("#writing-scroll"));
+  }
+
+  // 渲染一组田字格：右下角显示已临摹次数，徽章随次数接近阈值由橙色渐变为红色
+  function renderWritingCells(box, entries, counts, limit) {
+    box.innerHTML = "";
+    entries.forEach((e) => {
+      const n = counts[e.char] || 0;
+      const cell = document.createElement("button");
+      cell.type = "button";
+      cell.className = n >= limit ? "wcell done" : "wcell";
+      cell.dataset.char = e.char;
+      cell.title = `临摹「${e.char}」，已临摹 ${n} 次`;
+      cell.style.setProperty("--count-hue", Math.round(32 - 28 * Math.min(n / limit, 1)));
+      cell.innerHTML = `<span class="wchar">${e.char}</span><span class="wcount">${n}</span>`;
+      box.appendChild(cell);
+    });
+  }
+
+  /* ---------- 写字页临摹模态框 ---------- */
+  let traceModalFrom = null; // 源田字格相对视口中心的偏移，关闭时沿原路缩回
+  let traceModalBusy = false; // 开关动画进行中，避免重复触发
+
+  // 同步写字页顶部手势/语音按钮的高亮（与临摹页共享同一份设置）
+  function refreshWritingToggles() {
+    if (!window.TraceView) return;
+    $("#btn-writing-gesture").classList.toggle("active", TraceView.getGesture());
+    $("#btn-writing-voice").classList.toggle("active", TraceView.getVoice());
+  }
+
+  // 完整临摹一遍：累计次数与逐字历史同时更新；volume 为空时由记录页显示“单字练习”
+  function recordTraceCompletion(char, volume) {
+    const count = Storage.addTraceCount(char);
+    if (!count) return;
+    Storage.addTraceHistory({ char, volume: volume || "", count });
+  }
+
+  // 点田字格：与礼物放大框一致，从源格子缩小/半透明状态放大到视口中央
+  function openWritingTrace(char, cell) {
+    if (!char || !window.TraceView || traceModalBusy) return;
+    const overlay = $("#trace-modal");
+    if (!overlay.classList.contains("hidden")) return; // 已打开
+    const volume = writingVolume ? writingVolume.title : "";
+    const inner = $("#trace-modal-inner");
+    overlay.classList.remove("hidden");
+    // 模态框模式：田字格与提示挂载到面板，演示/重写挂载到面板上方外侧
+    TraceView.open(char, {
+      mount: $("#trace-modal-panel"),
+      actions: $("#trace-modal-actions"),
+      onComplete: () => recordTraceCompletion(char, volume),
+    });
+    traceModalBusy = true;
+    traceModalFrom = null;
+    inner.style.transition = "none";
+    if (cell) {
+      const r = cell.getBoundingClientRect();
+      traceModalFrom = {
+        dx: r.left + r.width / 2 - window.innerWidth / 2,
+        dy: r.top + r.height / 2 - window.innerHeight / 2,
+      };
+      inner.style.transform = `translate(${traceModalFrom.dx}px, ${traceModalFrom.dy}px) scale(0.3)`;
+      inner.style.opacity = "0.4";
+    } else {
+      inner.style.transform = "scale(0.6)";
+      inner.style.opacity = "0";
+    }
+    // 等一帧后清掉内联起始值并加 active，CSS 过渡接管：飞到中央并放大
+    requestAnimationFrame(() => {
+      inner.style.transition = "";
+      inner.style.transform = "";
+      inner.style.opacity = "";
+      overlay.classList.add("active");
+      setTimeout(() => { traceModalBusy = false; }, 320);
+    });
+  }
+
+  // 点框外关闭：整块内容沿原路收缩回源田字格并淡出，随后刷新次数与推荐字
+  function closeWritingTrace() {
+    const overlay = $("#trace-modal");
+    if (overlay.classList.contains("hidden") || traceModalBusy) return;
+    traceModalBusy = true;
+    TraceView.close();
+    const inner = $("#trace-modal-inner");
+    overlay.classList.remove("active");
+    if (traceModalFrom) {
+      inner.style.transform = `translate(${traceModalFrom.dx}px, ${traceModalFrom.dy}px) scale(0.3)`;
+      inner.style.opacity = "0";
+    }
+    traceModalFrom = null;
+    setTimeout(() => {
+      overlay.classList.add("hidden");
+      inner.style.transform = "";
+      inner.style.opacity = "";
+      traceModalBusy = false;
+      if (writingVolume) renderWriting(writingVolume);
+    }, 320);
   }
 
   /* ---------- 应用设置 ---------- */
@@ -646,6 +772,11 @@
     $("#set-trace-level")
       .querySelectorAll("button")
       .forEach((b) => b.classList.toggle("active", b.dataset.v === level));
+    $("#set-trace-limit").value = Storage.traceLimit(id);
+    const scope = Storage.writingScope(id);
+    $("#set-writing-scope")
+      .querySelectorAll("button")
+      .forEach((b) => b.classList.toggle("active", b.dataset.v === scope));
   }
 
   /* ---------- 通用单字详情页 ---------- */
@@ -676,6 +807,7 @@
   // 当前记录页里每个可点击汉字对应的字库条目
   let historyEntries = [];
   let historyTab = "record"; // 记录页当前标签：record（默认）/ stats
+  let historyMode = "read"; // 进入记录页时固定为认字 / 写字，详情返回后保持不变
   let statsEntries = []; // 统计页每个可点击错字对应的字库条目
 
   // 每条作答记录自带拼音、组词与注解，直接取出展示
@@ -683,31 +815,40 @@
     return { char: a.c, pinyin: a.pinyin, words: a.words, note: a.note };
   }
 
-  // 从选册页进入时总是回到「记录」标签
+  // 从选册页进入时根据胶囊模式展示对应记录，并总是回到「记录」标签
   function openHistory() {
+    historyMode = Storage.learnMode();
     historyTab = "record";
     renderHistory();
   }
 
-  // 按当前标签渲染：记录列表 / 统计面板
+  // 按当前模式和标签渲染：认字 / 写字，记录列表 / 统计面板
   function renderHistory() {
     const user = Storage.currentUser();
-    $("#history-owner").textContent = user ? `${user.name} 的练习记录` : "";
-    const list = Storage.loadHistory();
+    const isWriting = historyMode === "write";
+    $("#history-owner").textContent = user
+      ? `${user.name} 的${isWriting ? "写字" : "认字"}练习记录`
+      : "";
+    const list = isWriting ? Storage.loadTraceHistory() : Storage.loadHistory();
     const isStats = historyTab === "stats";
     document.querySelectorAll("#history-tab .setting-switch-btn").forEach((btn) => {
       btn.classList.toggle("active", btn.dataset.v === historyTab);
     });
-    // 图例与「汉字」开关只对记录列表有意义
-    $("#history-toolbar").classList.toggle("hidden", isStats);
+    // 写字没有对错与星星，认字图例和「汉字」开关只在认字记录列表显示
+    $("#history-toolbar").classList.toggle("hidden", isStats || isWriting);
     const box = $("#history-list");
-    if (isStats) {
+    if (isWriting) {
+      if (isStats) renderTraceStats(box, list);
+      else renderTraceRecordList(box, list);
+    } else if (isStats) {
       renderStats(box, list);
     } else {
       renderRecordList(box, list);
     }
-    // 进度或记录任一存在就保留「清除记录」
-    const hasData = list.length > 0 || Object.keys(Storage.loadAll()).length > 0;
+    // 当前模式的进度或记录任一存在就保留「清除记录」
+    const hasData = isWriting
+      ? list.length > 0 || Object.keys(Storage.traceCounts()).length > 0
+      : list.length > 0 || Object.keys(Storage.loadAll()).length > 0;
     $("#btn-reset").classList.toggle("hidden", !hasData);
     show("history");
     updateScrollFade($("#history-list"));
@@ -752,6 +893,87 @@
         </div>`;
       })
       .join("");
+  }
+
+  // 写字记录：每完整临摹一个字一遍记一条，导入的文本也用 textContent 展示
+  function renderTraceRecordList(box, list) {
+    const reversed = list.slice().reverse();
+    historyEntries = [];
+    if (reversed.length === 0) {
+      box.innerHTML = `<p class="history-empty">还没有写字记录，完整临摹一个字后会显示在这里！</p>`;
+      return;
+    }
+    box.innerHTML = "";
+    reversed.forEach((r) => {
+      const d = new Date(r.date);
+      const when = `${d.getMonth() + 1}月${d.getDate()}日 ${String(
+        d.getHours()
+      ).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")} · ${
+        r.volume || "单字练习"
+      }`;
+      const entry = charEntryOf(r.char);
+      const idx = historyEntries.length;
+      historyEntries.push({
+        char: r.char,
+        pinyin: entry.pinyin || "",
+        words: entry.words || "",
+        note: entry.note || "",
+      });
+
+      const item = document.createElement("div");
+      item.className = "history-item";
+      const head = document.createElement("div");
+      head.className = "history-head";
+      const date = document.createElement("span");
+      date.className = "history-date";
+      date.textContent = when;
+      head.appendChild(date);
+
+      const row = document.createElement("div");
+      row.className = "history-write-row";
+      const button = document.createElement("button");
+      button.className = "hchar write";
+      button.dataset.idx = idx;
+      button.textContent = r.char;
+      button.title = `查看「${r.char}」的详情`;
+      const meta = document.createElement("span");
+      meta.className = "history-write-meta";
+      meta.textContent = `完成临摹 · 累计第 ${r.count} 次`;
+      row.append(button, meta);
+      item.append(head, row);
+      box.appendChild(item);
+    });
+  }
+
+  // 写字统计：累计数据来自现有次数，今日数据来自逐字历史
+  function renderTraceStats(box, history) {
+    const counts = Storage.traceCounts();
+    const nums = Object.keys(counts)
+      .map((char) => counts[char])
+      .filter((n) => Number.isInteger(n) && n > 0);
+    const total = nums.reduce((sum, n) => sum + n, 0);
+    const today = history.filter((r) => r.date >= Storage.todayStart()).length;
+    const limit = Storage.traceLimit();
+    const reached = nums.filter((n) => n >= limit).length;
+    if (total === 0 && history.length === 0) {
+      box.innerHTML = `<p class="history-empty">还没有写字数据，快去临摹一个字吧！</p>`;
+      return;
+    }
+    const cards = [
+      { value: `${total}<small>遍</small>`, label: "累计临摹", hint: "所有完整临摹次数" },
+      { value: `${nums.length}<small>字</small>`, label: "练过的字", hint: "至少完整写过一遍" },
+      { value: `${today}<small>遍</small>`, label: "今日临摹", hint: "今天完成的遍数" },
+      { value: `${reached}<small>字</small>`, label: "达到阈值", hint: `当前换字阈值 ${limit} 次` },
+    ];
+    box.innerHTML = `<div class="stats-grid">${cards
+      .map(
+        (c) => `<div class="stats-card">
+          <span class="stats-value">${c.value}</span>
+          <span class="stats-label">${c.label}</span>
+          <span class="stats-hint">${c.hint}</span>
+        </div>`
+      )
+      .join("")}</div>`;
   }
 
   // 字库条目索引：把进度里的「汉字|拼音」还原成可打开详情页的条目
@@ -2646,7 +2868,7 @@
       renderVolumes(user);
     });
   });
-  // 选择某一册，开始练习；点右侧图标则先查看该册汉字表
+  // 选择某一册：认字模式进入练习，写字模式进入写字页；点右侧图标则先查看该册汉字表
   $("#volume-list").addEventListener("click", (e) => {
     const card = e.target.closest(".volume-card");
     if (!card) return;
@@ -2658,11 +2880,68 @@
       renderVolumeWords(volume);
       return;
     }
-    enterVolume(Storage.currentUser(), volume);
+    const user = Storage.currentUser();
+    if (user && Storage.learnMode(user.id) === "write") renderWriting(volume);
+    else enterVolume(user, volume);
+  });
+  // 小书架顶部「认字 | 写字」切换（按小朋友保存）
+  $("#volume-mode").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-v]");
+    if (!btn) return;
+    Storage.setLearnMode(btn.dataset.v, Storage.currentId());
+    renderVolumes(Storage.currentUser());
+  });
+  // 写字页：点推荐区或其他区的田字格都会弹出临摹模态框；顶部「返回」回到小书架
+  $("#view-writing").addEventListener("click", (e) => {
+    const cell = e.target.closest(".wcell");
+    if (!cell) return;
+    openWritingTrace(cell.dataset.char, cell);
+  });
+  $("#btn-writing-back").addEventListener("click", backToVolumes);
+  // 写字页顶部手势 / 语音开关：与临摹页共享同一份状态与存储
+  $("#btn-writing-gesture").addEventListener("click", () => {
+    if (!window.TraceView) return;
+    TraceView.setGesture(!TraceView.getGesture());
+    refreshWritingToggles();
+  });
+  $("#btn-writing-voice").addEventListener("click", () => {
+    if (!window.TraceView) return;
+    TraceView.setVoice(!TraceView.getVoice());
+    refreshWritingToggles();
+  });
+  // 临摹模态框：与礼物放大框一致，只有点内容区域外才关闭
+  $("#trace-modal").addEventListener("click", (e) => {
+    if (e.target.closest(".trace-modal-inner")) return;
+    closeWritingTrace();
+  });
+  // 写字页顶部按钮条折叠 / 展开（与临摹页、练习页一致）
+  const writingToolsWrap = $("#writing-tools-wrap");
+  const writingToolsHide = $("#btn-writing-tools-hide");
+  const writingToolsShow = $("#btn-writing-tools-show");
+  let writingDrawerTimer = 0;
+  writingToolsHide.addEventListener("click", () => {
+    if (writingToolsWrap.classList.contains("drawer-out")) return;
+    writingToolsWrap.classList.add("drawer-out");
+    writingDrawerTimer = setTimeout(() => {
+      writingDrawerTimer = 0;
+      writingToolsWrap.classList.remove("drawer-out");
+      writingToolsWrap.classList.add("collapsed");
+    }, 200);
+    writingToolsHide.setAttribute("aria-expanded", "false");
+    writingToolsShow.setAttribute("aria-expanded", "true");
+  });
+  writingToolsShow.addEventListener("click", () => {
+    clearTimeout(writingDrawerTimer);
+    writingDrawerTimer = 0;
+    writingToolsWrap.classList.remove("drawer-out");
+    writingToolsWrap.classList.remove("collapsed");
+    writingToolsHide.setAttribute("aria-expanded", "true");
+    writingToolsShow.setAttribute("aria-expanded", "false");
   });
   // 册目列表、汉字表、练习记录、练习设置、应用设置、礼物橱窗、礼物记录与礼物袋网格滚动时更新边缘淡出与滚动条显隐；窗口尺寸变化时重新计算
   bindScrollFx($("#volume-list"));
   bindScrollFx($("#word-list"), $("#word-sheet"));
+  bindScrollFx($("#writing-scroll"));
   bindScrollFx($("#history-list"));
   bindScrollFx($("#settings-scroll"));
   bindScrollFx($("#admin-scroll"));
@@ -2673,6 +2952,7 @@
   window.addEventListener("resize", () => {
     updateScrollFade($("#volume-list"));
     updateScrollFade($("#word-list"), $("#word-sheet"));
+    updateScrollFade($("#writing-scroll"));
     updateScrollFade($("#history-list"));
     updateScrollFade($("#settings-scroll"));
     updateScrollFade($("#admin-scroll"));
@@ -2794,6 +3074,19 @@
     Storage.setTraceLevel(btn.dataset.v, Storage.currentId());
     refreshSettings(Storage.currentUser());
   });
+  // 写字设置：推荐换字阈值与写字页展现范围（按小朋友保存）
+  $("#set-trace-limit").addEventListener("change", () => {
+    $("#set-trace-limit").value = Storage.setTraceLimit(
+      $("#set-trace-limit").value,
+      Storage.currentId()
+    );
+  });
+  $("#set-writing-scope").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-v]");
+    if (!btn) return;
+    Storage.setWritingScope(btn.dataset.v, Storage.currentId());
+    refreshSettings(Storage.currentUser());
+  });
 
   // 练习设置里的「学习重置」：应用内二次确认
   // 确认后清空该小朋友的学习进度与练习记录，礼物、练习设置等其余数据保留
@@ -2911,8 +3204,8 @@
       refreshSettings(Storage.currentUser());
       showDataMessage(
         "导入成功",
-        `已恢复 ${result.progress} 个字的学习进度、${result.history} 条练习记录、` +
-          `${result.gifts} 件礼物与 ${result.giftLog} 条礼物领取记录。`
+        `已恢复 ${result.progress} 个字的学习进度、${result.history} 条认字记录、` +
+          `${result.traceHistory} 条写字记录、${result.gifts} 件礼物与 ${result.giftLog} 条礼物领取记录。`
       );
     } catch (err) {
       showDataMessage("导入失败", err.message);
@@ -2979,16 +3272,21 @@
     TraceView.load(char).then(() => {
       clearTimeout(showTimer);
       if (loadingShown) hideLoading();
-      TraceView.open(char); // 数据已在缓存，立即渲染
+      TraceView.open(char, { onComplete: () => recordTraceCompletion(char, "") }); // 数据已在缓存，立即渲染
     });
   });
   $("#btn-card-back").addEventListener("click", () => {
     if (cardOnBack) cardOnBack();
   });
-  // 清除当前小朋友的进度与记录（二次确认），清空后停留在本页
+  // 按记录页模式清理对应数据，认字与写字互不影响
   $("#btn-reset").addEventListener("click", () => {
-    if (confirm("确定要清除这位小朋友的所有练习记录吗？此操作不可恢复。")) {
-      Storage.clearUserData();
+    const isWriting = historyMode === "write";
+    const message = isWriting
+      ? "确定要清除这位小朋友的所有写字记录和临摹次数吗？此操作不可恢复。"
+      : "确定要清除这位小朋友的所有认字记录和学习进度吗？此操作不可恢复。";
+    if (confirm(message)) {
+      if (isWriting) Storage.clearTraceData();
+      else Storage.clearReadData();
       renderHistory();
     }
   });

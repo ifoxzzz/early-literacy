@@ -4218,7 +4218,7 @@ body.hide-note .hint-bar {
 }
 
 .writing-grid-mini .wchar {
-  font-size: calc(clamp(18px, 4.6vmin, 26px) * min(var(--fs), 1));
+  font-size: calc(clamp(22px, 5.8vmin, 32px) * min(var(--fs), 1));
 }
 
 /* 临摹次数徽章：白字圆角框；--count-hue 由 JS 按次数从 32（橙）降到 4（红） */

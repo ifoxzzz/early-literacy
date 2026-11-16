@@ -7,7 +7,7 @@
   <script>
     // 全局唯一版本号（同时用于缓存失效）：改动任何 css/js/音频后递增版本号，
     // 如 1.0.0 → 1.0.1，即可让全部缓存失效；首页右下角显示的也是这个版本
-    var CACHE_VERSION = "1.1.4";
+    var CACHE_VERSION = "1.1.6";
     window.APP_VERSION = CACHE_VERSION;
     // 资源缓存标记：应用设置里「清理资源缓存」后更换。音频、字体、笔顺、图片等
     // 下载型资源的 URL 都会带上它，点一次清理即可绕过浏览器里的旧副本。
@@ -245,12 +245,23 @@
     <p class="history-owner writing-footer" id="writing-subtitle"></p>
   </section>
 
-  <!-- 写字页临摹模态框：面板内只有田字格和提示文字；演示/重写附着在面板上方外侧。
-       动画与礼物放大框一致：从所点田字格放大到中央，点框外收缩回去 -->
+  <!-- 临摹模态框（写字页与单字详情页共用）：面板内是田字格和提示文字，
+       演示/重写附着在面板上方外侧。动画与礼物放大框一致：从所点田字格放大到中央，点框外收缩回去 -->
   <div class="trace-modal hidden" id="trace-modal">
     <div class="trace-modal-inner" id="trace-modal-inner">
       <div class="trace-modal-actions" id="trace-modal-actions"></div>
-      <div class="trace-modal-panel trace-host" id="trace-modal-panel"></div>
+      <div class="trace-modal-panel trace-host" id="trace-modal-panel">
+        <div class="trace-stage">
+          <div class="trace-bar">
+            <button class="btn btn-read" id="btn-trace-demo">👀 演示</button>
+            <button class="btn btn-read" id="btn-trace-reset">🔄 重写</button>
+          </div>
+          <div class="trace-frame-wrap">
+            <svg id="trace-svg" viewBox="0 0 1024 1024" aria-label="临摹田字格"></svg>
+          </div>
+        </div>
+        <p class="trace-tip" id="trace-tip"></p>
+      </div>
     </div>
   </div>
 
@@ -539,7 +550,6 @@
     </header>
     <div class="detail-read">
       <button class="btn btn-read" id="btn-card-read"><span class="read-icon">🔊</span> 读一读</button>
-      <button class="btn btn-read btn-trace-entry" id="btn-card-trace"><span class="read-icon">✏️</span> 写一写</button>
     </div>
     <main class="card-detail" id="card-grid"></main>
     <div class="detail-bottom">
@@ -548,40 +558,6 @@
         <p id="card-note"></p>
       </footer>
     </div>
-  </section>
-
-  <!-- 临摹页（写一写原型）：从单字详情页进入的独立页面，顶部按钮风格与练习页一致 -->
-  <section id="view-trace" class="view hidden trace-host">
-    <header class="quiz-header">
-      <div class="quiz-tools-wrap" id="trace-tools-wrap">
-        <div class="quiz-tools" id="trace-tools">
-          <div class="quiz-tools-btns">
-            <button class="btn btn-skip" id="btn-trace-gesture">手势</button>
-            <button class="btn btn-skip" id="btn-trace-voice">语音</button>
-            <button class="btn btn-skip" id="btn-trace-back">返回</button>
-          </div>
-          <button class="quiz-tools-close" id="btn-trace-tools-hide" aria-expanded="true"
-            aria-controls="trace-tools" aria-label="关闭顶部按钮">✕</button>
-        </div>
-      </div>
-      <div class="quiz-status">
-        <button class="btn-tools-show" id="btn-trace-tools-show"
-          aria-expanded="false" aria-controls="trace-tools" aria-label="显示顶部按钮">
-          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-        </button>
-      </div>
-    </header>
-    <main class="trace-stage">
-      <!-- 演示 / 重写：参照练习页「再听一遍」按钮，紧贴在田字格上方 -->
-      <div class="trace-bar">
-        <button class="btn btn-read" id="btn-trace-demo">👀 演示</button>
-        <button class="btn btn-read" id="btn-trace-reset">🔄 重写</button>
-      </div>
-      <div class="trace-frame-wrap">
-        <svg id="trace-svg" viewBox="0 0 1024 1024" aria-label="临摹田字格"></svg>
-      </div>
-    </main>
-    <p class="trace-tip" id="trace-tip"></p>
   </section>
 
   <!-- 练习页 -->

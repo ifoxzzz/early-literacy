@@ -86,13 +86,13 @@
   let demoDot = null;
   let finishTimer = 0; // 一轮演示结束后下一轮开演的定时器
   let currentChar = ""; // 当前临摹的汉字
-  let openOpts = null; // 本次进入的附加参数 { mount, actions, onBack, onComplete(char, flawless) }
+  let openOpts = null; // 本次进入的附加参数 { mount, actions, onComplete(char, flawless) }
   let openToken = 0; // 会话令牌：每次 open/close 自增，作废进行中的笔顺加载回调
 
   /* ---------- DOM ---------- */
   const svg = $("#trace-svg");
   const tipEl = $("#trace-tip");
-  // 临摹舞台（演示/重写/田字格）：作为可移动单元，独立页与写字页模态框间按需挂载
+  // 临摹舞台（演示/重写/田字格）：挂在模态框面板内，打开时按需移动到目标容器
   const stageEl = $(".trace-stage");
   let flipG = null; // 字形层（翻转坐标）
   let goldG = null; // 完成特效：金色光丝沿笔画轮廓游走
@@ -472,7 +472,6 @@
     stopVoice();
     hideGuide();
     demoOn = true;
-    refreshToggleBtns();
     beginRound();
   }
 
@@ -484,7 +483,6 @@
     clearTimeout(finishTimer);
     removeDemoDot();
     resetBlank();
-    refreshToggleBtns();
     if (restore) {
       tipStroke();
       showGuide();
@@ -608,17 +606,10 @@
     if (goldG) goldG.classList.add("hidden");
   }
 
-  function refreshToggleBtns() {
-    $("#btn-trace-gesture").classList.toggle("active", gestureOn);
-    $("#btn-trace-voice").classList.toggle("active", voiceOn);
-  }
-
-  // 把临摹单元（田字格舞台 + 提示条）挂载到目标容器；独立页与模态框共用同一套 DOM。
-  // 模态框把演示/重写按钮放到面板上方外侧；回到独立页时再收进舞台顶部。
+  // 把临摹单元（田字格舞台 + 提示条）挂载到模态框面板；
+  // 演示/重写按钮放到面板上方外侧
   function mountTraceTo(container, actionMount) {
-    const barEl = $(".trace-bar");
-    if (actionMount) actionMount.appendChild(barEl);
-    else if (barEl.parentNode !== stageEl) stageEl.insertBefore(barEl, stageEl.firstChild);
+    if (actionMount) actionMount.appendChild($(".trace-bar"));
     container.appendChild(stageEl);
     container.appendChild(tipEl);
   }
@@ -627,14 +618,8 @@
     currentChar = char;
     openOpts = opts || null;
     const token = ++openToken;
-    const mount = (openOpts && openOpts.mount) || $("#view-trace");
-    const isModal = mount !== $("#view-trace");
-    if (!isModal) {
-      // 独立页：隐藏其它视图，显示临摹页
-      document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
-      $("#view-trace").classList.remove("hidden");
-    }
-    // 模态框模式：由调用方负责显示模态框，这里只挂载临摹单元
+    const mount = (openOpts && openOpts.mount) || $("#trace-modal-panel");
+    // 由调用方显示模态框，这里只把临摹单元挂载进去
     mountTraceTo(mount, openOpts && openOpts.actions);
     tipEl.textContent = "正在加载笔顺…";
     ready = false;
@@ -662,37 +647,25 @@
   function close() {
     openToken++; // 作废进行中的笔顺加载回调
     stopDemo(false); // 停演示、清残笔与金色光丝层
-    clearTimeout(drawerTimer); // 抽屉若正处于折叠延时中，退出后不再改动原页面
-    drawerTimer = 0;
     stopVoice();
     hideGuide();
     ready = false;
     pointerId = null;
-    const opts = openOpts;
     openOpts = null;
-    const isModal = opts && opts.mount && opts.mount !== $("#view-trace");
-    if (!isModal) $("#view-trace").classList.add("hidden");
-    // 模态框模式由调用方自行关闭模态框；独立页默认回到单字详情页
-    if (opts && typeof opts.onBack === "function") {
-      opts.onBack();
-    } else if (!isModal) {
-      $("#view-card").classList.remove("hidden");
-    }
+    // 模态框由调用方负责关闭
   }
 
   /* ---------- 顶部按钮（风格与练习页一致） ---------- */
-  // 手势 / 语音开关：独立页按钮与写字页模态框外的按钮共用同一份状态与存储
+  // 手势 / 语音开关：由写字页顶部按钮共享同一份状态与存储
   function setGesture(on) {
     gestureOn = !!on;
     savePref("gesture", gestureOn);
-    refreshToggleBtns();
     if (gestureOn) showGuide();
     else hideGuide();
   }
   function setVoice(on) {
     voiceOn = !!on;
     savePref("voice", voiceOn);
-    refreshToggleBtns();
     if (voiceOn) {
       announceName(idx);
       scheduleVoice();
@@ -700,15 +673,12 @@
       stopVoice();
     }
   }
-  $("#btn-trace-gesture").addEventListener("click", () => setGesture(!gestureOn));
-  $("#btn-trace-voice").addEventListener("click", () => setVoice(!voiceOn));
   $("#btn-trace-demo").addEventListener("click", () => {
     // 「演示」是开关：开 = 循环演示，关（或点页面任意位置）= 停止
     if (demoOn) stopDemo(true);
     else startDemo();
   });
   // 演示中点页面任意位置终止（「演示」按钮本身除外，它走自己的开关逻辑）
-  // 监听绑在可移动的临摹舞台上，独立页与写字页模态框内都生效
   stageEl.addEventListener(
     "pointerdown",
     (e) => {
@@ -716,30 +686,6 @@
     },
     true
   );
-  // 顶部按钮折叠 / 展开（与练习页一致：按钮先滑进灰色关闭区，滑完再折叠面板）
-  const toolsWrap = $("#trace-tools-wrap");
-  const toolsHide = $("#btn-trace-tools-hide");
-  const toolsShow = $("#btn-trace-tools-show");
-  let drawerTimer = 0;
-  toolsHide.addEventListener("click", () => {
-    if (toolsWrap.classList.contains("drawer-out")) return;
-    toolsWrap.classList.add("drawer-out");
-    drawerTimer = setTimeout(() => {
-      drawerTimer = 0;
-      toolsWrap.classList.remove("drawer-out");
-      toolsWrap.classList.add("collapsed");
-    }, 200);
-    toolsHide.setAttribute("aria-expanded", "false");
-    toolsShow.setAttribute("aria-expanded", "true");
-  });
-  toolsShow.addEventListener("click", () => {
-    clearTimeout(drawerTimer);
-    drawerTimer = 0;
-    toolsWrap.classList.remove("drawer-out");
-    toolsWrap.classList.remove("collapsed");
-    toolsHide.setAttribute("aria-expanded", "true");
-    toolsShow.setAttribute("aria-expanded", "false");
-  });
   $("#btn-trace-reset").addEventListener("click", () => {
     if (!ready) return;
     stopDemo(false); // 已含 resetBlank：清点亮、进度、金色光丝与演示状态
@@ -748,13 +694,12 @@
     announceName(0);
     scheduleVoice();
   });
-  $("#btn-trace-back").addEventListener("click", close);
 
   window.TraceView = {
     open,
     close,
     load: loadChar,
-    // 手势 / 语音开关（写字页顶部按钮与独立页共享同一份状态）
+    // 手势 / 语音开关（写字页顶部按钮用）
     setGesture,
     setVoice,
     getGesture: () => gestureOn,

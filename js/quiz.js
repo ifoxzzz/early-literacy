@@ -193,9 +193,9 @@ const Quiz = {
     const sorted = list.slice().sort((a, b) => rank(a) - rank(b));
     const recommend = sorted.slice(0, want);
     const picked = new Set(recommend.map((e) => e.char));
-    return {
-      recommend,
-      others: list.filter((e) => !picked.has(e.char)),
-    };
+    // 其他汉字按临摹次数从多到少排，次数相同的保持字库顺序
+    const others = list.filter((e) => !picked.has(e.char));
+    others.sort((a, b) => countOf(b) - countOf(a));
+    return { recommend, others };
   },
 };

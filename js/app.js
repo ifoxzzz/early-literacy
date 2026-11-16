@@ -665,10 +665,17 @@
     const gap = parseFloat(getComputedStyle(grid).columnGap) || 10;
     const cell = (grid.clientWidth - (writingCols - 1) * gap) / writingCols;
     grid.style.setProperty("--wchar-size", `${Math.min(cell * 0.6, 56)}px`);
+    // 当天已经临摹过的字：推荐区与其他汉字都用另一种底色标记
+    const todayStart = Storage.todayStart();
+    const todayChars = new Set(
+      Storage.loadTraceHistory(id)
+        .filter((r) => r.date >= todayStart)
+        .map((r) => r.char)
+    );
     // 推荐区只占两行，容纳不下的推荐字转入「其他汉字」，不会从页面消失
     const pick = Quiz.pickWriting(volume.entries, counts, limit, scope, writingCols * 2);
-    renderWritingCells(grid, pick.recommend, counts, limit);
-    renderWritingCells($("#writing-others"), pick.others, counts, limit);
+    renderWritingCells(grid, pick.recommend, counts, limit, todayChars);
+    renderWritingCells($("#writing-others"), pick.others, counts, limit, todayChars);
     prefetchWritingStrokes(pick.recommend);
     const empty = !pick.recommend.length && !pick.others.length;
     $("#writing-recommend-title").classList.toggle("hidden", !pick.recommend.length);
@@ -678,13 +685,16 @@
   }
 
   // 渲染一组田字格：右下角显示已临摹次数，徽章随次数接近阈值由橙色渐变为红色
-  function renderWritingCells(box, entries, counts, limit) {
+  function renderWritingCells(box, entries, counts, limit, todayChars) {
     box.innerHTML = "";
     entries.forEach((e) => {
       const n = counts[e.char] || 0;
       const cell = document.createElement("button");
       cell.type = "button";
-      cell.className = n >= limit ? "wcell done" : "wcell";
+      const classes = ["wcell"];
+      if (n >= limit) classes.push("done");
+      if (todayChars && todayChars.has(e.char)) classes.push("today");
+      cell.className = classes.join(" ");
       cell.dataset.char = e.char;
       cell.title = `临摹「${e.char}」，已临摹 ${n} 次`;
       cell.style.setProperty("--count-hue", Math.round(32 - 28 * Math.min(n / limit, 1)));
@@ -723,7 +733,7 @@
     const volume = writingVolume ? writingVolume.title : "";
     const data = window.STROKES_DATA && window.STROKES_DATA[char];
     if (data) {
-      showWritingTrace(char, cell, volume);
+      showTraceModal(char, cell, volume);
       return;
     }
     const endLoading = beginStrokeLoading(char);
@@ -733,11 +743,35 @@
       traceModalBusy = false;
       // 加载期间可能已返回书架，这时不再弹出
       if (views.writing.classList.contains("hidden")) return;
-      showWritingTrace(char, cell, volume);
+      showTraceModal(char, cell, volume);
     });
   }
 
-  function showWritingTrace(char, cell, volume) {
+  // 单字详情页：点田字格弹出与写字页相同的临摹模态框
+  function openCardTrace() {
+    if (!cardEntry || !window.TraceView || traceModalBusy) return;
+    const overlay = $("#trace-modal");
+    if (!overlay.classList.contains("hidden")) return; // 已打开
+    const char = cardEntry.char;
+    if (!char) return;
+    const card = $("#card-grid .card");
+    const data = window.STROKES_DATA && window.STROKES_DATA[char];
+    if (data) {
+      showTraceModal(char, card, "");
+      return;
+    }
+    const endLoading = beginStrokeLoading(char, 150, `正在准备「${char}」的笔顺`);
+    traceModalBusy = true; // 加载期间忽略重复点击
+    TraceView.load(char).then(() => {
+      endLoading();
+      traceModalBusy = false;
+      // 加载期间可能已返回上一页，这时不再弹出
+      if (views.card.classList.contains("hidden")) return;
+      showTraceModal(char, card, "");
+    });
+  }
+
+  function showTraceModal(char, cell, volume) {
     const overlay = $("#trace-modal");
     const inner = $("#trace-modal-inner");
     overlay.classList.remove("hidden");
@@ -822,8 +856,9 @@
     };
   }
 
-  // 点框外关闭：整块内容沿原路收缩回源田字格并淡出，随后刷新次数与推荐字
-  function closeWritingTrace() {
+  // 点框外关闭：整块内容沿原路收缩回源田字格并淡出；
+  // 从写字页打开时顺便刷新次数与推荐字，详情页不需要刷新
+  function closeTraceModal() {
     const overlay = $("#trace-modal");
     if (overlay.classList.contains("hidden") || traceModalBusy) return;
     traceModalBusy = true;
@@ -840,7 +875,7 @@
       inner.style.transform = "";
       inner.style.opacity = "";
       traceModalBusy = false;
-      if (writingVolume) renderWriting(writingVolume);
+      if (writingVolume && !views.writing.classList.contains("hidden")) renderWriting(writingVolume);
     }, 320);
   }
 
@@ -3076,7 +3111,7 @@
   // 临摹模态框：与礼物放大框一致，只有点内容区域外才关闭
   $("#trace-modal").addEventListener("click", (e) => {
     if (e.target.closest(".trace-modal-inner")) return;
-    closeWritingTrace();
+    closeTraceModal();
   });
   // 写字页顶部按钮条折叠 / 展开（与临摹页、练习页一致）
   const writingToolsWrap = $("#writing-tools-wrap");
@@ -3426,19 +3461,8 @@
   $("#btn-card-read").addEventListener("click", () => {
     if (cardEntry) Speaker.readEntry(cardEntry);
   });
-  // 单字详情页：进入临摹页（写一写原型，逻辑在 trace.js）
-  // 与点册进入练习一致的加载体验：笔顺数据未就绪时先弹进度条，加载完毕才进入
-  $("#btn-card-trace").addEventListener("click", () => {
-    if (!cardEntry || !window.TraceView) return;
-    const char = cardEntry.char;
-    const endLoading = beginStrokeLoading(char, 150, `正在准备「${char}」的笔顺`);
-    TraceView.load(char).then(() => {
-      endLoading();
-      TraceView.open(char, {
-        onComplete: (c, flawless) => completeWritingTrace(c, "", flawless),
-      }); // 数据已在缓存，立即渲染
-    });
-  });
+  // 单字详情页：点田字格打开临摹模态框（与写字页同一套逻辑与加载体验）
+  $("#card-grid").addEventListener("click", openCardTrace);
   $("#btn-card-back").addEventListener("click", () => {
     if (cardOnBack) cardOnBack();
   });

@@ -1891,28 +1891,21 @@ body.hide-history-chars .history-legend {
 
 /* ---------- 通用单字详情页 ---------- */
 #view-card {
+  --card-size: min(52vmin, 40vh, 340px);
   position: relative;
-  justify-content: flex-start;
+  justify-content: flex-end;
   padding-top: 0;
 }
 
-.detail-header {
-  position: relative;
-  z-index: 2;
-  width: 100%;
-  padding: 14px 4px 0;
-}
-
-/* 单格居中：复用答题页的田字格卡片，显示一个汉字 */
+/* 单格居中：复用答题页的田字格卡片，显示一个汉字；绝对定位让田字格始终在屏幕正中，
+   「读一读」与底部内容都浮在它周围，不会把田字格挤偏 */
 .card-detail {
-  --cols: 1;
-  --rows: 1;
-  --card-size: min(52vmin, 40vh, 340px);
-  flex: 1;
-  width: 100%;
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  pointer-events: none;
 }
 
 /* 详情页田字格可点击进入临摹 */
@@ -1929,18 +1922,20 @@ body.hide-pinyin #view-card .card .pinyin {
   display: block;
 }
 
+/* 「读一读」在田字格上方，间距与临摹模态框「演示」按钮到田字格的间距一致（26px） */
 .detail-read {
-  position: relative;
+  position: absolute;
+  left: 50%;
+  bottom: calc(50% + var(--card-size) / 2 + 26px);
   z-index: 2;
-  margin-top: 14px;
-  display: flex;
-  justify-content: center;
+  transform: translateX(-50%);
 }
 
 .detail-bottom {
   position: relative;
   z-index: 2;
   width: 100%;
+  margin-bottom: 16px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -4376,7 +4371,7 @@ body.hide-note .hint-bar {
 }
 
 .writing-grid-mini .wchar {
-  font-size: calc(clamp(24px, 6.4vmin, 34px) * min(var(--fs), 1));
+  font-size: calc(clamp(30px, 9vmin, 44px) * min(var(--fs), 1));
 }
 
 /* 当天已经临摹过的字：换用浅绿色底，推荐区与其他汉字一致 */

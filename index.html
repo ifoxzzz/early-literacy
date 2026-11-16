@@ -7,7 +7,7 @@
   <script>
     // 全局唯一版本号（同时用于缓存失效）：改动任何 css/js/音频后递增版本号，
     // 如 1.0.0 → 1.0.1，即可让全部缓存失效；首页右下角显示的也是这个版本
-    var CACHE_VERSION = "1.1.6";
+    var CACHE_VERSION = "1.1.7";
     window.APP_VERSION = CACHE_VERSION;
     // 资源缓存标记：应用设置里「清理资源缓存」后更换。音频、字体、笔顺、图片等
     // 下载型资源的 URL 都会带上它，点一次清理即可绕过浏览器里的旧副本。
@@ -545,9 +545,6 @@
 
   <!-- 通用单字详情页：田字格 + 拼音 + 读音 + 组词 + 注解（练习记录等位置复用） -->
   <section id="view-card" class="view hidden">
-    <header class="detail-header">
-      <button class="btn btn-skip" id="btn-card-back">← 返回</button>
-    </header>
     <div class="detail-read">
       <button class="btn btn-read" id="btn-card-read"><span class="read-icon">🔊</span> 读一读</button>
     </div>
@@ -558,6 +555,7 @@
         <p id="card-note"></p>
       </footer>
     </div>
+    <button class="btn btn-primary" id="btn-card-back">返回</button>
   </section>
 
   <!-- 练习页 -->

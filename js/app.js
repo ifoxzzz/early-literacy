@@ -605,18 +605,28 @@
   /* ---------- 写字页：推荐练习 + 其他汉字 ---------- */
   let writingVolume = null; // 当前写字页对应的册（从临摹页返回时重新渲染）
   let writingCols = 0; // 推荐区当前列数，窗口尺寸变化后据此判断是否需要重排
-  const WRITING_RECOMMEND_MIN_CELL = 76; // 推荐格子最小边长，再小就减少一列换更大字号
 
-  // 推荐区固定两行：先保证格子够大，再尽量多显示（宽屏 5×2，窄屏 4×2 / 3×2）
+  // 推荐区固定两行，列数按屏幕宽度选择：平板/桌面 5×2，常见手机 4×2，极窄屏 3×2
   function writingRecommendCols() {
-    const grid = $("#writing-recommend");
-    const width = grid.clientWidth;
-    if (!width) return 5;
-    const gap = parseFloat(getComputedStyle(grid).columnGap) || 10;
-    for (let cols = 5; cols > 3; cols--) {
-      if ((width - (cols - 1) * gap) / cols >= WRITING_RECOMMEND_MIN_CELL) return cols;
-    }
+    const width = document.documentElement.clientWidth || window.innerWidth;
+    if (width >= 640) return 5;
+    if (width >= 360) return 4;
     return 3;
+  }
+
+  // 预取推荐字的笔顺数据：手机上第一次点开临摹框时不用等网络下载
+  const prefetchedStrokes = new Set();
+  function prefetchWritingStrokes(entries) {
+    if (!window.TraceView || !entries.length) return;
+    const chars = entries.map((e) => e.char).filter((c) => !prefetchedStrokes.has(c));
+    chars.forEach((c) => prefetchedStrokes.add(c));
+    let i = 0;
+    const next = () => {
+      if (i >= chars.length) return;
+      TraceView.load(chars[i++]);
+      setTimeout(next, 120); // 逐个取，避免同时发太多请求
+    };
+    setTimeout(next, 400);
   }
 
   function renderWriting(volume) {
@@ -639,6 +649,7 @@
     const pick = Quiz.pickWriting(volume.entries, counts, limit, scope, writingCols * 2);
     renderWritingCells(grid, pick.recommend, counts, limit);
     renderWritingCells($("#writing-others"), pick.others, counts, limit);
+    prefetchWritingStrokes(pick.recommend);
     const empty = !pick.recommend.length && !pick.others.length;
     $("#writing-recommend-title").classList.toggle("hidden", !pick.recommend.length);
     $("#writing-others-title").classList.toggle("hidden", !pick.others.length);
@@ -680,12 +691,31 @@
     Storage.addTraceHistory({ char, volume: volume || "", count });
   }
 
-  // 点田字格：与礼物放大框一致，从源格子缩小/半透明状态放大到视口中央
+  // 点田字格：与礼物放大框一致，从源格子缩小/半透明状态放大到视口中央。
+  // 该字的笔顺数据若还没下载，先显示进度框，下载完成后再打开临摹框
   function openWritingTrace(char, cell) {
     if (!char || !window.TraceView || traceModalBusy) return;
     const overlay = $("#trace-modal");
     if (!overlay.classList.contains("hidden")) return; // 已打开
     const volume = writingVolume ? writingVolume.title : "";
+    const data = window.STROKES_DATA && window.STROKES_DATA[char];
+    if (data) {
+      showWritingTrace(char, cell, volume);
+      return;
+    }
+    const token = showStrokeLoading(char);
+    traceModalBusy = true; // 加载期间忽略重复点击
+    TraceView.load(char).then(() => {
+      hideStrokeLoading(token);
+      traceModalBusy = false;
+      // 加载期间可能已返回书架，这时不再弹出
+      if (views.writing.classList.contains("hidden")) return;
+      showWritingTrace(char, cell, volume);
+    });
+  }
+
+  function showWritingTrace(char, cell, volume) {
+    const overlay = $("#trace-modal");
     const inner = $("#trace-modal-inner");
     overlay.classList.remove("hidden");
     // 模态框模式：田字格与提示挂载到面板，演示/重写挂载到面板上方外侧
@@ -717,6 +747,35 @@
       overlay.classList.add("active");
       setTimeout(() => { traceModalBusy = false; }, 320);
     });
+  }
+
+  // 笔顺数据下载进度框：单个小文件，用持续推进的进度条表示正在下载
+  let strokeLoadingTimer = 0;
+  let strokeLoadingToken = 0;
+
+  function showStrokeLoading(char) {
+    const token = ++strokeLoadingToken;
+    const fill = $("#stroke-loading-fill");
+    $("#stroke-loading-title").textContent = `正在加载「${char}」的笔顺`;
+    fill.style.width = "0%";
+    $("#stroke-loading").classList.remove("hidden");
+    clearInterval(strokeLoadingTimer);
+    let pct = 0;
+    strokeLoadingTimer = setInterval(() => {
+      pct = Math.min(92, pct + (pct < 40 ? 9 : 5)); // 慢慢推进，避免卡在 0%
+      fill.style.width = `${pct}%`;
+    }, 120);
+    return token;
+  }
+
+  function hideStrokeLoading(token) {
+    if (token !== strokeLoadingToken) return;
+    clearInterval(strokeLoadingTimer);
+    strokeLoadingTimer = 0;
+    $("#stroke-loading-fill").style.width = "100%";
+    setTimeout(() => {
+      if (token === strokeLoadingToken) $("#stroke-loading").classList.add("hidden");
+    }, 160);
   }
 
   // 点框外关闭：整块内容沿原路收缩回源田字格并淡出，随后刷新次数与推荐字

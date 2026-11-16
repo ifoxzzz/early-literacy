@@ -249,6 +249,14 @@
     return node;
   }
 
+  // 田字格中心十字虚线（外框由容器边框提供，与练习页卡片一致；6% 内边距对齐 .card 伪元素）
+  // 笔顺数据还在下载时也先画出它，避免打开后只看到一块空白
+  function buildGridLines() {
+    const grid = el("g", {}, svg);
+    el("line", { x1: 512, y1: 61, x2: 512, y2: 963, class: "trace-dash" }, grid);
+    el("line", { x1: 61, y1: 512, x2: 963, y2: 512, class: "trace-dash" }, grid);
+  }
+
   function build(data, char) {
     applyLevel();
     strokes = data.strokes;
@@ -259,10 +267,7 @@
     prog = 0;
     clearSvg();
 
-    // 田字格中心十字虚线（外框由容器边框提供，与练习页卡片一致；6% 内边距对齐 .card 伪元素）
-    const grid = el("g", {}, svg);
-    el("line", { x1: 512, y1: 61, x2: 512, y2: 963, class: "trace-dash" }, grid);
-    el("line", { x1: 61, y1: 512, x2: 963, y2: 512, class: "trace-dash" }, grid);
+    buildGridLines();
 
     // 字形层：数据坐标 y 向上，翻转成屏幕坐标（screen_y = 900 - data_y）
     flipG = el("g", { transform: "scale(1,-1) translate(0,-900)" }, svg);
@@ -634,6 +639,7 @@
     stopDemo(false); // 若上一轮演示的 rAF 仍在跑，先停掉并清场（含 finishTimer、演示圆点）
     stopVoice();
     clearSvg();
+    buildGridLines(); // 先画出田字格，笔顺数据到达后再补上字形
     loadChar(char).then((data) => {
       if (token !== openToken) return; // 已退出或换了字，丢弃结果
       if (!data) {

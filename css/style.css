@@ -785,6 +785,11 @@ body {
   transition: width 0.18s ease;
 }
 
+/* 笔顺下载进度：没有跑动的小图标，不需要为它预留高度 */
+#stroke-loading .loading-track {
+  padding-top: 0;
+}
+
 /* 跑在进度条最前端的小图标：位置随进度移动，动画模拟"一颠一颠地跑" */
 .loading-icon {
   position: absolute;

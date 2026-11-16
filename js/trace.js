@@ -17,8 +17,12 @@
       const hit = window.STROKES_DATA && window.STROKES_DATA[char];
       if (hit) return resolve(hit);
       const s = document.createElement("script");
+      // 笔顺数据走内容哈希（data/asset-manifest.js）：文件没改 → hash 不变 → URL 不变，
+      // 浏览器缓存直接命中；清单里查不到时退回全局版本号，保证仍能加载。
+      const rel = "strokes/" + encodeURIComponent(char) + ".js";
+      const ver = Resource.hash(rel) || window.APP_VERSION || "";
       s.src = resourceUrl(
-        "assets/strokes/" + encodeURIComponent(char) + ".js?v=" + (window.APP_VERSION || "")
+        "assets/strokes/" + encodeURIComponent(char) + ".js?h=" + ver
       );
       s.onload = () => resolve((window.STROKES_DATA && window.STROKES_DATA[char]) || null);
       s.onerror = () => resolve(null);

@@ -202,6 +202,11 @@ const Speaker = {
     this.play([this.phraseFile("writeWelcome", name)]);
   },
 
+  // 整字一笔不差地临摹完成：表扬「XXX小朋友，写得真棒！」
+  playWritingPraise(name) {
+    this.play([this.phraseFile("writePraise", name)]);
+  },
+
   // 去掉字库里的「汉字(拼音)」读音标注，只留汉字（标注只给语音生成脚本用）
   // 界面展示（app.js 的 displayText）与系统语音兜底都复用这里，保证清洗规则一致
   stripAnnotation(text) {
@@ -232,7 +237,7 @@ const Speaker = {
   // 以及内置楷体字体文件。所有资源一起交给 Resource 预载，进度条统一统计。
   // 题目相关的单字/组词/注解语音不在这里加载（由 app.js 按首题阻塞 + 后台滑窗预取）
   preloadGlobal(name, onProgress) {
-    const phrases = ["welcome", "writeWelcome", "done", "cheer"];
+    const phrases = ["welcome", "writeWelcome", "writePraise", "done", "cheer"];
     for (let level = 1; level <= 5; level++) {
       for (let n = 1; n <= 6; n++) phrases.push(`praise${level}_${n}`);
     }

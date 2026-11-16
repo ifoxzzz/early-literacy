@@ -785,11 +785,6 @@ body {
   transition: width 0.18s ease;
 }
 
-/* 笔顺下载进度：没有跑动的小图标，不需要为它预留高度 */
-#stroke-loading .loading-track {
-  padding-top: 0;
-}
-
 /* 跑在进度条最前端的小图标：位置随进度移动，动画模拟"一颠一颠地跑" */
 .loading-icon {
   position: absolute;
@@ -1438,16 +1433,7 @@ body {
   color: #b8342f;
 }
 
-/* 写字记录：中性橙色田字格 + 累计次数，不使用认字对错的红绿色 */
-.history-write-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  border-top: 1px dashed #eadfc8;
-  padding-top: 8px;
-}
-
+/* 写字记录：中性橙色田字格，不使用认字对错的红绿色 */
 .hchar.write {
   flex: none;
   background-color: #fff7e8;
@@ -1455,9 +1441,10 @@ body {
   color: #b65a34;
 }
 
-.history-write-meta {
-  font-size: calc(clamp(14px, 3vmin, 18px) * var(--fs));
-  color: #9b8669;
+/* 写字记录每天右侧的汇总：当天临摹次数与练过的字数 */
+.history-day-sum {
+  font-size: calc(clamp(13px, 2.8vmin, 16px) * var(--fs));
+  color: #b09a7d;
 }
 
 .history-chars-empty {

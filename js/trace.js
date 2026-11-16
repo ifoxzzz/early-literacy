@@ -75,6 +75,7 @@
   let litPaths = []; // 点亮层 path 元素
   let idx = 0; // 当前要写第几笔
   let prog = 0; // 当前笔已描到的采样点下标
+  let flawless = true; // 本次整字是否每一笔都一次写完（中途抬手/重画会变为 false）
   let ready = false; // 数据是否就绪（就绪前忽略描画）
   let pointerId = null; // 当前跟踪的触摸点（单指）
   let liftGate = false; // 一笔写完后必须抬手才能写下一笔，防止一次划动连续过掉多笔
@@ -85,7 +86,7 @@
   let demoDot = null;
   let finishTimer = 0; // 一轮演示结束后下一轮开演的定时器
   let currentChar = ""; // 当前临摹的汉字
-  let openOpts = null; // 本次进入的附加参数 { mount, onBack, onComplete }
+  let openOpts = null; // 本次进入的附加参数 { mount, actions, onBack, onComplete(char, flawless) }
   let openToken = 0; // 会话令牌：每次 open/close 自增，作废进行中的笔顺加载回调
 
   /* ---------- DOM ---------- */
@@ -265,6 +266,7 @@
     preloadNames();
     idx = 0;
     prog = 0;
+    flawless = true;
     clearSvg();
 
     buildGridLines();
@@ -409,7 +411,7 @@
       // 整字写完通知调用方（写字页/单字详情页据此累加临摹次数）；
       // 「重写」后重新写完会再次触发，符合“每临摹一遍算一次”
       if (openOpts && typeof openOpts.onComplete === "function") {
-        openOpts.onComplete(currentChar);
+        openOpts.onComplete(currentChar, flawless);
       }
     } else {
       tipStroke();
@@ -584,6 +586,7 @@
     // 一笔结束（无论写完还是没写完）：清掉残笔痕迹、进度归零，
     // 从下一笔的起笔处重新显示手势。手势只在这里出现，
     // 不在拖动途中就显示，避免圆点沿下一笔走了半截后又被重建拉回起点
+    if (prog > 0) flawless = false; // 这一笔没写完就抬手，整字不再算“一次成功”
     prog = 0;
     if (progPath) progPath.setAttribute("d", "");
     showGuide();
@@ -595,6 +598,7 @@
   function resetBlank() {
     idx = 0;
     prog = 0;
+    flawless = true;
     liftGate = false;
     litPaths.forEach((p) => p.classList.remove("on"));
     if (progPath) progPath.setAttribute("d", "");

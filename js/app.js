@@ -619,6 +619,7 @@
   function prefetchWritingStrokes(entries) {
     if (!window.TraceView || !entries.length) return;
     const chars = entries.map((e) => e.char).filter((c) => !prefetchedStrokes.has(c));
+    if (!chars.length) return;
     chars.forEach((c) => prefetchedStrokes.add(c));
     let i = 0;
     const next = () => {
@@ -684,11 +685,14 @@
     $("#btn-writing-voice").classList.toggle("active", TraceView.getVoice());
   }
 
-  // 完整临摹一遍：累计次数与逐字历史同时更新；volume 为空时由记录页显示“单字练习”
-  function recordTraceCompletion(char, volume) {
+  // 完整临摹一遍：累计次数与逐字历史同时更新；每一笔都一次写成时再表扬
+  function completeWritingTrace(char, volume, flawless) {
     const count = Storage.addTraceCount(char);
     if (!count) return;
     Storage.addTraceHistory({ char, volume: volume || "", count });
+    if (!flawless) return;
+    const user = Storage.currentUser();
+    Speaker.playWritingPraise(user ? user.name : "");
   }
 
   // 点田字格：与礼物放大框一致，从源格子缩小/半透明状态放大到视口中央。
@@ -703,10 +707,10 @@
       showWritingTrace(char, cell, volume);
       return;
     }
-    const token = showStrokeLoading(char);
+    const endLoading = beginStrokeLoading(char);
     traceModalBusy = true; // 加载期间忽略重复点击
     TraceView.load(char).then(() => {
-      hideStrokeLoading(token);
+      endLoading();
       traceModalBusy = false;
       // 加载期间可能已返回书架，这时不再弹出
       if (views.writing.classList.contains("hidden")) return;
@@ -722,7 +726,7 @@
     TraceView.open(char, {
       mount: $("#trace-modal-panel"),
       actions: $("#trace-modal-actions"),
-      onComplete: () => recordTraceCompletion(char, volume),
+      onComplete: (c, flawless) => completeWritingTrace(c, volume, flawless),
     });
     traceModalBusy = true;
     traceModalFrom = null;
@@ -749,21 +753,26 @@
     });
   }
 
-  // 笔顺数据下载进度框：单个小文件，用持续推进的进度条表示正在下载
+  // 笔顺数据下载进度框：复用进入书架时的加载对话框（含跑动的小动物与计数）
   let strokeLoadingTimer = 0;
   let strokeLoadingToken = 0;
 
-  function showStrokeLoading(char) {
+  // 单个字的笔顺是一个文件：进度条持续推进，计数从 0 / 1 走到 1 / 1
+  function setStrokeLoadingPct(pct) {
+    $("#loading-fill").style.width = `${pct}%`;
+    $("#loading-icon").style.left = `${pct}%`;
+    $("#loading-count").textContent = pct >= 100 ? "1 / 1" : "0 / 1";
+  }
+
+  function showStrokeLoading(char, title) {
     const token = ++strokeLoadingToken;
-    const fill = $("#stroke-loading-fill");
-    $("#stroke-loading-title").textContent = `正在加载「${char}」的笔顺`;
-    fill.style.width = "0%";
-    $("#stroke-loading").classList.remove("hidden");
+    showLoading(title || `正在加载「${char}」的笔顺`);
+    setStrokeLoadingPct(0);
     clearInterval(strokeLoadingTimer);
     let pct = 0;
     strokeLoadingTimer = setInterval(() => {
       pct = Math.min(92, pct + (pct < 40 ? 9 : 5)); // 慢慢推进，避免卡在 0%
-      fill.style.width = `${pct}%`;
+      setStrokeLoadingPct(pct);
     }, 120);
     return token;
   }
@@ -772,10 +781,26 @@
     if (token !== strokeLoadingToken) return;
     clearInterval(strokeLoadingTimer);
     strokeLoadingTimer = 0;
-    $("#stroke-loading-fill").style.width = "100%";
+    setStrokeLoadingPct(100);
     setTimeout(() => {
-      if (token === strokeLoadingToken) $("#stroke-loading").classList.add("hidden");
+      if (token === strokeLoadingToken) hideLoading();
     }, 160);
+  }
+
+  // 笔顺数据未就绪时显示进度框，返回收尾函数；delay 毫秒后才出现，已缓存时不会闪一下
+  function beginStrokeLoading(char, delay, title) {
+    let token = 0;
+    let timer = 0;
+    const start = () => {
+      timer = 0;
+      token = showStrokeLoading(char, title);
+    };
+    if (delay > 0) timer = setTimeout(start, delay);
+    else start();
+    return () => {
+      if (timer) clearTimeout(timer);
+      if (token) hideStrokeLoading(token);
+    };
   }
 
   // 点框外关闭：整块内容沿原路收缩回源田字格并淡出，随后刷新次数与推荐字
@@ -976,29 +1001,44 @@
       .join("");
   }
 
-  // 写字记录：每完整临摹一个字一遍记一条，导入的文本也用 textContent 展示
+  // 写字记录按天汇总：一天一条，日期下面是当天临摹过的所有字（同一个字只出现一次）
   function renderTraceRecordList(box, list) {
-    const reversed = list.slice().reverse();
     historyEntries = [];
-    if (reversed.length === 0) {
+    if (list.length === 0) {
       box.innerHTML = `<p class="history-empty">还没有写字记录，完整临摹一个字后会显示在这里！</p>`;
       return;
     }
-    box.innerHTML = "";
-    reversed.forEach((r) => {
+    // 按本地日期分组；记录按时间先后追加，这里再按日期倒序排，最近的一天在最上面
+    const groups = [];
+    const index = new Map();
+    list.forEach((r) => {
       const d = new Date(r.date);
-      const when = `${d.getMonth() + 1}月${d.getDate()}日 ${String(
-        d.getHours()
-      ).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")} · ${
-        r.volume || "单字练习"
-      }`;
-      const entry = charEntryOf(r.char);
-      const idx = historyEntries.length;
-      historyEntries.push({
-        char: r.char,
-        pinyin: entry.pinyin || "",
-        words: entry.words || "",
-        note: entry.note || "",
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      let g = index.get(key);
+      if (!g) {
+        g = { time: d.getTime(), date: d, items: [] };
+        index.set(key, g);
+        groups.push(g);
+      }
+      g.time = Math.max(g.time, d.getTime());
+      g.items.push(r);
+    });
+    groups.sort((a, b) => b.time - a.time);
+    box.innerHTML = "";
+    groups.forEach((g) => {
+      // 当天练过的字：同一个字只占一个格子，重复临摹次数记在提示里
+      const seen = new Map();
+      const chars = [];
+      g.items.forEach((r) => {
+        const hit = seen.get(r.char);
+        if (hit) {
+          hit.times += 1;
+          hit.last = r;
+          return;
+        }
+        const rec = { char: r.char, times: 1, last: r };
+        seen.set(r.char, rec);
+        chars.push(rec);
       });
 
       const item = document.createElement("div");
@@ -1007,20 +1047,31 @@
       head.className = "history-head";
       const date = document.createElement("span");
       date.className = "history-date";
-      date.textContent = when;
-      head.appendChild(date);
+      date.textContent = `${g.date.getMonth() + 1}月${g.date.getDate()}日`;
+      const sum = document.createElement("span");
+      sum.className = "history-day-sum";
+      sum.textContent = `${g.items.length} 次 · ${chars.length} 个字`;
+      head.append(date, sum);
 
       const row = document.createElement("div");
-      row.className = "history-write-row";
-      const button = document.createElement("button");
-      button.className = "hchar write";
-      button.dataset.idx = idx;
-      button.textContent = r.char;
-      button.title = `查看「${r.char}」的详情`;
-      const meta = document.createElement("span");
-      meta.className = "history-write-meta";
-      meta.textContent = `完成临摹 · 累计第 ${r.count} 次`;
-      row.append(button, meta);
+      row.className = "history-chars";
+      chars.forEach((rec) => {
+        const entry = charEntryOf(rec.char);
+        const idx = historyEntries.length;
+        historyEntries.push({
+          char: rec.char,
+          pinyin: entry.pinyin || "",
+          words: entry.words || "",
+          note: entry.note || "",
+        });
+        const button = document.createElement("button");
+        button.className = "hchar write";
+        button.dataset.idx = idx;
+        button.textContent = rec.char;
+        const repeat = rec.times > 1 ? `，当天 ${rec.times} 次` : "";
+        button.title = `查看「${rec.char}」的详情（累计第 ${rec.last.count} 次${repeat}）`;
+        row.appendChild(button);
+      });
       item.append(head, row);
       box.appendChild(item);
     });
@@ -3350,16 +3401,12 @@
   $("#btn-card-trace").addEventListener("click", () => {
     if (!cardEntry || !window.TraceView) return;
     const char = cardEntry.char;
-    let loadingShown = false;
-    const showTimer = setTimeout(() => {
-      loadingShown = true;
-      showLoading(`正在准备「${char}」的笔顺`);
-      updateLoading(0, 1);
-    }, 150); // 数据已缓存时会瞬间完成，延迟显示避免进度条一闪而过
+    const endLoading = beginStrokeLoading(char, 150, `正在准备「${char}」的笔顺`);
     TraceView.load(char).then(() => {
-      clearTimeout(showTimer);
-      if (loadingShown) hideLoading();
-      TraceView.open(char, { onComplete: () => recordTraceCompletion(char, "") }); // 数据已在缓存，立即渲染
+      endLoading();
+      TraceView.open(char, {
+        onComplete: (c, flawless) => completeWritingTrace(c, "", flawless),
+      }); // 数据已在缓存，立即渲染
     });
   });
   $("#btn-card-back").addEventListener("click", () => {

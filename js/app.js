@@ -534,7 +534,7 @@
     // 拼音 / 注解开关按小朋友保存，切换小朋友后要重新应用
     refreshDisplaySwitches();
     // 标题用小朋友的名字做个人空间入口；中间胶囊切换「认字 / 写字」（按小朋友保存）
-    $("#volumes-title").textContent = user ? `${user.name}的小书架` : "我的小书架";
+    $("#volumes-title").textContent = user ? `${user.name}的小书桌` : "我的小书桌";
     const mode = user ? Storage.learnMode(user.id) : "read";
     document.querySelectorAll("#volume-mode .setting-switch-btn").forEach((btn) => {
       btn.classList.toggle("active", btn.dataset.v === mode);
@@ -3037,20 +3037,31 @@
       Speaker.playWritingWelcome(user.name);
     } else enterVolume(user, volume);
   });
-  // 小书架顶部「认字 | 写字」切换（按小朋友保存）
+  // 小书桌顶部「认字 | 写字」切换（按小朋友保存）
   $("#volume-mode").addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-v]");
     if (!btn) return;
     Storage.setLearnMode(btn.dataset.v, Storage.currentId());
     renderVolumes(Storage.currentUser());
   });
-  // 写字页：点推荐区或其他区的田字格都会弹出临摹模态框；顶部「返回」回到小书架
+  // 写字页：点推荐区或其他区的田字格都会弹出临摹模态框；顶部「返回」回到小书桌
   $("#view-writing").addEventListener("click", (e) => {
     const cell = e.target.closest(".wcell");
     if (!cell) return;
     openWritingTrace(cell.dataset.char, cell);
   });
-  $("#btn-writing-back").addEventListener("click", backToVolumes);
+  // 写字页「退出」：与练习页的「结束」一致，先弹应用内确认框，确定后回到选册页
+  $("#btn-writing-back").addEventListener("click", () => {
+    $("#writing-quit-dialog").classList.remove("hidden");
+  });
+  $("#writing-quit-dialog").addEventListener("click", () => {
+    $("#writing-quit-dialog").classList.add("hidden");
+  });
+  $("#btn-writing-quit-ok").addEventListener("click", (e) => {
+    e.stopPropagation(); // 避免触发遮罩的关闭逻辑
+    $("#writing-quit-dialog").classList.add("hidden");
+    backToVolumes();
+  });
   // 写字页顶部手势 / 语音开关：与临摹页共享同一份状态与存储
   $("#btn-writing-gesture").addEventListener("click", () => {
     if (!window.TraceView) return;
@@ -3459,7 +3470,7 @@
   $("#btn-gift").addEventListener("click", () => {
     openGiftView("quiz");
   });
-  // 小书架副标题右侧的礼物图标：进入礼物展柜，返回时回到小书架
+  // 小书桌副标题右侧的礼物图标：进入礼物展柜，返回时回到小书桌
   $("#btn-volume-gift").addEventListener("click", () => {
     openGiftView("volumes");
   });

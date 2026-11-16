@@ -166,11 +166,11 @@ body {
   margin-top: 0;
 }
 
-.volume-actions #btn-history {
+.volume-actions #btn-settings {
   justify-self: start;
 }
 
-.volume-actions #btn-settings {
+.volume-actions #btn-history {
   justify-self: end;
 }
 

@@ -711,13 +711,16 @@
     renderWritingCells($("#writing-others"), pick.others, counts, limit, todayChars);
     prefetchWritingStrokes(pick.recommend);
     const empty = !pick.recommend.length && !pick.others.length;
-    $("#writing-recommend-title").classList.toggle("hidden", !pick.recommend.length);
+    // 推荐字全部练够阈值时推荐区改为提示文案，其他汉字照常可练
+    const recommendDone = !pick.recommend.length && !empty;
+    $("#writing-recommend-title").classList.toggle("hidden", empty);
+    $("#writing-recommend-empty").classList.toggle("hidden", !recommendDone);
     $("#writing-others-title").classList.toggle("hidden", !pick.others.length);
     $("#writing-empty").classList.toggle("hidden", !empty);
     updateScrollFade($("#writing-scroll"));
   }
 
-  // 渲染一组田字格：右下角显示已临摹次数，徽章随次数接近阈值由橙色渐变为红色
+  // 渲染一组田字格：右下角显示已临摹次数（0 次不显示），徽章随次数接近阈值由橙色渐变为红色
   function renderWritingCells(box, entries, counts, limit, todayChars) {
     box.innerHTML = "";
     entries.forEach((e) => {
@@ -729,9 +732,10 @@
       if (todayChars && todayChars.has(e.char)) classes.push("today");
       cell.className = classes.join(" ");
       cell.dataset.char = e.char;
-      cell.title = `临摹「${e.char}」，已临摹 ${n} 次`;
+      cell.title = n > 0 ? `临摹「${e.char}」，已临摹 ${n} 次` : `临摹「${e.char}」`;
       cell.style.setProperty("--count-hue", Math.round(32 - 28 * Math.min(n / limit, 1)));
-      cell.innerHTML = `<span class="wchar">${e.char}</span><span class="wcount">${n}</span>`;
+      const count = n > 0 ? `<span class="wcount">${n}</span>` : "";
+      cell.innerHTML = `<span class="wchar">${e.char}</span>${count}`;
       box.appendChild(cell);
     });
   }

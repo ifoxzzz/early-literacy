@@ -166,8 +166,9 @@ const Quiz = {
 
   // 写字页：挑出推荐练习的字（占满推荐区两行），其余作为「其他汉字」
   // - 同一册里的多音字只保留一张田字格（临摹的是字形，按汉字去重）
-  // - 优先推荐 level="书写" 的字；临摹次数达到阈值的字降级，让位给还没练够的字
-  // - 分组优先级：书写未达标 > 认识未达标 > 书写已达标 > 认识已达标，组内保持字库原顺序
+  // - 临摹次数达到「推荐换字阈值」的字不再进入推荐区，下放到「其他汉字」
+  // - 推荐区先取 level="书写" 的字，不够再用 level="认识" 的字补齐，组内保持字库顺序
+  // - 「其他汉字」= 有临摹次数的字（次数降序）+ 未临摹的书写字 + 未临摹的认识字
   // - scope="write" 时整页只使用要求书写的字
   pickWriting(entries, counts, limit, scope, recommendCount) {
     const max = Math.max(1, limit || 10);
@@ -184,18 +185,25 @@ const Quiz = {
       const n = counts && counts[e.char];
       return Number.isInteger(n) && n > 0 ? n : 0;
     };
-    const rank = (e) => {
-      const full = countOf(e) >= max;
-      if (e.level === "书写") return full ? 2 : 0;
-      return full ? 3 : 1;
-    };
-    // Array.prototype.sort 在现代浏览器是稳定排序，组内自然保持字库顺序
-    const sorted = list.slice().sort((a, b) => rank(a) - rank(b));
-    const recommend = sorted.slice(0, want);
+    const isWriting = (e) => e.level === "书写";
+    // 练够阈值的字退出推荐区，交给「其他汉字」
+    const eligible = (e) => countOf(e) < max;
+    // 推荐区：书写字优先，书写字不够时用认识字补齐，组内保持字库顺序
+    const recommend = [
+      ...list.filter((e) => isWriting(e) && eligible(e)),
+      ...list.filter((e) => !isWriting(e) && eligible(e)),
+    ].slice(0, want);
     const picked = new Set(recommend.map((e) => e.char));
-    // 其他汉字按临摹次数从多到少排，次数相同的保持字库顺序
-    const others = list.filter((e) => !picked.has(e.char));
-    others.sort((a, b) => countOf(b) - countOf(a));
+    const rest = list.filter((e) => !picked.has(e.char));
+    // Array.prototype.sort 在现代浏览器是稳定排序，同次数的字自然保持字库顺序
+    const practiced = rest
+      .filter((e) => countOf(e) > 0)
+      .sort((a, b) => countOf(b) - countOf(a));
+    const others = [
+      ...practiced,
+      ...rest.filter((e) => countOf(e) === 0 && isWriting(e)),
+      ...rest.filter((e) => countOf(e) === 0 && !isWriting(e)),
+    ];
     return { recommend, others };
   },
 };

@@ -7,7 +7,7 @@
   <script>
     // 全局唯一版本号（同时用于缓存失效）：改动任何 css/js/音频后递增版本号，
     // 如 1.0.0 → 1.0.1，即可让全部缓存失效；首页右下角显示的也是这个版本
-    var CACHE_VERSION = "1.1.1";
+    var CACHE_VERSION = "1.1.2";
     window.APP_VERSION = CACHE_VERSION;
     // 资源缓存标记：应用设置里「清理资源缓存」后更换。音频、字体、笔顺、图片等
     // 下载型资源的 URL 都会带上它，点一次清理即可绕过浏览器里的旧副本。
@@ -280,7 +280,7 @@
             <span class="setting-unit">5 ~ 20 题</span>
           </span>
         </div>
-        <p class="settings-tip">设置只对这位小朋友生效，下一组练习开始生效。</p>
+        <p class="settings-tip">设置只作用于这位小朋友，下一组练习开始生效。</p>
       </section>
       <section class="admin-block">
         <h2 class="admin-title">练习计划</h2>
@@ -312,7 +312,7 @@
             <button class="btn btn-skip" data-v="strict">严格</button>
           </span>
         </div>
-        <p class="settings-tip">「宽松」最容易把一笔描过关；孩子写长横、弯钩多次失败时选宽松，描得熟练后可逐步收紧。只对这位小朋友生效，重新进入「写一写」时生效。</p>
+        <p class="settings-tip">「宽松」最容易把一笔描过关；孩子写长横、弯钩多次失败时选宽松，描得熟练后可逐步收紧。</p>
       </section>
       <section class="admin-block">
         <h2 class="admin-title">写字设置</h2>
@@ -328,11 +328,11 @@
           <span class="setting-opts">
             <span class="setting-switch" id="set-writing-scope">
               <button class="setting-switch-btn" data-v="all">全部字</button>
-              <button class="setting-switch-btn" data-v="write">只展现书写字</button>
+              <button class="setting-switch-btn" data-v="write">要求书写的字</button>
             </span>
           </span>
         </div>
-        <p class="settings-tip">一个字临摹达到阈值次数后不再优先推荐，换成下一个字；「只展现书写字」会让写字页只在要求书写的字中选择。只对这位小朋友生效。</p>
+        <p class="settings-tip">一个字临摹达到阈值次数后不再优先推荐，换成下一个字；「要求书写的字」会让写字页只在要求书写的字中选择。</p>
       </section>
       <section class="admin-block">
         <h2 class="admin-title">数据管理</h2>

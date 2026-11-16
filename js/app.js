@@ -547,6 +547,8 @@
     const recentIndex = lastId ? volumes.findIndex((v) => String(v.id) === lastId) : -1;
     const hasRecent = recentIndex >= 0;
     if (recentIndex > 0) volumes.unshift(volumes.splice(recentIndex, 1)[0]);
+    // 写字进度看临摹次数：同一字形（多音字）只算一个字
+    const traceCounts = Storage.traceCounts();
     volumes.forEach((v, i) => {
       const s = Storage.statsFor(v.entries);
       const writeCount = v.entries.filter((e) => e.level === "书写").length;
@@ -554,12 +556,29 @@
         mode === "write"
           ? `共 ${s.total} 字 · 书写 ${writeCount} 字`
           : `共 ${s.total} 字 · 已学 ${s.learned} · 待复习 ${s.due}`;
-      const card = document.createElement("button");
+      // 学习进度：认字模式看已学条目，写字模式看已临摹过的字
+      const done =
+        mode === "write"
+          ? new Set(v.entries.filter((e) => traceCounts[e.char] > 0).map((e) => e.char)).size
+          : s.learned;
+      const total =
+        mode === "write" ? new Set(v.entries.map((e) => e.char)).size : s.total;
+      const pct = total ? Math.round((done / total) * 100) : 0;
+      const card = document.createElement("div");
       card.className = hasRecent && i === 0 ? "volume-card recent" : "volume-card";
       card.dataset.id = v.id;
-      card.innerHTML = `<span class="volume-name">${v.title}</span>
-        <span class="volume-meta">${meta}</span>
-        <span class="volume-icon" role="img" aria-label="查看本册汉字" title="查看本册汉字">📖</span>`;
+      card.innerHTML = `<button type="button" class="volume-main" aria-label="进入${v.title}（学习进度 ${pct}%）">
+          <span class="volume-fill" style="--p:${pct}%" aria-hidden="true"></span>
+          <span class="volume-line">
+            <span class="volume-name">${v.title}</span>
+            <span class="volume-pct">${pct}%</span>
+          </span>
+          <span class="volume-meta">${meta}</span>
+        </button>
+        <button type="button" class="volume-sheet" aria-label="查看${v.title}汉字表" title="查看本册汉字表">
+          <span class="volume-icon" role="img" aria-hidden="true">📖</span>
+          <span class="volume-sheet-text">汉字表</span>
+        </button>`;
       list.appendChild(card);
       if (hasRecent && i === 0) {
         const divider = document.createElement("div");
@@ -3000,7 +3019,7 @@
       renderVolumes(user);
     });
   });
-  // 选择某一册：认字模式进入练习，写字模式进入写字页；点右侧图标则先查看该册汉字表
+  // 选择某一册：认字模式进入练习，写字模式进入写字页；点右侧汉字表区则先查看该册汉字表
   $("#volume-list").addEventListener("click", (e) => {
     const card = e.target.closest(".volume-card");
     if (!card) return;
@@ -3008,7 +3027,7 @@
     if (!volume) return;
     // 记住最近点开的册，下次进入该小朋友的选册页时排在第一项
     Storage.setLastVolume(volume.id);
-    if (e.target.closest(".volume-icon")) {
+    if (e.target.closest(".volume-sheet")) {
       renderVolumeWords(volume);
       return;
     }

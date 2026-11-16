@@ -274,93 +274,259 @@ body {
 }
 
 .volume-card {
-  font-family: inherit;
   position: relative;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
+  align-items: stretch;
+  flex: 0 0 auto;
   width: 100%;
-  text-align: left;
   border: 3px solid #f2a541;
   background: #fffdf5;
-  border-radius: 16px;
-  padding: 16px 84px 16px 24px; /* 右侧留出图标位置 */
-  cursor: pointer;
-  box-shadow: 0 4px 0 #e8cfa1;
-  transition: transform 0.15s, background 0.2s;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 4px 0 #e8cfa1, 0 6px 14px rgba(193, 145, 70, 0.1);
+  transition: transform 0.15s, box-shadow 0.2s, border-color 0.2s;
+}
+
+/* 顶部一层内高光，让边框更有厚度 */
+.volume-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.75);
+  pointer-events: none;
 }
 
 .volume-card:hover {
-  background: #fff3d6;
   transform: translateY(-2px);
+  box-shadow: 0 6px 0 #e8cfa1, 0 10px 20px rgba(193, 145, 70, 0.16);
 }
 
 .volume-card:active {
-  transform: scale(0.97);
+  transform: scale(0.985);
 }
 
 /* 最近点开的册：排在列表第一项，用绿色系与其他册区分 */
 .volume-card.recent {
   border-color: #57a86f;
-  background: #f1fbf3;
-  box-shadow: 0 4px 0 #c3e5cc;
+  background: #f5fdf7;
+  box-shadow: 0 4px 0 #c3e5cc, 0 6px 14px rgba(87, 168, 111, 0.12);
 }
 
 .volume-card.recent:hover {
-  background: #e5f7e9;
+  box-shadow: 0 6px 0 #c3e5cc, 0 10px 20px rgba(87, 168, 111, 0.18);
 }
 
 .volume-card.recent .volume-name {
   color: #2f7d4a;
 }
 
-/* 最近一册与其他册之间的分隔线 */
-.volume-divider {
-  flex: 0 0 auto;
-  width: 90%;
-  height: 1px;
-  margin: 0 auto;
-  background: #ddd0b4;
+/* 左侧主体：整块点击进入学习，淡色蒙版按进度从左向右铺开 */
+.volume-main {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 16px 18px 16px 24px;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: background 0.2s;
+}
+
+.volume-main:hover {
+  background: rgba(242, 165, 65, 0.06);
+}
+
+.volume-card.recent .volume-main:hover {
+  background: rgba(87, 168, 111, 0.07);
+}
+
+/* 进度蒙版：右边缘渐隐，宽度由 --p 控制 */
+.volume-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--p, 0%);
+  max-width: 100%;
+  background-image: linear-gradient(
+    90deg,
+    rgba(242, 165, 65, 0.18) 0%,
+    rgba(242, 165, 65, 0.15) 82%,
+    rgba(242, 165, 65, 0) 100%
+  );
+  pointer-events: none;
+  transition: width 0.35s ease;
+}
+
+.volume-card.recent .volume-fill {
+  background-image: linear-gradient(
+    90deg,
+    rgba(87, 168, 111, 0.18) 0%,
+    rgba(87, 168, 111, 0.13) 82%,
+    rgba(87, 168, 111, 0) 100%
+  );
+}
+
+.volume-line {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
 }
 
 .volume-name {
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: calc(clamp(20px, 4.6vmin, 28px) * var(--fs));
   color: #d1603d;
 }
 
+/* 进度百分比小徽标 */
+.volume-pct {
+  flex: 0 0 auto;
+  font-size: calc(clamp(12px, 2.6vmin, 15px) * var(--fs));
+  line-height: 1.7;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(242, 165, 65, 0.4);
+  background: rgba(242, 165, 65, 0.14);
+  color: #b4762a;
+}
+
+.volume-card.recent .volume-pct {
+  border-color: rgba(87, 168, 111, 0.4);
+  background: rgba(87, 168, 111, 0.12);
+  color: #357c4e;
+}
+
 .volume-meta {
+  position: relative;
+  z-index: 1;
   font-size: calc(clamp(13px, 3vmin, 17px) * var(--fs));
   color: #9b8669;
 }
 
-/* 每册右侧的汉字表图标（在卡片内部，不改变整卡点击开始练习） */
+/* 最近一册与其他册之间的分隔线 */
+.volume-divider {
+  flex: 0 0 auto;
+  width: 90%;
+  height: 2px;
+  margin: 2px auto;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, #ddd0b4 20%, #ddd0b4 80%, transparent);
+}
+
+/* 每册右侧汉字表入口：独立底色 + 竖向分隔，整块可点击 */
+.volume-sheet {
+  flex: 0 0 clamp(76px, 16vw, 94px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 6px;
+  border: none;
+  border-left: 2px dashed #f0d9ad;
+  background: #fdf1d4;
+  color: #b4762a;
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: background 0.2s;
+}
+
+.volume-sheet:hover {
+  background: #ffe9bd;
+}
+
+.volume-sheet:active {
+  background: #ffdfa4;
+}
+
+.volume-card.recent .volume-sheet {
+  border-left-color: #c3e5cc;
+  background: #e6f6ea;
+  color: #357c4e;
+}
+
+.volume-card.recent .volume-sheet:hover {
+  background: #d8f0de;
+}
+
+.volume-card.recent .volume-sheet:active {
+  background: #caebd3;
+}
+
 .volume-icon {
-  position: absolute;
-  right: 18px;
-  top: 50%;
-  width: clamp(40px, 9vmin, 50px);
-  height: clamp(40px, 9vmin, 50px);
   display: flex;
   align-items: center;
   justify-content: center;
+  width: clamp(38px, 8vmin, 46px);
+  height: clamp(38px, 8vmin, 46px);
   font-size: calc(clamp(20px, 4.5vmin, 26px) * var(--fs));
   line-height: 1;
-  background: #fff3d6;
+  background: #fffaf0;
   border: 2px solid #f2a541;
   border-radius: 50%;
-  transform: translateY(-50%);
-  cursor: pointer;
-  transition: background 0.2s, transform 0.15s;
+  transition: transform 0.15s, background 0.2s;
 }
 
-.volume-icon:hover {
-  background: #ffe6b8;
-  transform: translateY(-50%) scale(1.08);
+.volume-card.recent .volume-icon {
+  background: #ffffff;
+  border-color: #57a86f;
 }
 
-.volume-icon:active {
-  transform: translateY(-50%) scale(0.94);
+.volume-sheet:hover .volume-icon {
+  background: #ffffff;
+  transform: scale(1.08);
+}
+
+.volume-sheet:active .volume-icon {
+  transform: scale(0.94);
+}
+
+.volume-sheet-text {
+  font-size: calc(clamp(11px, 2.4vmin, 14px) * var(--fs));
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.volume-main:focus-visible,
+.volume-sheet:focus-visible {
+  outline: 3px solid #f2a541;
+  outline-offset: -4px;
+}
+
+.volume-card.recent .volume-main:focus-visible,
+.volume-card.recent .volume-sheet:focus-visible {
+  outline-color: #57a86f;
+}
+
+/* 窄屏收紧左侧留白，汉字表入口按屏宽比例收窄 */
+@media (max-width: 480px) {
+  .volume-main {
+    padding: 14px 12px 14px 18px;
+  }
+
+  .volume-sheet {
+    flex-basis: clamp(66px, 19vw, 82px);
+  }
+
+  .volume-pct {
+    padding: 0 7px;
+  }
 }
 
 /* ---------- 某一册的汉字表 ---------- */

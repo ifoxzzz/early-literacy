@@ -4219,12 +4219,30 @@ body.hide-note .hint-bar {
 /* 上方推荐练习大田字格，下方其他汉字小田字格；内容多时内部滚动，返回按钮固定在底部 */
 #view-writing {
   justify-content: flex-start;
+  /* 与识字练习页一致：顶部只留 6px 内边距（.view 默认 16px 会让按钮区明显偏低） */
+  padding-top: 6px;
   padding-bottom: 12px;
 }
 
 /* 顶部抽屉按钮条：状态行只有三点展开按钮，靠右对齐（与练习页一致） */
 #view-writing .quiz-status {
   justify-content: flex-end;
+}
+
+/* 「推荐练习」放进顶部状态行（原状态行只有三个点，下方会空出一整行）：
+   居中显示，与练习页星星行一样紧贴按钮区下方，不再与下方田字格之间留大块空白 */
+#view-writing .quiz-status .writing-section {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin: 0;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+}
+
+/* 标题在状态行内，网格与标题之间保留与原来相近的 8px 间距 */
+#view-writing .writing-grid-main {
+  margin-top: 8px;
 }
 
 /* 底部居中显示册名（如「一年级上册 · 写一写」） */

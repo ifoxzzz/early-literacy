@@ -3876,6 +3876,11 @@ body.hide-note .hint-bar {
   white-space: nowrap;
 }
 
+/* 演示 / 重写：去掉按钮底部投影，贴在面板上方时更轻巧 */
+.trace-bar .btn {
+  box-shadow: none;
+}
+
 /* 窄屏收窄左右内边距，保证两个按钮并排不溢出 */
 .trace-bar .btn-read {
   padding: 10px clamp(18px, 4vw, 34px);
@@ -4213,8 +4218,11 @@ body.hide-note .hint-bar {
   font-family: var(--kaiti);
 }
 
+/* 推荐区字号由 JS 按实际格子宽度写入，列数减少后字也随之变大 */
 .writing-grid-main .wchar {
-  font-size: calc(clamp(26px, 7.6vmin, 50px) * min(var(--fs), 1));
+  font-size: calc(
+    var(--wchar-size, clamp(26px, 7.6vmin, 50px)) * min(var(--fs), 1)
+  );
 }
 
 .writing-grid-mini .wchar {
@@ -4327,10 +4335,10 @@ body.hide-note .hint-bar {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: calc(var(--trace-size) + 34px); /* 左右各 14px 内边距 + 3px 边框 */
+  width: calc(var(--trace-size) + 28px); /* 左右各 14px 内边距 */
   padding: 14px;
   background: #fdf6e9;
-  border: 3px solid #d1603d;
+  border: 0;
   border-radius: 16px;
   box-shadow: 0 24px 60px rgba(60, 40, 20, 0.35);
 }
@@ -4339,6 +4347,13 @@ body.hide-note .hint-bar {
   flex: none;
   width: 100%;
   height: var(--trace-size);
+}
+
+/* 窄屏手机：面板左右撑满，把宽度都留给临摹区域（高度仍为提示与按钮留出空间） */
+@media (max-width: 560px) {
+  .trace-modal-panel {
+    --trace-size: min(calc(100vw - 52px), calc(100vh - 210px), 420px);
+  }
 }
 
 .trace-modal-panel .trace-tip {

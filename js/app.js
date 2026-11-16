@@ -604,6 +604,20 @@
 
   /* ---------- 写字页：推荐练习 + 其他汉字 ---------- */
   let writingVolume = null; // 当前写字页对应的册（从临摹页返回时重新渲染）
+  let writingCols = 0; // 推荐区当前列数，窗口尺寸变化后据此判断是否需要重排
+  const WRITING_RECOMMEND_MIN_CELL = 76; // 推荐格子最小边长，再小就减少一列换更大字号
+
+  // 推荐区固定两行：先保证格子够大，再尽量多显示（宽屏 5×2，窄屏 4×2 / 3×2）
+  function writingRecommendCols() {
+    const grid = $("#writing-recommend");
+    const width = grid.clientWidth;
+    if (!width) return 5;
+    const gap = parseFloat(getComputedStyle(grid).columnGap) || 10;
+    for (let cols = 5; cols > 3; cols--) {
+      if ((width - (cols - 1) * gap) / cols >= WRITING_RECOMMEND_MIN_CELL) return cols;
+    }
+    return 3;
+  }
 
   function renderWriting(volume) {
     writingVolume = volume;
@@ -611,16 +625,24 @@
     const counts = Storage.traceCounts(id);
     const limit = Storage.traceLimit(id);
     const scope = Storage.writingScope(id);
-    const pick = Quiz.pickWriting(volume.entries, counts, limit, scope);
     $("#writing-subtitle").textContent = `${volume.title} · 写一写`;
     refreshWritingToggles(); // 同步顶部手势/语音按钮高亮
-    renderWritingCells($("#writing-recommend"), pick.recommend, counts, limit);
+    show("writing");
+    // 推荐区列数按可见宽度决定，并让字号跟着格子一起放大
+    const grid = $("#writing-recommend");
+    writingCols = writingRecommendCols();
+    grid.style.gridTemplateColumns = `repeat(${writingCols}, minmax(0, 1fr))`;
+    const gap = parseFloat(getComputedStyle(grid).columnGap) || 10;
+    const cell = (grid.clientWidth - (writingCols - 1) * gap) / writingCols;
+    grid.style.setProperty("--wchar-size", `${Math.min(cell * 0.6, 56)}px`);
+    // 推荐区只占两行，容纳不下的推荐字转入「其他汉字」，不会从页面消失
+    const pick = Quiz.pickWriting(volume.entries, counts, limit, scope, writingCols * 2);
+    renderWritingCells(grid, pick.recommend, counts, limit);
     renderWritingCells($("#writing-others"), pick.others, counts, limit);
     const empty = !pick.recommend.length && !pick.others.length;
     $("#writing-recommend-title").classList.toggle("hidden", !pick.recommend.length);
     $("#writing-others-title").classList.toggle("hidden", !pick.others.length);
     $("#writing-empty").classList.toggle("hidden", !empty);
-    show("writing");
     updateScrollFade($("#writing-scroll"));
   }
 
@@ -2881,8 +2903,10 @@
       return;
     }
     const user = Storage.currentUser();
-    if (user && Storage.learnMode(user.id) === "write") renderWriting(volume);
-    else enterVolume(user, volume);
+    if (user && Storage.learnMode(user.id) === "write") {
+      renderWriting(volume);
+      Speaker.playWritingWelcome(user.name);
+    } else enterVolume(user, volume);
   });
   // 小书架顶部「认字 | 写字」切换（按小朋友保存）
   $("#volume-mode").addEventListener("click", (e) => {
@@ -2959,6 +2983,10 @@
     updateScrollFade($("#gift-shelf"));
     updateScrollFade($("#gift-list"));
     updateScrollFade($("#gift-box"));
+    // 转屏或改变窗口后推荐区可能需要换列数，重新排一次
+    if (writingVolume && !views.writing.classList.contains("hidden")) {
+      if (writingRecommendCols() !== writingCols) renderWriting(writingVolume);
+    }
     closeGiftBubble(); // 窗口尺寸变化后气泡位置失效
     scheduleGiftReflow(); // 展柜打开时按新窗口重新计算橱窗容量
   });

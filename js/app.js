@@ -89,6 +89,8 @@
     // 练习页保持屏幕常亮，离开练习页立即释放
     if (name === "quiz") WakeLock.enable();
     else WakeLock.disable();
+    // 离开礼物展柜时停止礼物音频逐个加载，避免阻塞后续操作
+    if (name !== "gifts") stopGiftAudioPrefetch();
   }
 
   /* ---------- 屏幕常亮：练习时避免手机自动息屏 ---------- */
@@ -649,6 +651,37 @@
     setTimeout(next, 400);
   }
 
+  // 礼物音频逐个预加载：每 120ms 入队一个，返回 stop 函数可随时中止后续调度。
+  // 目的：用户退出礼物界面时立即停止，避免礼物音频下载阻塞答题/临摹等后续操作。
+  // 已下载（blob 就绪）的礼物会被跳过，重复调用不会重新下载。
+  let giftAudioPrefetchStop = null;
+  function stopGiftAudioPrefetch() {
+    if (giftAudioPrefetchStop) {
+      giftAudioPrefetchStop();
+      giftAudioPrefetchStop = null;
+    }
+  }
+  function prefetchGiftAudios(names) {
+    stopGiftAudioPrefetch();
+    const urls = names
+      .map((n) => Speaker.giftAudio(n))
+      .filter((u) => u && !Resource.getBlobUrl(u));
+    if (!urls.length) return;
+    let i = 0;
+    let timer = 0;
+    let stopped = false;
+    const next = () => {
+      if (stopped || i >= urls.length) return;
+      Resource.preload([urls[i++]]);
+      timer = setTimeout(next, 120);
+    };
+    timer = setTimeout(next, 400);
+    giftAudioPrefetchStop = () => {
+      stopped = true;
+      if (timer) { clearTimeout(timer); timer = 0; }
+    };
+  }
+
   function renderWriting(volume) {
     writingVolume = volume;
     const id = Storage.currentId();
@@ -854,6 +887,85 @@
       if (timer) clearTimeout(timer);
       if (token) hideStrokeLoading(token);
     };
+  }
+
+  // ---------- 礼物音频加载进度条（复用加载对话框） ----------
+  let giftLoadingTimer = 0;
+  let giftLoadingToken = 0;
+
+  function setGiftLoadingPct(pct) {
+    $("#loading-fill").style.width = `${pct}%`;
+    $("#loading-icon").style.left = `${pct}%`;
+    $("#loading-count").textContent = pct >= 100 ? "1 / 1" : "0 / 1";
+  }
+
+  function showGiftLoading(name) {
+    const token = ++giftLoadingToken;
+    showLoading(`正在加载「${name}」的语音`);
+    setGiftLoadingPct(0);
+    clearInterval(giftLoadingTimer);
+    let pct = 0;
+    giftLoadingTimer = setInterval(() => {
+      pct = Math.min(92, pct + (pct < 40 ? 9 : 5)); // 慢慢推进，避免卡在 0%
+      setGiftLoadingPct(pct);
+    }, 120);
+    return token;
+  }
+
+  function hideGiftLoading(token) {
+    if (token !== giftLoadingToken) return;
+    clearInterval(giftLoadingTimer);
+    giftLoadingTimer = 0;
+    setGiftLoadingPct(100);
+    setTimeout(() => {
+      if (token === giftLoadingToken) hideLoading();
+    }, 160);
+  }
+
+  // 礼物语音未就绪时显示进度框，返回收尾函数；delay 毫秒后才出现，已缓存时不会闪一下
+  function beginGiftLoading(name, delay) {
+    let token = 0;
+    let timer = 0;
+    const start = () => {
+      timer = 0;
+      token = showGiftLoading(name);
+    };
+    if (delay > 0) timer = setTimeout(start, delay);
+    else start();
+    return () => {
+      if (timer) clearTimeout(timer);
+      if (token) hideGiftLoading(token);
+    };
+  }
+
+  // 播放礼物名称：已缓存（blob 就绪）直接播；未缓存先弹进度条，加载完成后再播
+  function playGiftNameSafe(name, onReady) {
+    const url = Speaker.giftAudio(name);
+    if (!url || Resource.getBlobUrl(url)) {
+      Speaker.playGiftName(name);
+      if (onReady) onReady();
+      return;
+    }
+    const endLoading = beginGiftLoading(name, 150);
+    Resource.preload([url]).then(() => {
+      endLoading();
+      Speaker.playGiftName(name);
+      if (onReady) onReady();
+    });
+  }
+
+  // 勾选礼物：播放「你挑选了：<礼物名称>」；礼物名称未缓存时先弹进度条再播放
+  function playGiftPickSafe(name) {
+    const url = Speaker.giftAudio(name);
+    if (!url || Resource.getBlobUrl(url)) {
+      Speaker.playGiftPick(name);
+      return;
+    }
+    const endLoading = beginGiftLoading(name, 150);
+    Resource.preload([url]).then(() => {
+      endLoading();
+      Speaker.playGiftPick(name);
+    });
   }
 
   // 点框外关闭：整块内容沿原路收缩回源田字格并淡出；
@@ -2295,10 +2407,14 @@
     // 新礼物的闪烁只在本次首次进入橱窗时展示：拿到 fresh 状态后立即标记为已看，
     // 本次渲染保留闪烁，后续再次进入页面或切换模式都不会再闪
     giftItems.filter((g) => g.fresh).forEach((g) => Storage.markGiftSeen(g.id));
-    // 后台预取已拥有礼物的名称音频（通常只有几件），放大时即可秒播
-    Speaker.preload(
-      [...new Set(giftItems.map((g) => g.name))].map((n) => Speaker.giftAudio(n))
-    );
+    // 逐个预取已拥有礼物的名称音频：橱窗在前、收纳盒在后，按 giftItems 顺序去重；
+    // 每 120ms 入队一个，退出展柜时停止，避免阻塞后续操作
+    const orderedNames = [];
+    const seen = new Set();
+    giftItems.forEach((g) => {
+      if (!seen.has(g.name)) { seen.add(g.name); orderedNames.push(g.name); }
+    });
+    prefetchGiftAudios(orderedNames);
     $("#gifts-owner").textContent = user
       ? `${user.name} 的礼物 · 共 ${total} 件`
       : `我的礼物 · 共 ${total} 件`;
@@ -2751,7 +2867,7 @@
     $("#gift-zoom-name").textContent = name;
     $("#gift-zoom-count").textContent = count > 1 ? `共 ${count} 件` : "";
     Sound.play("correct"); // 先播音效，再播礼物名称
-    Speaker.playGiftName(name);
+    playGiftNameSafe(name);
     const overlay = $("#gift-zoom");
     const inner = overlay.querySelector(".gift-zoom-inner");
     overlay.classList.remove("hidden");
@@ -2843,7 +2959,9 @@
     giftPicked = [];
     giftBagRefreshed = false;
     $("#btn-gift-refresh").classList.remove("hidden");
-    renderGiftBag(buildGiftBag(true), false);
+    const bag = buildGiftBag(true);
+    renderGiftBag(bag, false);
+    prefetchGiftAudios(bag); // 逐个预取礼物袋中的礼物名称音频
     updateGiftPickState();
     $("#gift-dialog").classList.remove("hidden");
     // 弹窗显示后再计算礼物网格的上下渐隐（未滚动时只显示底部淡出）
@@ -3509,6 +3627,7 @@
   });
   $("#btn-gifts-back").addEventListener("click", () => {
     closeGiftBubble();
+    stopGiftAudioPrefetch(); // 退出展柜时停止礼物音频逐个加载
     show(giftsReturnView);
     if (giftsReturnView === "quiz") applyGridLayout();
   });
@@ -3537,7 +3656,7 @@
     item.classList.remove("pop");
     void item.offsetWidth; // 强制重排，连续点击都能重新播放
     item.classList.add("pop");
-    Speaker.playGiftName(gift.name); // 报出礼物名字，与放大展示时一致
+    playGiftNameSafe(gift.name); // 报出礼物名字，与放大展示时一致
     openGiftBubble(item);
   });
   // 收纳盒滚动时卡片会移出气泡箭头位置，直接收起（忽略点击卡片瞬间自身触发的滚动）
@@ -3751,7 +3870,7 @@
       giftPicked.push(name);
       popGiftEmoji(item);
       Sound.play("pick"); // 先播选中音效，再播「你从礼物袋中挑选了：<礼物名称>」
-      Speaker.playGiftPick(name);
+      playGiftPickSafe(name);
     } else {
       // 已选满：不播放放大动画，改用偏低的提示音，与选中音（高音"叮"）区分
       $("#gift-pick-tip").textContent = `最多选 ${giftQuota} 件，可以先取消一件`;
@@ -3773,7 +3892,9 @@
     grid.querySelectorAll(".gift-item").forEach((el) => el.classList.add("bag-out"));
     // 等旧卡片全部消失（0.2s 动画 + 逐张延迟）后再替换内容
     setTimeout(() => {
-      renderGiftBag(buildGiftBag(false), true);
+      const newBag = buildGiftBag(false);
+      renderGiftBag(newBag, true);
+      prefetchGiftAudios(newBag); // 换一批后重新逐个预取新批次的礼物名称音频
       grid.scrollTop = 0;
       grid.classList.remove("fade-top", "fade-bottom");
       requestAnimationFrame(() => updateScrollFade(grid));
@@ -3790,6 +3911,7 @@
     // 新礼物摆在橱窗顶部；进柜时若有旧礼物被挤进收纳盒，按这个数量播放飞入动画
     giftOverflowPending += pickedCount;
     giftOverflowUid = session.userId;
+    stopGiftAudioPrefetch(); // 收下礼物、关闭礼物袋时停止逐个加载
     $("#gift-dialog").classList.add("hidden");
     Sound.play("correct");
     Speaker.playGiftSaved();

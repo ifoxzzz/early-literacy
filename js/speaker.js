@@ -244,17 +244,13 @@ const Speaker = {
     const urls = phrases.map((k) => this.phraseFile(k, name));
     urls.push(this.audioUrl("phrases/find.mp3"));
     urls.push(this.audioUrl("phrases/help.mp3"));
-    // 礼物相关语音：勾选前缀、礼物袋打开提示（1/2/3 件）、收下礼物提示、全部礼物名称
+    // 礼物相关短语：勾选前缀、礼物袋打开提示（1/2/3 件）、收下礼物提示、新礼物提示、收纳盒溢出提示
+    // （礼物名称音频不再全局预载，改为进入礼物展柜/礼物袋时按需逐个加载，见 app.js prefetchGiftAudios）
     urls.push(this.audioUrl("phrases/chose.mp3"));
     for (let q = 1; q <= 3; q++) urls.push(this.audioUrl(`phrases/pickBag${q}.mp3`));
     urls.push(this.audioUrl("phrases/giftSaved.mp3"));
     urls.push(this.audioUrl("phrases/giftNew.mp3"));
     urls.push(this.audioUrl("phrases/giftBoxOverflow.mp3"));
-    const giftNames = window.GIFT_AUDIO || [];
-    giftNames.forEach((n) => {
-      const u = this.giftAudio(n);
-      if (u) urls.push(u);
-    });
     for (let i = 0; i <= 20; i++) urls.push(this.audioUrl(`phrases/stars${i}.mp3`));
     // 楷体字体也加入同一批预载，进度条自动把它算进去；下载完成后再安装字体
     const fontUrl = Resource.fontUrl();

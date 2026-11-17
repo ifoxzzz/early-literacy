@@ -3956,17 +3956,34 @@ body.hide-note .hint-bar {
 }
 
 /* ---------- 神秘礼物（🎁 神秘礼盒）特效 ---------- */
-/* 橱窗卡片：紫色渐变 + 金色光晕 + 轻微摇摆 */
+/* 橱窗卡片：紫色渐变 + 金色光晕 + 轻微摇摆
+   紫色背景、金色虚线边框与光晕放在伪元素上，揭晓礼物时可以整体淡出 */
 .gift-shelf-item.mystery {
   position: relative;
+  overflow: visible;
+  border-color: transparent;
+  box-shadow: none;
+  animation: mystery-shelf-pulse 2.4s ease-in-out infinite;
+}
+.gift-shelf-item.mystery::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
   background: linear-gradient(145deg, #6b4c9a, #8e6bbf, #c9a4e8);
   border: 2px dashed #f2c94c;
   box-shadow:
     0 0 12px rgba(242, 201, 76, 0.6),
     0 4px 0 rgba(107, 76, 154, 0.5),
     0 6px 16px rgba(107, 76, 154, 0.4);
-  overflow: visible;
-  animation: mystery-shelf-pulse 2.4s ease-in-out infinite;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+/* 图标与名称需要压在紫色背景伪元素之上 */
+.gift-shelf-item.mystery > .gift-shelf-icon,
+.gift-shelf-item.mystery > .gift-shelf-name {
+  position: relative;
+  z-index: 1;
 }
 .gift-shelf-item.mystery .gift-shelf-icon {
   animation: mystery-icon-spin 4s linear infinite, mystery-icon-glow 1.8s ease-in-out infinite;
@@ -4079,17 +4096,33 @@ body.hide-note .hint-bar {
 }
 
 /* ---------- 神秘礼物大图特效 ---------- */
-/* 大图背景改为神秘渐变 */
+/* 大图：紫色背景、金色虚线边框与光晕放在伪元素上，揭晓礼物时整体淡出 */
 .gift-zoom-overlay.zoom-mystery .gift-zoom-inner {
+  position: relative;
+}
+.gift-zoom-overlay.zoom-mystery .gift-zoom-inner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
   background: linear-gradient(145deg, #5b3d8a, #7d5ab0, #a77dd9);
   border: 3px dashed #f2c94c;
   box-shadow:
     0 0 24px rgba(242, 201, 76, 0.5),
     0 16px 48px rgba(91, 61, 138, 0.5);
+  pointer-events: none;
+  transition: opacity 0.35s ease;
 }
-.gift-zoom-overlay.zoom-mystery .gift-zoom-name {
-  color: #fff9c4;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+/* 内容压在紫色背景伪元素之上 */
+.gift-zoom-overlay.zoom-mystery .gift-zoom-inner > * {
+  position: relative;
+  z-index: 1;
+}
+/* 神秘礼物大图不显示名称与数量，但保留占位，让大图框与普通礼物一样大；
+   礼盒的位置由 JS 按占位高度下移，落在框的正中间 */
+.gift-zoom-overlay.zoom-mystery .gift-zoom-name,
+.gift-zoom-overlay.zoom-mystery .gift-zoom-count {
+  visibility: hidden;
 }
 .gift-zoom-overlay.zoom-mystery .gift-zoom-icon-wrap {
   filter: drop-shadow(0 0 16px rgba(242, 201, 76, 0.9));
@@ -4151,83 +4184,166 @@ body.hide-note .hint-bar {
   }
 }
 
-/* ---------- 打开动画：金光爆开 ---------- */
-.mystery-open-burst {
-  position: fixed;
+/* ---------- 打开动画：礼盒缩小消失 + 礼物由小变大 ---------- */
+/* 彩带、星星、爱心等道具从礼盒中央四溅散开 */
+.mystery-props {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.mystery-prop {
+  position: absolute;
   left: 50%;
   top: 50%;
-  width: 60px;
-  height: 60px;
-  transform: translate(-50%, -50%) scale(0);
-  border-radius: 50%;
-  background: radial-gradient(circle, #fff 0%, #f2c94c 30%, rgba(242, 201, 76, 0.8) 50%, rgba(242, 201, 76, 0) 80%);
-  pointer-events: none;
-  z-index: 9950;
-  animation: mystery-burst-open 0.9s cubic-bezier(0.15, 0.6, 0.3, 1) forwards;
-}
-
-@keyframes mystery-burst-open {
-  0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
-  30% { transform: translate(-50%, -50%) scale(1.5); opacity: 1; }
-  70% { transform: translate(-50%, -50%) scale(5); opacity: 0.8; }
-  100% { transform: translate(-50%, -50%) scale(8); opacity: 0; }
-}
-
-/* 打开时礼物图标先疯狂抖动 */
-.gift-zoom-overlay.zoom-opening .gift-zoom-icon {
-  animation: mystery-icon-open-shake 0.55s ease-in-out;
-}
-
-@keyframes mystery-icon-open-shake {
-  0% { transform: rotate(0) scale(1); }
-  20% { transform: rotate(-18deg) scale(1.15); }
-  40% { transform: rotate(14deg) scale(1.2); }
-  60% { transform: rotate(-10deg) scale(1.1); }
-  80% { transform: rotate(6deg) scale(1.05); }
-  100% { transform: rotate(0) scale(1); }
-}
-
-/* 随机结果揭晓：新礼物飞出来 */
-.mystery-reveal-wrap {
-  position: fixed;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%) scale(0);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  pointer-events: none;
-  z-index: 9960;
-  animation: mystery-reveal-pop 0.6s cubic-bezier(0.2, 1.6, 0.4, 1) forwards;
-}
-
-.mystery-reveal-icon {
-  font-size: calc(clamp(80px, 22vmin, 160px) * var(--fs, 1));
+  font-size: calc(clamp(20px, 4.5vmin, 30px) * var(--fs));
   line-height: 1;
-  filter: drop-shadow(0 0 18px rgba(242, 201, 76, 1));
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.3);
+  animation: mystery-prop-burst var(--pdur, 1s) cubic-bezier(0.15, 0.65, 0.35, 1) var(--pdelay, 0s) forwards;
+  will-change: transform, opacity;
 }
 
-.mystery-reveal-name {
-  font-size: calc(clamp(22px, 5vmin, 34px) * var(--fs, 1));
-  color: #fff9c4;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
-  font-weight: 600;
+@keyframes mystery-prop-burst {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.3) rotate(0deg);
+  }
+  15% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--pdx, 0px)), calc(-50% + var(--pdy, 0px))) scale(var(--psc, 1)) rotate(var(--prot, 0deg));
+  }
 }
 
-@keyframes mystery-reveal-pop {
-  0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
-  40% { transform: translate(-50%, -50%) scale(1.3); opacity: 1; }
-  70% { transform: translate(-50%, -50%) scale(0.95); }
-  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+/* 礼盒缩小消失：大图与橱窗卡片共用 */
+@keyframes mystery-box-out {
+  0% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  35% {
+    transform: scale(1.15) rotate(-8deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0) rotate(10deg);
+    opacity: 0;
+  }
 }
 
-/* 结果揭晓结束后淡出 */
-.mystery-reveal-wrap.fade-out {
-  animation: mystery-reveal-fade 0.35s ease-in forwards;
+/* 礼物由小变大：先超过正常尺寸一点，再回到原样 */
+@keyframes mystery-gift-grow {
+  0% {
+    transform: scale(0.1);
+    opacity: 0;
+  }
+  55% {
+    transform: scale(1.18);
+    opacity: 1;
+  }
+  80% {
+    transform: scale(0.98);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
-@keyframes mystery-reveal-fade {
-  to { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+
+@keyframes mystery-name-in {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 大图：背景淡出、礼盒缩小、道具四溅 → 新礼物弹出 */
+.gift-zoom-overlay.zoom-revealing .gift-zoom-inner::before,
+.gift-zoom-overlay.zoom-revealed .gift-zoom-inner::before {
+  opacity: 0;
+}
+
+.gift-zoom-overlay.zoom-revealing .zoom-mystery-particles {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.gift-zoom-overlay.zoom-revealing .gift-zoom-icon-wrap,
+.gift-zoom-overlay.zoom-mystery.zoom-revealed .gift-zoom-icon-wrap {
+  animation: none;
+}
+
+.gift-zoom-overlay.zoom-mystery.zoom-revealed .gift-zoom-icon-wrap {
+  filter: none;
+}
+
+.gift-zoom-overlay.zoom-revealing .gift-zoom-icon {
+  animation: mystery-box-out 0.38s ease-in forwards;
+}
+
+.gift-zoom-overlay.zoom-revealed .gift-zoom-icon {
+  animation: mystery-gift-grow 0.62s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+/* 橱窗卡片：与大图同步揭晓 */
+.gift-shelf-item.mystery.revealing,
+.gift-shelf-item.mystery.revealed {
+  animation: none;
+}
+
+.gift-shelf-item.mystery.revealing::before {
+  opacity: 0;
+}
+
+.gift-shelf-item.mystery.revealing .mystery-particles {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.gift-shelf-item.mystery.revealing .gift-shelf-icon {
+  animation: mystery-box-out 0.38s ease-in forwards;
+}
+
+.gift-shelf-item.mystery.revealed .gift-shelf-icon {
+  animation: mystery-gift-grow 0.62s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.gift-shelf-item.mystery.revealing .gift-shelf-name {
+  color: #6b5b45;
+  text-shadow: none;
+}
+
+.gift-shelf-item.mystery.revealed .gift-shelf-name {
+  animation: mystery-name-in 0.4s ease both;
+}
+
+/* 拖拽时与普通礼物一致：幽灵卡片固定跟随指针，落点高亮与落位强调正常生效 */
+.gift-shelf-item.mystery.gift-touch-ghost {
+  position: fixed;
+  animation: none;
+  transform: scale(1.06);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+
+.gift-shelf-item.mystery.dragging,
+.gift-shelf-item.mystery.drag-over {
+  animation: none;
+}
+
+.gift-shelf-item.mystery.emph {
+  animation: gift-card-emph 0.55s ease-in-out;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -4256,8 +4372,22 @@ body.hide-note .hint-bar {
   .mystery-confetti,
   .mystery-balloon,
   .zoom-mystery-confetti,
-  .zoom-mystery-balloon {
+  .zoom-mystery-balloon,
+  .mystery-props {
     display: none;
+  }
+
+  .gift-zoom-overlay.zoom-revealing .gift-zoom-icon,
+  .gift-zoom-overlay.zoom-revealed .gift-zoom-icon,
+  .gift-shelf-item.mystery.revealing .gift-shelf-icon,
+  .gift-shelf-item.mystery.revealed .gift-shelf-icon {
+    animation: none;
+  }
+
+  .gift-zoom-overlay.zoom-revealing .gift-zoom-inner::before,
+  .gift-shelf-item.mystery.revealing::before {
+    opacity: 0;
+    transition: none;
   }
 }
 

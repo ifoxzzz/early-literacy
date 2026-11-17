@@ -972,7 +972,7 @@
     });
   }
 
-  // 神秘礼物打开：播放「你得到了：<礼物名称>」；礼物名称未缓存时先弹进度条再播放
+  // 神秘礼物打开：播放「拆开礼物，你获得了：<礼物名称>」；礼物名称未缓存时先弹进度条再播放
   function playMysteryOpenSafe(name) {
     const url = Speaker.giftAudio(name);
     if (!url || Resource.getBlobUrl(url)) {

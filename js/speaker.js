@@ -170,7 +170,7 @@ const Speaker = {
     this.play(list);
   },
 
-  // 神秘礼物被打开：播报「你得到了：<礼物名称>」
+  // 神秘礼物被打开：播报「拆开礼物，你获得了：<礼物名称>」
   playMysteryOpen(name) {
     const list = [this.audioUrl("phrases/mysteryOpen.mp3")];
     const url = this.giftAudio(name);

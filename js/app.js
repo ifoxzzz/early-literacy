@@ -972,6 +972,20 @@
     });
   }
 
+  // 神秘礼物打开：播放「你得到了：<礼物名称>」；礼物名称未缓存时先弹进度条再播放
+  function playMysteryOpenSafe(name) {
+    const url = Speaker.giftAudio(name);
+    if (!url || Resource.getBlobUrl(url)) {
+      Speaker.playMysteryOpen(name);
+      return;
+    }
+    const endLoading = beginGiftLoading(name, 150);
+    Resource.preload([url]).then(() => {
+      endLoading();
+      Speaker.playMysteryOpen(name);
+    });
+  }
+
   // 点框外关闭：整块内容沿原路收缩回源田字格并淡出；
   // 从写字页打开时顺便刷新次数与推荐字，详情页不需要刷新
   function closeTraceModal() {
@@ -2257,6 +2271,84 @@
   /* ---------- 礼物兑换与展柜 ---------- */
   const giftCatalog = () => window.GIFTS || {};
 
+  // 神秘礼物：名称为「神秘礼物」，被打开后随机变成清单中其他非神秘礼物
+  const MYSTERY_GIFT_NAME = "神秘礼物";
+  const MYSTERY_CONFETTI_COLORS = ["#f2c94c", "#e74c3c", "#3498db", "#2ecc71", "#9b59b6", "#ff6b9d"];
+  const MYSTERY_BALLOON_EMOJIS = ["💖", "💝", "🎈", "⭐", "✨", "🎊"];
+
+  // 判断礼物名是否是神秘礼物
+  function isMysteryGift(name) {
+    return name === MYSTERY_GIFT_NAME;
+  }
+
+  // 在容器内注入飘动粒子（彩带 + 气球），粒子数量随容器类型而不同
+  // container: 卡片容器（.gift-shelf-item.mystery 等）；count: 粒子数量
+  function injectMysteryParticles(container, confettiCount, balloonCount) {
+    if (!container) return;
+    // 避免重复注入
+    if (container.querySelector(".mystery-particles")) return;
+    const layer = document.createElement("div");
+    layer.className = "mystery-particles";
+    layer.style.position = "absolute";
+    layer.style.inset = "0";
+    container.appendChild(layer);
+
+    // 彩带粒子
+    for (let i = 0; i < confettiCount; i++) {
+      const c = document.createElement("span");
+      c.className = "mystery-confetti";
+      const color = MYSTERY_CONFETTI_COLORS[i % MYSTERY_CONFETTI_COLORS.length];
+      c.style.background = color;
+      c.style.left = `${8 + Math.random() * 84}%`;
+      c.style.animationDelay = `${(Math.random() * 2200).toFixed(0)}ms`;
+      c.style.setProperty("--cx", `${(Math.random() - 0.5) * 40}px`);
+      c.style.setProperty("--cr", `${Math.random() * 360}deg`);
+      layer.appendChild(c);
+    }
+    // 气球爱心粒子
+    for (let i = 0; i < balloonCount; i++) {
+      const b = document.createElement("span");
+      b.className = "mystery-balloon";
+      b.textContent = MYSTERY_BALLOON_EMOJIS[i % MYSTERY_BALLOON_EMOJIS.length];
+      b.style.left = `${10 + Math.random() * 80}%`;
+      b.style.animationDelay = `${(Math.random() * 3500).toFixed(0)}ms`;
+      b.style.setProperty("--bx", `${(Math.random() - 0.5) * 30}px`);
+      layer.appendChild(b);
+    }
+  }
+
+  // 在大图 overlay 内注入覆盖全屏的飘动粒子层
+  function injectZoomMysteryParticles(overlay) {
+    if (!overlay) return;
+    if (overlay.querySelector(".zoom-mystery-particles")) return;
+    const layer = document.createElement("div");
+    layer.className = "zoom-mystery-particles";
+    overlay.appendChild(layer);
+
+    // 更多彩带，从底部向上飘到 overlay 各处
+    for (let i = 0; i < 24; i++) {
+      const c = document.createElement("span");
+      c.className = "zoom-mystery-confetti";
+      c.style.background = MYSTERY_CONFETTI_COLORS[i % MYSTERY_CONFETTI_COLORS.length];
+      c.style.left = `${Math.random() * 100}%`;
+      c.style.bottom = `${Math.random() * 20}%`;
+      c.style.animationDelay = `${(Math.random() * 2600).toFixed(0)}ms`;
+      c.style.setProperty("--zx", `${(Math.random() - 0.5) * 80}px`);
+      c.style.setProperty("--zr", `${Math.random() * 720}deg`);
+      layer.appendChild(c);
+    }
+    for (let i = 0; i < 10; i++) {
+      const b = document.createElement("span");
+      b.className = "zoom-mystery-balloon";
+      b.textContent = MYSTERY_BALLOON_EMOJIS[i % MYSTERY_BALLOON_EMOJIS.length];
+      b.style.left = `${Math.random() * 100}%`;
+      b.style.bottom = `${Math.random() * 15}%`;
+      b.style.animationDelay = `${(Math.random() * 4000).toFixed(0)}ms`;
+      b.style.setProperty("--bzx", `${(Math.random() - 0.5) * 60}px`);
+      layer.appendChild(b);
+    }
+  }
+
   // 礼物袋固定礼物：window.GIFTS_FIXED 里的图标每次打开都必须在袋中
   // 图标按礼物清单反查名称；清单里没有该图标、或同一图标对应多个名称时直接报错
   function fixedGiftNames() {
@@ -2487,7 +2579,7 @@
       hasGifts && mode === "shelf"
         ? shelfItems
             .map(
-              (g) => `<div class="gift-shelf-item${g.fresh ? " fresh" : ""}" data-id="${g.id}">
+              (g) => `<div class="gift-shelf-item${g.fresh ? " fresh" : ""}${isMysteryGift(g.name) ? " mystery" : ""}" data-id="${g.id}">
             <span class="gift-shelf-icon">${catalog[g.name] || "🎁"}</span>
             <span class="gift-shelf-name">${g.name}</span>
           </div>`
@@ -2500,7 +2592,7 @@
       hasGifts && mode === "box"
         ? boxItems
             .map(
-              (g) => `<button type="button" class="gift-box-item" data-id="${g.id}" title="${g.name}" aria-label="${g.name}">
+              (g) => `<button type="button" class="gift-box-item${isMysteryGift(g.name) ? " mystery" : ""}" data-id="${g.id}" title="${g.name}" aria-label="${g.name}">
             <span class="gift-box-icon">${catalog[g.name] || "🎁"}</span>
           </button>`
             )
@@ -2556,6 +2648,17 @@
             }, 260);
           }
         }
+      });
+    }
+
+    // 为神秘礼物卡片注入飘动粒子（橱窗和收纳盒各自处理）
+    if (mode === "shelf") {
+      $("#gift-shelf").querySelectorAll(".gift-shelf-item.mystery").forEach((card) => {
+        injectMysteryParticles(card, 3, 2);
+      });
+    } else if (mode === "box") {
+      $("#gift-box").querySelectorAll(".gift-box-item.mystery").forEach((card) => {
+        injectMysteryParticles(card, 2, 1);
       });
     }
   }
@@ -2863,6 +2966,7 @@
   // giftZoomFrom 记住起飞偏移，关闭时缩回卡片位置，与展开相呼应
   let giftZoomFrom = null;
   let giftZoomEl = null; // 记录被放大的橱窗卡片，关闭大图后图标做一次强调动画
+  let giftZoomMysteryInstance = null; // 当前被放大的神秘礼物实例（打开时用于定位 Storage 条目）
 
   function zoomGift(name, fromEl) {
     const catalog = giftCatalog();
@@ -2870,9 +2974,30 @@
     $("#gift-zoom-icon").textContent = catalog[name] || "🎁";
     $("#gift-zoom-name").textContent = name;
     $("#gift-zoom-count").textContent = count > 1 ? `共 ${count} 件` : "";
+
+    const overlay = $("#gift-zoom");
+    const isMystery = isMysteryGift(name);
+    // 切换神秘礼物的特效类：普通礼物时先清除
+    overlay.classList.remove("zoom-mystery", "zoom-opening");
+    overlay.querySelectorAll(".zoom-mystery-particles").forEach((n) => n.remove());
+
+    if (isMystery) {
+      overlay.classList.add("zoom-mystery");
+      injectZoomMysteryParticles(overlay);
+      // giftZoomMysteryInstance 存实例 id，openMysteryGift 时从 Storage 实时查询（不依赖内存缓存）
+      const uidObj = Storage.currentUser();
+      const uid = uidObj ? uidObj.id : "";
+      const arr = Storage.gifts(uid);
+      const candidate = fromEl
+        ? arr.find((g) => g.id === fromEl.dataset.id)
+        : arr.find((g) => g.name === MYSTERY_GIFT_NAME);
+      giftZoomMysteryInstance = candidate ? { id: candidate.id } : null;
+    } else {
+      giftZoomMysteryInstance = null;
+    }
+
     Sound.play("correct"); // 先播音效，再播礼物名称
     playGiftNameSafe(name);
-    const overlay = $("#gift-zoom");
     const inner = overlay.querySelector(".gift-zoom-inner");
     overlay.classList.remove("hidden");
     // 起始状态：定位到卡片中心（视口中心为原点计算偏移），缩小、半透明
@@ -2898,6 +3023,211 @@
       inner.style.opacity = "";
       overlay.classList.add("active");
     });
+  }
+
+  // 神秘礼物被点击打开：
+  // 1. 大图图标先疯狂抖动（zoom-opening）
+  // 2. 金光从中心爆开（DOM burst + fx-canvas 金色烟花）
+  // 3. 随机选一件非神秘礼物，写入 Storage 替换原实例
+  // 4. 揭晓新礼物，短暂展示后关闭大图，刷新橱窗
+  function openMysteryGift() {
+    if (mysteryOpening) return;
+    if (!giftZoomMysteryInstance) return;
+    mysteryOpening = true;
+
+    const overlay = $("#gift-zoom");
+    const inner = overlay.querySelector(".gift-zoom-inner");
+    const instance = giftZoomMysteryInstance;
+
+    // ---- 阶段 1：图标疯狂抖动 + boom 音效 ----
+    overlay.classList.add("zoom-opening");
+    Sound.play("mysteryOpen");
+
+    // ---- 阶段 2：金光爆开 + 烟花 ----
+    setTimeout(() => {
+      // 金光 DOM burst
+      const burst = document.createElement("div");
+      burst.className = "mystery-open-burst";
+      document.body.appendChild(burst);
+      burst.addEventListener("animationend", () => burst.remove(), { once: true });
+
+      // 金色烟花（从屏幕中心炸开，用金色/紫色调）
+      const canvas = $("#fx-canvas");
+      if (canvas) {
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          const dpr = Math.min(window.devicePixelRatio || 1, 2);
+          const w = window.innerWidth;
+          const h = window.innerHeight;
+          canvas.width = w * dpr;
+          canvas.height = h * dpr;
+          canvas.style.display = "block";
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+          // 金色+紫色主色调
+          const goldenColors = ["#f2c94c", "#fff176", "#ffca28", "#d1603d", "#9b59b6", "#e1bee7", "#ffffff"];
+          const cx = w / 2;
+          const cy = h / 2;
+          const particles = [];
+          const gen = ++fwGeneration; // 复用代次机制取消上一轮
+
+          // 一次打 5 簇烟花
+          const bursts = [
+            { at: 0, count: 60, min: 240, max: 460 },
+            { at: 120, count: 50, min: 220, max: 420 },
+            { at: 260, count: 50, min: 200, max: 380 },
+            { at: 420, count: 40, min: 180, max: 340 },
+            { at: 600, count: 40, min: 200, max: 360 },
+          ];
+
+          let nextBurst = 0;
+          let elapsed = 0;
+          let last = performance.now();
+          let doneAt = 0;
+
+          function mf(now) {
+            if (gen !== fwGeneration) return;
+            const dt = Math.min((now - last) / 1000, 0.05);
+            last = now;
+            elapsed += dt * 1000;
+
+            while (nextBurst < bursts.length && elapsed >= bursts[nextBurst].at) {
+              const b = bursts[nextBurst++];
+              const ox = cx + (Math.random() - 0.5) * 80;
+              const oy = cy + (Math.random() - 0.5) * 80;
+              for (let i = 0; i < b.count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const power = b.min + Math.random() * (b.max - b.min);
+                particles.push({
+                  x: ox, y: oy,
+                  vx: Math.cos(angle) * power,
+                  vy: Math.sin(angle) * power,
+                  life: 0,
+                  maxLife: 1.3 + Math.random() * 0.5,
+                  color: goldenColors[i % goldenColors.length],
+                  size: 2 + Math.random() * 2.5,
+                });
+              }
+            }
+
+            ctx.clearRect(0, 0, w, h);
+            const drag = Math.pow(0.35, dt);
+            for (let i = particles.length - 1; i >= 0; i--) {
+              const p = particles[i];
+              p.life += dt;
+              if (p.life >= p.maxLife) { particles.splice(i, 1); continue; }
+              p.vx *= drag;
+              p.vy = p.vy * drag + 240 * dt;
+              p.x += p.vx * dt;
+              p.y += p.vy * dt;
+
+              ctx.globalAlpha = 1 - p.life / p.maxLife;
+              ctx.strokeStyle = p.color;
+              ctx.fillStyle = p.color;
+              ctx.lineWidth = p.size * 0.9;
+              ctx.beginPath();
+              ctx.moveTo(p.x - p.vx * 0.02, p.y - p.vy * 0.02);
+              ctx.lineTo(p.x, p.y);
+              ctx.stroke();
+              ctx.beginPath();
+              ctx.arc(p.x, p.y, p.size * 0.7, 0, Math.PI * 2);
+              ctx.fill();
+            }
+
+            if (particles.length > 0 || nextBurst < bursts.length) {
+              fwRaf = requestAnimationFrame(mf);
+            } else if (!doneAt) {
+              doneAt = performance.now();
+              fwRaf = requestAnimationFrame(mf);
+            } else if (performance.now() - doneAt > 600) {
+              fwRaf = 0;
+              ctx.clearRect(0, 0, w, h);
+              canvas.style.display = "none";
+            } else {
+              fwRaf = requestAnimationFrame(mf);
+            }
+          }
+          fwRaf = requestAnimationFrame(mf);
+        }
+      }
+    }, 180);
+
+    // ---- 阶段 3：随机选礼物 + 写入 Storage ----
+    setTimeout(() => {
+      const catalog = giftCatalog();
+      const candidates = Object.keys(catalog).filter((n) => !isMysteryGift(n));
+      if (candidates.length === 0) { mysteryOpening = false; return; }
+      const newName = candidates[Math.floor(Math.random() * candidates.length)];
+      const newIcon = catalog[newName];
+
+      // 更新 Storage：替换该实例的 name
+      const uidObj = Storage.currentUser();
+      const uid = uidObj ? uidObj.id : "";
+      const arr = Storage.gifts(uid);
+      const target = arr.find((g) => g.id === instance.id);
+      if (target) {
+        target.name = newName;
+        Storage.saveGifts(arr, uid);
+      }
+      // 同步更新内存数组
+      giftItems = Storage.gifts(uid);
+
+      // 播报「你得到了 XXX！」——用礼物名称音频 + 惊叹前缀
+      playMysteryOpenSafe(newName);
+    }, 550);
+
+    // ---- 阶段 4：揭晓新礼物（展示在 overlay 上），短暂展示后关闭并刷新橱窗 ----
+    setTimeout(() => {
+      const catalog = giftCatalog();
+      // 直接从 Storage 读取最新数据，不依赖 giftItems 缓存
+      const uidObj = Storage.currentUser();
+      const uid = uidObj ? uidObj.id : "";
+      const arr = Storage.gifts(uid);
+      const currentInstance = arr.find((g) => g.id === instance.id);
+      if (!currentInstance) {
+        mysteryOpening = false;
+        $("#gift-zoom").classList.add("hidden");
+        renderGiftShelf();
+        return;
+      }
+      const newName = currentInstance.name;
+      const newIcon = catalog[newName] || "🎁";
+
+      // overlay 上的卡片先淡入显示新礼物
+      const iconEl = $("#gift-zoom-icon");
+      const nameEl = $("#gift-zoom-name");
+      const countEl = $("#gift-zoom-count");
+      iconEl.textContent = newIcon;
+      nameEl.textContent = newName;
+      const total = arr.filter((g) => g.name === newName).length;
+      countEl.textContent = total > 1 ? `共 ${total} 件` : "";
+
+      // 去掉神秘特效类
+      overlay.classList.remove("zoom-mystery", "zoom-opening");
+      overlay.querySelectorAll(".zoom-mystery-particles").forEach((n) => n.remove());
+      // 让 inner 有一个短暂的过渡（紫色背景 → 白色背景）
+      inner.style.transition = "background 0.4s ease, box-shadow 0.4s ease";
+
+      // 2.5 秒后关闭大图，刷新橱窗
+      setTimeout(() => {
+        overlay.classList.remove("active");
+        // 飞回卡片位置
+        if (giftZoomFrom) {
+          inner.style.transition = "transform 0.32s cubic-bezier(0.2, 1.2, 0.3, 1), opacity 0.25s";
+          inner.style.transform = `translate(${giftZoomFrom.dx}px, ${giftZoomFrom.dy}px) scale(0.3)`;
+          inner.style.opacity = "0";
+          giftZoomFrom = null;
+        }
+        giftZoomMysteryInstance = null;
+        giftZoomEl = null;
+        setTimeout(() => {
+          overlay.classList.add("hidden");
+          // 刷新橱窗（神秘礼物卡片会自动变成新礼物）
+          renderGiftShelf();
+          mysteryOpening = false;
+        }, 320);
+      }, 1600);
+    }, 900);
   }
 
   // 点礼物袋里的礼物：图标放大、摇晃再恢复（与橱窗放大的手感一致）
@@ -2948,8 +3278,9 @@
       .map((name, i) => {
         const icon = giftCatalog()[name];
         const count = owned[name] || 0;
+        const isMystery = isMysteryGift(name);
         // --i 供消失/弹入动画计算逐张延迟；位置索引同时是卡片序号
-        return `<button type="button" class="gift-item${animate ? " bag-in" : ""}" data-name="${name}" style="--i:${i}">
+        return `<button type="button" class="gift-item${animate ? " bag-in" : ""}${isMystery ? " mystery" : ""}" data-name="${name}" style="--i:${i}">
           <span class="gift-emoji">${icon}</span>
           <span class="gift-name">${name}</span>
           ${count > 0 ? `<span class="gift-owned">已有 ${count}</span>` : ""}
@@ -3675,9 +4006,17 @@
     if (e.target.closest(".gift-box-item")) return;
     closeGiftBubble();
   });
-  // 点击大图上的礼物图标：左右晃动 + 点击音效（不会关闭大图）
+  // 点击大图上的礼物图标：
+  // - 神秘礼物：触发打开流程（随机变成真实礼物 + 震撼动画）
+  // - 普通礼物：左右晃动 + 点击音效（不会关闭大图）
+  let mysteryOpening = false; // 打开动画进行中，期间阻止重复点击
   $("#gift-zoom-icon").addEventListener("click", (e) => {
     e.stopPropagation();
+    if (mysteryOpening) return;
+    if (giftZoomMysteryInstance) {
+      openMysteryGift();
+      return;
+    }
     const icon = e.currentTarget;
     Sound.play("click");
     icon.classList.remove("shaking");
@@ -3690,6 +4029,7 @@
   // 放大 overlay：只有点卡片外区域才恢复——沿原路飞回卡片位置并缩小淡出，再隐藏遮罩
   $("#gift-zoom").addEventListener("click", (e) => {
     if (e.target.closest(".gift-zoom-inner")) return; // 点大图卡片内部不关闭
+    if (mysteryOpening) return; // 打开动画进行中，禁止关闭
     const overlay = e.currentTarget;
     const inner = overlay.querySelector(".gift-zoom-inner");
     overlay.classList.remove("active"); // 背景遮罩淡出

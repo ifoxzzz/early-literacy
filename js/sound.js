@@ -100,6 +100,15 @@ const Sound = {
       this.tone(2093, 1.3, 0.18, "sine", 0.05);
       this.tone(2349, 1.6, 0.18, "sine", 0.045);
       this.tone(2637, 1.9, 0.24, "sine", 0.04);
+    } else if (name === "mysteryOpen") {
+      // 神秘礼物打开：中华小当家经典"当当当当"——四连上行惊喜音
+      // do-mi-sol-do，渐次升高，最后一拍最长最亮
+      this.tone(262, 0, 0.18, "triangle", 0.2);    // C4 咚
+      this.tone(330, 0.12, 0.18, "triangle", 0.2);  // E4 当
+      this.tone(392, 0.24, 0.22, "triangle", 0.22); // G4 当
+      this.tone(523, 0.38, 0.42, "triangle", 0.24); // C5 当（延长音，最亮）
+      // 高音装饰：最后一拍叠加一个八度高音，更闪亮
+      this.tone(1047, 0.4, 0.35, "sine", 0.1);       // C6 泛音装饰
     }
   },
 };

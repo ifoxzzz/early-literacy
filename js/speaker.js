@@ -170,6 +170,14 @@ const Speaker = {
     this.play(list);
   },
 
+  // 神秘礼物被打开：播报「你得到了：<礼物名称>」
+  playMysteryOpen(name) {
+    const list = [this.audioUrl("phrases/mysteryOpen.mp3")];
+    const url = this.giftAudio(name);
+    if (url) list.push(url);
+    this.play(list);
+  },
+
   // 打开礼物袋时播报「你现在可以从礼物袋中挑选 N 件礼物」
   playGiftBagOpen(quota) {
     const url = this.audioUrl(`phrases/pickBag${quota}.mp3`);

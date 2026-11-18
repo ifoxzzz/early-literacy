@@ -7,7 +7,7 @@
   <script>
     // 全局唯一版本号（同时用于缓存失效）：改动任何 css/js/音频后递增版本号，
     // 如 1.0.0 → 1.0.1，即可让全部缓存失效；首页右下角显示的也是这个版本
-    var CACHE_VERSION = "1.1.24";
+    var CACHE_VERSION = "1.1.26";
     window.APP_VERSION = CACHE_VERSION;
     // 资源缓存标记：应用设置里「清理资源缓存」后更换。音频、字体、笔顺、图片等
     // 下载型资源的 URL 都会带上它，点一次清理即可绕过浏览器里的旧副本。
@@ -145,6 +145,20 @@
 
   <!-- 首页：选择小朋友 -->
   <section id="view-home" class="view">
+    <!-- 全屏引导：进入首页 2 秒后从顶部缓缓拉下，仅当前环境支持全屏时出现 -->
+    <div class="fullscreen-tip hidden" id="fullscreen-tip" role="status">
+      <span class="fullscreen-tip-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+        </svg>
+      </span>
+      <div class="fullscreen-tip-body">
+        <p class="fullscreen-tip-title">用全屏，陪孩子学得更专注</p>
+        <p class="fullscreen-tip-text">开启后应用会铺满屏幕；想关闭时，到「应用设置」里的「<span class="fullscreen-tip-nowrap">全屏模式</span>」关掉即可。</p>
+      </div>
+      <button class="fullscreen-tip-btn" id="btn-fullscreen-tip" type="button">开启全屏</button>
+      <button class="fullscreen-tip-close" id="btn-fullscreen-tip-close" type="button" aria-label="关闭提示">×</button>
+    </div>
     <h1 class="app-title">宝贝趣味识字</h1>
     <p class="home-stats" id="home-stats"></p>
     <div class="user-list" id="user-list"></div>
@@ -401,6 +415,20 @@
           </div>
         </div>
         <p class="settings-tip">手机系统字体调大后，界面文字可能挤在一起甚至显示不全，把滑块拖到「更小」即可恢复。此设置对所有小朋友生效。</p>
+      </section>
+      <!-- 全屏模式：仅当前环境支持全屏 API 时显示，默认关闭 -->
+      <section class="admin-block hidden" id="admin-fullscreen">
+        <h2 class="admin-title">全屏模式</h2>
+        <div class="setting-row">
+          <span class="setting-label">全屏显示</span>
+          <span class="setting-opts">
+            <span class="setting-switch" id="set-fullscreen">
+              <button class="setting-switch-btn" data-v="on">开启</button>
+              <button class="setting-switch-btn" data-v="off">关闭</button>
+            </span>
+          </span>
+        </div>
+        <p class="settings-tip">开启后应用会铺满屏幕，点「关闭」或按 Esc 即可退出，退出后状态自动同步。</p>
       </section>
       <section class="admin-block">
         <h2 class="admin-title">缓存清理</h2>

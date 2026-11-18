@@ -1071,6 +1071,154 @@ body {
   padding-bottom: 48px;
 }
 
+/* ---------- 全屏引导悬浮条：进入首页 2 秒后从顶部缓缓拉下 ---------- */
+.fullscreen-tip {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  left: 50%;
+  z-index: 90;
+  width: min(94vw, 680px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 16px;
+  background: linear-gradient(135deg, #fffdf7 0%, #fff7e8 55%, #ffefd5 100%);
+  border: 1px solid #f0dcb8;
+  border-radius: 18px;
+  box-shadow:
+    0 16px 38px rgba(122, 87, 38, 0.16),
+    0 2px 6px rgba(122, 87, 38, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  opacity: 0;
+  transform: translate(-50%, calc(-100% - 32px));
+  transition:
+    transform 0.78s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.6s ease;
+  pointer-events: none;
+}
+
+.fullscreen-tip.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  pointer-events: auto;
+}
+
+.fullscreen-tip-icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  color: #fff;
+  background: linear-gradient(145deg, #f8bd5c, #ed8f2b);
+  box-shadow: 0 4px 12px rgba(237, 143, 43, 0.35);
+}
+
+.fullscreen-tip-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.fullscreen-tip-body {
+  flex: 1;
+  min-width: 0;
+  padding-right: 18px;
+}
+
+.fullscreen-tip-title {
+  font-size: calc(clamp(15px, 3.3vmin, 19px) * var(--fs));
+  font-weight: 600;
+  line-height: 1.3;
+  color: #7a4526;
+}
+
+.fullscreen-tip-text {
+  margin-top: 3px;
+  font-size: calc(clamp(12px, 2.7vmin, 15px) * var(--fs));
+  line-height: 1.45;
+  color: #9a7b55;
+}
+
+/* 避免「全屏模式」这个词在窄屏上被拆到两行 */
+.fullscreen-tip-nowrap {
+  white-space: nowrap;
+}
+
+.fullscreen-tip-btn {
+  flex: none;
+  font-family: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 9px 18px;
+  border: none;
+  border-radius: 999px;
+  font-size: calc(clamp(13px, 2.9vmin, 16px) * var(--fs));
+  color: #fff;
+  background: linear-gradient(135deg, #f6b24a, #ec8c2c);
+  box-shadow: 0 3px 0 #cf7420, 0 6px 14px rgba(236, 140, 44, 0.26);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.fullscreen-tip-btn:active {
+  transform: translateY(2px) scale(0.97);
+  box-shadow: 0 1px 0 #cf7420;
+}
+
+.fullscreen-tip-close {
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  font-family: inherit;
+  font-size: calc(18px * var(--fs));
+  line-height: 1;
+  color: #c0a580;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.fullscreen-tip-close:hover {
+  color: #8a6a45;
+  background: rgba(192, 165, 128, 0.16);
+}
+
+/* 窄屏：提示文字独占一行，开启按钮放下方，避免文字被挤成细条 */
+@media (max-width: 560px) {
+  .fullscreen-tip {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 14px 15px 13px;
+  }
+
+  .fullscreen-tip-body {
+    flex-basis: calc(100% - 54px);
+    padding-right: 20px;
+  }
+
+  .fullscreen-tip-btn {
+    flex: 1 0 100%;
+    padding: 9px 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fullscreen-tip {
+    transform: translate(-50%, 0);
+    transition: opacity 0.2s ease;
+  }
+}
+
 /* ---------- 作者信息浮层：点遮罩（浮层以外区域）关闭 ---------- */
 .about-mask {
   position: fixed;

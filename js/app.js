@@ -235,6 +235,7 @@
         : "点小朋友的名字，开始练习";
     show("home");
     startBubbles();
+    scheduleFullscreenTip();
   }
 
   /* ---------- 首页气泡：名字气泡悬浮漂移 + 相互碰撞 ---------- */
@@ -1032,6 +1033,7 @@
     });
     refreshClickSound();
     refreshUiFont();
+    refreshFullscreen();
     show("admin");
     updateScrollFade($("#admin-scroll"));
   }
@@ -3279,6 +3281,85 @@
     btn.setAttribute("aria-pressed", String(on));
   }
 
+  /* ---------- 全屏模式（全局设置，仅环境支持时显示） ---------- */
+  // 各浏览器前缀不同：优先标准 API，其次 WebKit（旧 Safari / Android WebView）与 IE/Edge
+  function getFullscreenApi() {
+    const root = document.documentElement;
+    if (root.requestFullscreen) {
+      return {
+        available: () => document.fullscreenEnabled !== false,
+        active: () => !!document.fullscreenElement,
+        enter: () => root.requestFullscreen(),
+        exit: () => document.exitFullscreen(),
+        event: "fullscreenchange",
+      };
+    }
+    if (root.webkitRequestFullscreen) {
+      return {
+        available: () => document.webkitFullscreenEnabled !== false,
+        active: () => !!document.webkitFullscreenElement,
+        enter: () => root.webkitRequestFullscreen(),
+        exit: () => document.webkitExitFullscreen(),
+        event: "webkitfullscreenchange",
+      };
+    }
+    if (root.msRequestFullscreen) {
+      return {
+        available: () => document.msFullscreenEnabled !== false,
+        active: () => !!document.msFullscreenElement,
+        enter: () => root.msRequestFullscreen(),
+        exit: () => document.msExitFullscreen(),
+        event: "MSFullscreenChange",
+      };
+    }
+    return null;
+  }
+  const fsApi = getFullscreenApi();
+
+  // 胶囊按钮状态始终跟随真实全屏状态：按 Esc 或浏览器自行退出时也会同步
+  function refreshFullscreen() {
+    const supported = !!(fsApi && fsApi.available());
+    $("#admin-fullscreen").classList.toggle("hidden", !supported);
+    const on = supported && fsApi.active();
+    $("#set-fullscreen")
+      .querySelectorAll("button")
+      .forEach((b) => b.classList.toggle("active", (b.dataset.v === "on") === on));
+    if (on) dismissFullscreenTip();
+  }
+
+  // 首页全屏引导条：进入首页 2 秒后从顶部拉下，本次页面加载只提示一次
+  const fullscreenTip = $("#fullscreen-tip");
+  let fullscreenTipTimer = 0;
+  let fullscreenTipHideTimer = 0;
+  let fullscreenTipShown = false;
+
+  function showFullscreenTip() {
+    fullscreenTipShown = true;
+    clearTimeout(fullscreenTipHideTimer);
+    fullscreenTip.classList.remove("hidden");
+    // 强制回流，让「屏幕外 + 透明」的起始状态先生效，再加 show 触发下拉动画
+    void fullscreenTip.offsetWidth;
+    fullscreenTip.classList.add("show");
+  }
+
+  function dismissFullscreenTip() {
+    if (fullscreenTip.classList.contains("hidden")) return;
+    clearTimeout(fullscreenTipHideTimer);
+    fullscreenTip.classList.remove("show");
+    fullscreenTipHideTimer = setTimeout(() => fullscreenTip.classList.add("hidden"), 800);
+  }
+
+  function scheduleFullscreenTip() {
+    if (fullscreenTipShown || !fsApi || !fsApi.available() || fsApi.active()) return;
+    clearTimeout(fullscreenTipTimer);
+    fullscreenTipTimer = setTimeout(() => {
+      if (fullscreenTipShown || !fsApi || !fsApi.available() || fsApi.active()) return;
+      // 已经离开首页就不再打扰，下次回到首页重新计时
+      if (views.home.classList.contains("hidden")) return;
+      showFullscreenTip();
+    }, 2000);
+  }
+
   /* ---------- 界面字号（全局设置） ---------- */
   // 五档字号，滑块从左到右：更小 / 小 / 标准 / 大 / 更大
   // 小字号用来抵消系统大字体，大字号让眼睛不好的家长也能看清
@@ -4199,6 +4280,37 @@
     Storage.setPref(Storage.PREF_KEYS.CLICK, !Storage.pref(Storage.PREF_KEYS.CLICK));
     refreshClickSound();
   });
+  // 全屏模式（全局设置，仅环境支持时可见）：胶囊开关，默认关闭
+  $("#set-fullscreen").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-v]");
+    if (!btn || !fsApi || !fsApi.available()) return;
+    const want = btn.dataset.v === "on";
+    if (want === fsApi.active()) return;
+    try {
+      const result = want ? fsApi.enter() : fsApi.exit();
+      // 标准 API 返回 Promise：成功或失败都按真实状态刷新，避免界面误报
+      if (result && typeof result.then === "function") {
+        result.then(refreshFullscreen, refreshFullscreen);
+      }
+    } catch (err) {
+      refreshFullscreen();
+    }
+  });
+  // 按 Esc 或浏览器自行退出全屏时，同步胶囊按钮状态
+  if (fsApi) document.addEventListener(fsApi.event, refreshFullscreen);
+  // 首页全屏引导条：一键开启全屏，成功后自动收起；× 直接关闭提示
+  $("#btn-fullscreen-tip").addEventListener("click", () => {
+    if (!fsApi || !fsApi.available()) return;
+    try {
+      const result = fsApi.enter();
+      if (result && typeof result.then === "function") {
+        result.then(refreshFullscreen, refreshFullscreen);
+      }
+    } catch (err) {
+      refreshFullscreen();
+    }
+  });
+  $("#btn-fullscreen-tip-close").addEventListener("click", dismissFullscreenTip);
   // 界面字号（全局设置）：五档滑块，拖动时立即生效
   $("#ui-font-range").addEventListener("input", (e) => {
     const idx = Number(e.target.value);

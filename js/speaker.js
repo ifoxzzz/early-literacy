@@ -199,6 +199,11 @@ const Speaker = {
     this.play([this.audioUrl("phrases/giftBoxOverflow.mp3")]);
   },
 
+  // 写字页五笔全亮：神秘礼物飞进橱窗后播报提示
+  playMysteryGiftFly() {
+    this.play([this.audioUrl("phrases/mysteryGiftFly.mp3")]);
+  },
+
   // 橱窗放大礼物：只播礼物名称（音效由 Sound 负责）
   playGiftName(name) {
     const url = this.giftAudio(name);
@@ -259,6 +264,7 @@ const Speaker = {
     urls.push(this.audioUrl("phrases/giftSaved.mp3"));
     urls.push(this.audioUrl("phrases/giftNew.mp3"));
     urls.push(this.audioUrl("phrases/giftBoxOverflow.mp3"));
+    urls.push(this.audioUrl("phrases/mysteryGiftFly.mp3"));
     for (let i = 0; i <= 20; i++) urls.push(this.audioUrl(`phrases/stars${i}.mp3`));
     // 楷体字体也加入同一批预载，进度条自动把它算进去；下载完成后再安装字体
     const fontUrl = Resource.fontUrl();

@@ -40,7 +40,7 @@ const Sound = {
     osc.stop(t + dur);
   },
 
-  play(name) {
+  play(name, step = 0) {
     // 只有按钮音效受「按钮音效」开关控制；正确/错误/求助等答题反馈音效不受影响
     if (name === "click" && !Storage.pref(Storage.PREF_KEYS.CLICK)) return;
     if (name === "pick") {
@@ -90,6 +90,12 @@ const Sound = {
       this.tone(622, 0, 0.07, "sine", 0.14);
       this.tone(932, 0.08, 0.1, "sine", 0.14);
       this.tone(1245, 0.18, 0.12, "sine", 0.1);
+    } else if (name === "strokeLight") {
+      // 「写」字逐笔点亮：短促清脆的铃声，五笔音高逐级上行，并叠加轻微八度泛音
+      const scale = [880, 988, 1175, 1319, 1568];
+      const freq = scale[Math.min(Math.max(step - 1, 0), scale.length - 1)];
+      this.tone(freq, 0, 0.14, "sine", 0.14);
+      this.tone(freq * 2, 0.035, 0.22, "sine", 0.065);
     } else if (name === "sparkle") {
       // 临摹整字写完：配合金色流光的"流光"音，音高一路向上，尾部点缀细碎高音闪光
       this.tone(784, 0, 0.3, "sine", 0.14);

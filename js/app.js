@@ -73,6 +73,7 @@
 
   // 礼物兑换状态：本组可挑选数量、已选礼物、是否已领取；giftsReturnView 记录展柜返回去向
   let giftQuota = 0;
+  let giftAllCorrect = false; // 本组是否全对（拿满星星），只有全对时礼物袋才包含固定礼物
   let giftPicked = [];
   let giftClaimed = false;
   let giftBagRefreshed = false; // 本次打开的礼物袋是否已用过「换一批」（每袋只能用一次）
@@ -80,12 +81,12 @@
   let giftShelfMode = "shelf"; // "shelf" 橱窗 / "box" 收纳盒 / "list" 记录
 
   function show(name) {
-    // 离开写字页时清理奖励动画（星星飞出/礼物掉落）
-    if (name !== "writing" && typeof WriteReward !== "undefined") {
-      WriteReward.cleanup();
-    }
     Object.values(views).forEach((v) => v.classList.add("hidden"));
     views[name].classList.remove("hidden");
+    if (name !== "writing") {
+      cancelWritingStars();
+      cancelWritingGiftFlight();
+    }
     // 离开首页就停掉气泡漂移，避免后台空转
     if (name !== "home") stopBubbles();
     // 离开结束页时清理小手和水波纹
@@ -631,6 +632,200 @@
   /* ---------- 写字页：推荐练习 + 其他汉字 ---------- */
   let writingVolume = null; // 当前写字页对应的册（从临摹页返回时重新渲染）
   let writingCols = 0; // 推荐区当前列数，窗口尺寸变化后据此判断是否需要重排
+  let writingMarkPaths = []; // 顶部「写」字的五笔 SVG 轮廓
+  let writingMarkLit = 0; // 本次进入写字页后已点亮的笔画数
+  let writingMarkLoading = false;
+  let writingStarGen = 0; // 离开写字页后作废旧批次的飞星与到达回调
+  let writingGiftFlight = null; // 当前全亮礼物动画及其 Web Animation 实例
+  let writingGiftGen = 0; // 离开写字页后作废旧礼物动画的异步回调
+
+  function paintWritingMark() {
+    writingMarkPaths.forEach((path, i) => path.classList.toggle("lit", i < writingMarkLit));
+    const allLit = writingMarkPaths.length > 0 && writingMarkLit >= writingMarkPaths.length;
+    $("#writing-mark").classList.toggle("all-lit", allLit);
+  }
+
+  // 顶部「写」字沿用临摹笔顺数据：红色底字不变，每颗星星到达后把下一笔改为金色
+  function prepareWritingMark() {
+    if (writingMarkPaths.length || writingMarkLoading || !window.TraceView) return;
+    writingMarkLoading = true;
+    TraceView.load("写").then((data) => {
+      writingMarkLoading = false;
+      if (!data || writingMarkPaths.length) return;
+      const ns = "http://www.w3.org/2000/svg";
+      const svg = document.createElementNS(ns, "svg");
+      svg.setAttribute("viewBox", "0 0 1024 1024");
+      svg.setAttribute("aria-hidden", "true");
+      const flip = document.createElementNS(ns, "g");
+      flip.setAttribute("transform", "scale(1,-1) translate(0,-900)");
+      svg.appendChild(flip);
+      writingMarkPaths = data.strokes.map((d) => {
+        const path = document.createElementNS(ns, "path");
+        path.setAttribute("d", d);
+        path.setAttribute("class", "writing-mark-stroke");
+        flip.appendChild(path);
+        return path;
+      });
+      const mark = $("#writing-mark");
+      mark.innerHTML = "";
+      mark.appendChild(svg);
+      paintWritingMark();
+    });
+  }
+
+  function resetWritingMark() {
+    cancelWritingStars();
+    writingMarkLit = 0;
+    $("#writing-mark").classList.remove("light-pop");
+    paintWritingMark();
+  }
+
+  function lightWritingMarkStroke() {
+    const total = writingMarkPaths.length || 5;
+    if (writingMarkLit >= total) return; // 五笔全亮后，后续星星仍飞但不再重复播放点亮反馈
+    writingMarkLit += 1;
+    paintWritingMark();
+    const mark = $("#writing-mark");
+    mark.classList.remove("light-pop");
+    void mark.offsetWidth; // 星星连续到达时也能重新播放缩放动画
+    mark.classList.add("light-pop");
+    if (typeof Sound !== "undefined") Sound.play("strokeLight", writingMarkLit);
+    if (writingMarkLit === total) playWritingGiftFlight();
+  }
+
+  function cancelWritingStars() {
+    writingStarGen += 1;
+    document.querySelectorAll(".writing-star").forEach((star) => star.remove());
+  }
+
+  function cancelWritingGiftFlight() {
+    writingGiftGen += 1;
+    const flight = writingGiftFlight;
+    if (!flight) return;
+    writingGiftFlight = null;
+    flight.animations.forEach((animation) => animation.cancel());
+    flight.el.remove();
+    resetWritingMark(); // 动画被切页打断时也要去掉全亮金框，避免返回后无法再次触发
+  }
+
+  // 五笔全亮：🎁 先向右上抛出，再加速落到屏幕 2/3 高度；🎈 在落点打开并接住礼物，
+  // 随后两者一起飘向右上角礼物按钮，消失后将「写」字框恢复为初始红字状态。
+  async function playWritingGiftFlight() {
+    if (writingGiftFlight) return;
+    cancelWritingStars(); // 全亮后不再接收本轮多余星星，防止复位后又被旧星星点亮
+    const mark = $("#writing-mark");
+    const targetEl = $("#btn-writing-gift .gift-icon") || $("#btn-writing-gift");
+    if (!mark || !targetEl || typeof mark.animate !== "function") {
+      resetWritingMark();
+      return;
+    }
+
+    const startRect = mark.getBoundingClientRect();
+    const start = { x: startRect.left + startRect.width / 2, y: startRect.top + startRect.height / 2 };
+    const peak = {
+      x: Math.min(window.innerWidth - 48, start.x + 56),
+      y: Math.max(64, start.y - Math.min(110, window.innerHeight * 0.16)),
+    };
+    const caught = {
+      x: Math.min(window.innerWidth - 36, start.x + Math.min(110, window.innerWidth * 0.24)),
+      y: window.innerHeight * 2 / 3,
+    };
+    const gen = ++writingGiftGen;
+    const el = document.createElement("div");
+    el.className = "writing-gift-flight";
+    el.setAttribute("aria-hidden", "true");
+    el.innerHTML = '<span class="writing-gift-flight-balloon">🎈</span><span class="writing-gift-flight-gift">🎁</span>';
+    document.body.appendChild(el);
+    const balloon = el.querySelector(".writing-gift-flight-balloon");
+    const flight = { el, animations: [] };
+    writingGiftFlight = flight;
+    const pose = (point, scale = 1, rotate = 0) =>
+      `translate(${point.x}px, ${point.y}px) scale(${scale}) rotate(${rotate}deg)`;
+    const active = () =>
+      gen === writingGiftGen && writingGiftFlight === flight && !views.writing.classList.contains("hidden");
+    const animate = (target, keyframes, options) => {
+      const animation = target.animate(keyframes, { fill: "forwards", ...options });
+      flight.animations.push(animation);
+      return animation.finished;
+    };
+
+    try {
+      // 1) 向右上抛起：初速快、接近顶点变慢
+      await animate(el, [
+        { transform: pose(start, 0.5, -15), opacity: 0 },
+        { transform: pose({ x: start.x + 16, y: start.y - 28 }, 1.05, -4), opacity: 1, offset: 0.25 },
+        { transform: pose(peak, 1, 12), opacity: 1 },
+      ], { duration: 420, easing: "cubic-bezier(0.2, 0.75, 0.35, 1)" });
+      if (!active()) return;
+
+      // 2) 自由落体：加速下降到屏幕三分之二处
+      await animate(el, [
+        { transform: pose(peak, 1, 12), opacity: 1 },
+        { transform: pose(caught, 1, -5), opacity: 1 },
+      ], { duration: 680, easing: "cubic-bezier(0.55, 0.06, 0.85, 0.5)" });
+      if (!active()) return;
+
+      // 3) 气球打开，礼物先向下顿一下再被拉住，模拟降落伞打开时的拖拽感
+      await Promise.all([
+        animate(el, [
+          { transform: pose(caught, 1, -5), opacity: 1 },
+          { transform: pose({ x: caught.x, y: caught.y + 14 }, 1.04, 3), opacity: 1, offset: 0.45 },
+          { transform: pose(caught, 1, 0), opacity: 1 },
+        ], { duration: 340, easing: "ease-out" }),
+        animate(balloon, [
+          { transform: "translate(-50%, -50%) scale(0)", opacity: 0 },
+          { transform: "translate(-50%, -50%) scale(1.16)", opacity: 1, offset: 0.68 },
+          { transform: "translate(-50%, -50%) scale(1)", opacity: 1 },
+        ], { duration: 340, easing: "ease-out" }),
+      ]);
+      if (!active()) return;
+
+      // 4) 气球带礼物轻轻上飘，再一起飞向礼物按钮并缩小消失
+      const targetRect = targetEl.getBoundingClientRect();
+      const target = { x: targetRect.left + targetRect.width / 2, y: targetRect.top + targetRect.height / 2 };
+      const drift = { x: Math.min(window.innerWidth - 36, caught.x + 24), y: caught.y - 44 };
+      const middle = { x: (drift.x + target.x) / 2, y: (drift.y + target.y) / 2 - 20 };
+      await animate(el, [
+        { transform: pose(caught, 1, 0), opacity: 1 },
+        { transform: pose(drift, 1.03, 4), opacity: 1, offset: 0.28 },
+        { transform: pose(middle, 0.78, -3), opacity: 1, offset: 0.68 },
+        { transform: pose(target, 0.35, 0), opacity: 0 },
+      ], { duration: 1350, easing: "cubic-bezier(0.4, 0, 0.2, 1)" });
+      if (!active()) return;
+
+      // 5) 礼物已飞入礼物按钮：在橱窗第一格放入一件「神秘礼物」并播报提示
+      Storage.addGifts([MYSTERY_GIFT_NAME]);
+      Speaker.playMysteryGiftFly();
+    } catch (e) {
+      // 切页时 cancel() 会让 finished Promise reject；清理由 finally 统一处理
+    } finally {
+      el.remove();
+      if (writingGiftFlight === flight) {
+        writingGiftFlight = null;
+        if (gen === writingGiftGen && !views.writing.classList.contains("hidden")) resetWritingMark();
+      }
+    }
+  }
+
+  // 多次临摹在同一轮关闭时统一结算：每 260ms 起飞一颗，抵达后才点亮下一笔
+  function playWritingStars(rect, count) {
+    const gen = writingStarGen;
+    for (let i = 0; i < count; i++) {
+      setTimeout(() => {
+        if (gen !== writingStarGen || views.writing.classList.contains("hidden")) return;
+        popStarAt(
+          rect,
+          () => {
+            if (gen === writingStarGen && !views.writing.classList.contains("hidden")) {
+              lightWritingMarkStroke();
+            }
+          },
+          $("#writing-mark"),
+          "writing-star"
+        );
+      }, i * 260);
+    }
+  }
 
   // 推荐区固定两行，列数按屏幕宽度选择：平板/桌面 5×2，常见手机 4×2，极窄屏 3×2
   function writingRecommendCols() {
@@ -695,7 +890,7 @@
     const scope = Storage.writingScope(id);
     $("#writing-subtitle").textContent = `${volume.title} · 写一写`;
     refreshWritingToggles(); // 同步顶部手势/语音按钮高亮
-    WriteReward.init(); // 初始化"写"字真实笔画（加载笔顺数据并注入 SVG）
+    prepareWritingMark();
     show("writing");
     // 推荐区列数按可见宽度决定，并让字号跟着格子一起放大
     const grid = $("#writing-recommend");
@@ -749,6 +944,7 @@
   /* ---------- 写字页临摹模态框 ---------- */
   let traceModalFrom = null; // 源田字格相对视口中心的偏移，关闭时沿原路缩回
   let traceModalBusy = false; // 开关动画进行中，避免重复触发
+  let traceReward = null; // 写字页本轮临摹的源格子与待飞星数量；详情页为 null
 
   // 同步写字页顶部手势/语音按钮的高亮（与临摹页共享同一份设置）
   function refreshWritingToggles() {
@@ -757,388 +953,15 @@
     $("#btn-writing-voice").classList.toggle("active", TraceView.getVoice());
   }
 
-  // ---------- 写字页"写"字奖励模块 ----------
-  // 用 STROKES_DATA["写"].strokes（5笔）渲染真实的"写"字，每成功临摹一个字（且未超阈值）
-  // 就有一颗星星飞向"写"字图案并点亮一笔；5 笔全部点亮后触发礼物掉落动画，
-  // 播放"有件神秘礼物正飘向你的礼物橱窗，快去看看吧"语音，最后重置。
-  const WriteReward = (function () {
-    const STROKE_TOTAL = 5; // "写"字总笔画数
-    const STROKE_CHAR = "写";
-    let litCount = 0;
-    let sessionCompletions = 0;
-    let sessionChar = null;
-    let sessionCell = null;
-    let locked = false;
-    let strokesReady = false;
-
-    // 异步加载"写"字笔顺数据并注入 SVG
-    function init() {
-      if (strokesReady) return;
-      const data = window.STROKES_DATA && window.STROKES_DATA[STROKE_CHAR];
-      if (data) { injectStrokes(data.strokes); return; }
-      // 没有预加载：动态注入脚本加载 assets/strokes/写.js
-      const script = document.createElement("script");
-      script.src = resourceUrl("assets/strokes/" + encodeURIComponent(STROKE_CHAR) + ".js?v=" + window.APP_VERSION);
-      script.onload = () => {
-        const d = window.STROKES_DATA && window.STROKES_DATA[STROKE_CHAR];
-        if (d) injectStrokes(d.strokes);
-      };
-      document.head.appendChild(script);
-    }
-
-    // 把 5 笔路径注入到 <g id="write-reward-group"> 里（坐标经 scale(1,-1) translate(0,-900) 翻转）
-    function injectStrokes(strokeList) {
-      if (strokesReady || !strokeList || !strokeList.length) return;
-      const NS = "http://www.w3.org/2000/svg";
-      const g = document.getElementById("write-reward-group");
-      if (!g) return;
-      g.innerHTML = "";
-      strokeList.forEach((d, i) => {
-        const p = document.createElementNS(NS, "path");
-        p.setAttribute("d", d);
-        p.setAttribute("class", "write-stroke");
-        p.setAttribute("data-stroke", String(i));
-        g.appendChild(p);
-      });
-      strokesReady = true;
-    }
-
-    function getThreshold() {
-      try { return Storage.traceLimit(); } catch (e) { return 10; }
-    }
-
-    // 每完成一次临摹：检查阈值并累计
-    function onTraceComplete(char) {
-      if (locked) return;
-      init();
-      const limit = getThreshold();
-      const counts = Storage.traceCounts();
-      const currentCount = counts[char] || 0;
-      if (currentCount > limit) return;
-      if (views.writing.classList.contains("hidden")) return;
-      sessionCompletions += 1;
-      sessionChar = char;
-    }
-
-    function onTraceOpen(char, cell) {
-      init();
-      sessionCompletions = 0;
-      sessionChar = char;
-      sessionCell = cell || null;
-    }
-
-    function onTraceClose() {
-      if (locked || sessionCompletions <= 0) return;
-      if (views.writing.classList.contains("hidden")) return;
-      const fromCell = sessionCell;
-      const count = sessionCompletions;
-      sessionCompletions = 0;
-      sessionCell = null;
-      sessionChar = null;
-      flyStars(count, fromCell);
-    }
-
-    function flyStars(count, fromCell) {
-      locked = true;
-      const target = $("#write-reward-svg");
-      if (!target) { locked = false; return; }
-      const tRect = target.getBoundingClientRect();
-      const toX = tRect.left + tRect.width / 2;
-      const toY = tRect.top + tRect.height / 2;
-
-      let fromX, fromY;
-      if (fromCell) {
-        const r = fromCell.getBoundingClientRect();
-        fromX = r.left + r.width / 2;
-        fromY = r.top + r.height / 2;
-      } else {
-        const modal = $("#trace-modal");
-        const r = modal ? modal.getBoundingClientRect() : null;
-        if (r && r.width) {
-          fromX = r.left + r.width / 2;
-          fromY = r.top + r.height / 2;
-        } else {
-          fromX = window.innerWidth / 2;
-          fromY = window.innerHeight / 2;
-        }
-      }
-
-      for (let i = 0; i < count; i++) {
-        setTimeout(() => {
-          if (views.writing.classList.contains("hidden")) return;
-          createFlyStar(fromX, fromY, toX, toY, () => lightOneStroke());
-        }, i * 220);
-      }
-
-      const totalMs = count * 220 + 1000 + 100;
-      setTimeout(() => {
-        if (litCount >= STROKE_TOTAL) {
-          triggerGiftAnimation();
-        } else {
-          locked = false;
-        }
-      }, totalMs);
-    }
-
-    function createFlyStar(fromX, fromY, toX, toY, onArrive) {
-      const star = document.createElement("div");
-      star.className = "write-star-pop";
-      star.textContent = "⭐";
-      star.style.left = fromX - 14 + "px";
-      star.style.top = fromY - 14 + "px";
-      star.style.setProperty("--dx", `${toX - fromX}px`);
-      star.style.setProperty("--dy", `${toY - fromY}px`);
-      document.body.appendChild(star);
-      star.addEventListener("animationend", () => {
-        star.remove();
-        if (onArrive) onArrive();
-      }, { once: true });
-    }
-
-    function lightOneStroke() {
-      if (litCount >= STROKE_TOTAL) return;
-      const g = document.getElementById("write-reward-group");
-      if (!g) return;
-      const strokes = g.querySelectorAll(".write-stroke");
-      const target = strokes[litCount];
-      if (!target) return;
-      litCount += 1;
-      target.classList.add("lit", "just-lit");
-      setTimeout(() => target.classList.remove("just-lit"), 550);
-    }
-
-    // ---------- 礼物动画：全部点亮后触发 ----------
-    // 单一 rAF 时间轴驱动，消除 CSS keyframes 与 JS 定位混用问题。
-    // 全程只在开始时读取一次 DOM 坐标，后续全部用数学插值写 transform。
-    //
-    // 阶段        时间      事件
-    //  0 等待       0~400ms   背景框出现流动金边
-    //  1 下坠     400~1200ms  🎁 从"写"字中心掉到半空 (midY)
-    //  2 停顿+气球 1200~1500ms 停住、🎈气球出现（带淡入动画）
-    //  3 飘向按钮 1500~3800ms 被气球托起上升，x/y 向礼物按钮过渡，带上下晃动
-    //  4 抵达消失 3800~4100ms 缩放淡出
-    //  5 收尾     4100ms     播放语音、重置"写"字
-    function triggerGiftAnimation() {
-      const frame = $("#write-reward-frame");
-      if (frame) frame.classList.add("all-lit");
-      locked = true;
-
-      // --- 开始时只读一次 DOM 坐标 ---
-      const giftBtn = $("#btn-writing-gift") || $("#btn-gift");
-      const gRect = giftBtn ? giftBtn.getBoundingClientRect() : null;
-      const toX = gRect ? gRect.left + gRect.width / 2 : window.innerWidth / 2;
-      const toY = gRect ? gRect.top + gRect.height / 2 : 80;
-
-      const reward = $("#write-reward");
-      const rRect = reward ? reward.getBoundingClientRect() : null;
-      const fromX = rRect ? rRect.left + rRect.width / 2 : 60;
-      const fromY = rRect ? rRect.top + rRect.height / 2 : 80;
-      // 半空位置：从 fromY 往下掉约屏幕高度的 2/3，但不超出视口底部
-      const midX = fromX;
-      const midY = Math.min(fromY + window.innerHeight * 2 / 3, window.innerHeight - 60);
-
-      const GIFT_W = 42; // emoji 礼物近似宽度
-      let giftEl = null;
-      let balloonEl = null;
-      let phase = 0;
-      let finalized = false; // finalize 已执行？防止 while 推进 phase=5 和 if(phase>=5) 重复触发
-      const DURATIONS = [400, 900, 300, 2600, 350, 0]; // 各阶段时长 ms
-
-      function easeIn(t) { return t * t; }
-      function easeOut(t) { return 1 - (1 - t) * (1 - t); }
-
-      // 多低频叠加的"被风吹"摆动：几个不同频率的正弦叠加，效果更自然
-      // baseT 用整个飘向阶段的累计时间（让摆动跨阶段不突变）
-      let floatStartTs = 0; // phase 3 开始时记录
-
-      let lastTs = performance.now();
-      let phaseStartTs = 0;
-
-      function tick(ts) {
-        const dt = ts - lastTs;
-        lastTs = ts;
-        phaseStartTs += dt;
-
-        // 离开写字页 → 中断
-        if (views.writing.classList.contains("hidden")) {
-          if (giftEl) giftEl.remove();
-          if (frame) frame.classList.remove("all-lit");
-          resetNow();
-          return;
-        }
-
-        // 根据 phaseStartTs 推进阶段
-        while (phase < DURATIONS.length - 1 && phaseStartTs >= DURATIONS[phase]) {
-          phaseStartTs -= DURATIONS[phase];
-          phase += 1;
-          onPhaseEnter(phase);
-        }
-
-        if (phase >= 5) { finalize(); return; }
-
-        const pDur = DURATIONS[phase];
-        const pt = Math.min(1, phaseStartTs / pDur); // 当前阶段 0~1 进度
-
-        // --- 每帧写 transform ---
-        let x = fromX, y = fromY, scale = 1, rotate = 0, opacity = 1;
-
-        if (phase === 0) {
-          // 等待，礼物还没创建
-          requestAnimationFrame(tick); return;
-        }
-
-        if (phase === 1) {
-          // 下坠：fromX → midX, fromY → midY, easeIn
-          const e = easeIn(pt);
-          x = fromX + (midX - fromX) * e;
-          y = fromY + (midY - fromY) * e;
-          scale = 0.5 + 0.5 * easeOut(pt); // 从 0.5 放大到 1
-          opacity = easeOut(pt);
-          rotate = -15 * Math.sin(pt * Math.PI); // 轻微摆动
-        } else if (phase === 2) {
-          // 停在半空 + 长气球
-          x = midX; y = midY;
-          scale = 1; opacity = 1;
-          rotate = 0;
-        } else if (phase === 3) {
-          // 飘向礼物按钮：midX → toX, midY → toY, easeOut
-          const e = easeOut(pt);
-          x = midX + (toX - midX) * e;
-          y = midY + (toY - midY) * e;
-          // --- "被风吹"的柔和摆动：多低频正弦叠加 ---
-          // baseT 累计整个飘向阶段的时间，让摆动是连续的、不突变
-          const baseT = (phaseStartTs + floatStartTs) / 1000; // 秒
-          // 振幅随进度缓慢衰减到 0（越接近按钮越稳）
-          const damp = Math.pow(1 - pt, 1.4);
-          // 垂直：主波 0.6Hz + 次波 1.8Hz（低频是主导）
-          y += (Math.sin(baseT * Math.PI * 2 * 0.6) * 8
-              + Math.sin(baseT * Math.PI * 2 * 1.8 + 0.7) * 3) * damp;
-          // 水平：更慢的 0.35Hz 主波 + 0.9Hz 次波（模拟风从侧面吹）
-          x += (Math.sin(baseT * Math.PI * 2 * 0.35 + 0.3) * 10
-              + Math.sin(baseT * Math.PI * 2 * 0.9 + 1.2) * 4) * damp;
-          scale = 1;
-          opacity = 1;
-          // 旋转也跟着水平风摆（轻微的）
-          rotate = Math.sin(baseT * Math.PI * 2 * 0.35 + 0.3) * 7 * damp;
-        } else if (phase === 4) {
-          // 抵达 → 缩小淡出
-          x = toX; y = toY;
-          scale = 1 - 0.6 * pt; // 1 → 0.4
-          opacity = 1 - pt;
-          rotate = 0;
-        }
-
-        // 写入 transform：left/top 定中心，translate 负责位移
-        if (giftEl) {
-          giftEl.style.left = (x - GIFT_W / 2) + "px";
-          giftEl.style.top = (y - GIFT_W / 2) + "px";
-          giftEl.style.transform = `scale(${scale}) rotate(${rotate}deg)`;
-          giftEl.style.opacity = opacity;
-        }
-
-        requestAnimationFrame(tick);
-      }
-
-      function onPhaseEnter(p) {
-        if (p === 1) {
-          // 创建礼物元素
-          giftEl = document.createElement("div");
-          giftEl.className = "write-gift";
-          giftEl.textContent = "🎁";
-          giftEl.style.fontSize = GIFT_W + "px";
-          document.body.appendChild(giftEl);
-        } else if (p === 2) {
-          // 出现气球 + 播放语音
-          if (giftEl) {
-            balloonEl = document.createElement("span");
-            balloonEl.className = "write-gift-balloon";
-            balloonEl.textContent = "🎈";
-            giftEl.appendChild(balloonEl);
-            requestAnimationFrame(() => balloonEl && balloonEl.classList.add("show"));
-          }
-          // 播放"神秘礼物正飘向你的礼物橱窗"
-          try {
-            const url = Speaker.audioUrl("phrases/mysteryGiftArriving.mp3");
-            const audio = new Audio(url);
-            audio.play().catch(() => {
-              // mp3 不存在时用 TTS 兜底
-              Speaker.speak("有件神秘礼物正飘向你的礼物橱窗，快去看看吧", { rate: 0.95 });
-            });
-          } catch (e) {
-            try { Speaker.speak("有件神秘礼物正飘向你的礼物橱窗，快去看看吧", { rate: 0.95 }); } catch (_) {}
-          }
-        } else if (p === 3) {
-          // 记录浮起时间戳，让摆动从 0 开始算
-          floatStartTs = performance.now();
-        } else if (p === 5) {
-          finalize();
-        }
-      }
-
-      function finalize() {
-        if (finalized) return;
-        finalized = true;
-        // 向展柜第一件位置插入一件"神秘礼物"
-        try {
-          const id = Storage.currentId();
-          Storage.addGifts(["神秘礼物"], id);
-        } catch (e) {}
-
-        if (giftEl) { giftEl.remove(); giftEl = null; }
-        if (balloonEl) { balloonEl.remove(); balloonEl = null; }
-        if (frame) frame.classList.remove("all-lit");
-        resetNow();
-      }
-
-      requestAnimationFrame((ts) => {
-        lastTs = ts; phaseStartTs = 0;
-        tick(ts);
-      });
-    }
-
-    function resetNow() {
-      litCount = 0;
-      locked = false;
-      const g = document.getElementById("write-reward-group");
-      if (g) {
-        g.querySelectorAll(".write-stroke").forEach((s) => {
-          s.classList.remove("lit", "just-lit");
-        });
-      }
-      const frame = $("#write-reward-frame");
-      if (frame) frame.classList.remove("all-lit");
-    }
-
-    function reset() { resetNow(); }
-
-    function cleanup() {
-      locked = false;
-      sessionCompletions = 0;
-      sessionChar = null;
-      sessionCell = null;
-      document.querySelectorAll(".write-star-pop, .write-gift, .write-gift-drop, .write-gift-rise").forEach((el) => el.remove());
-    }
-
-    return {
-      init,
-      onTraceComplete,
-      onTraceOpen,
-      onTraceClose,
-      reset,
-      cleanup,
-      STROKE_TOTAL,
-      // 测试/调试入口：手动触发礼物动画（需 5 笔已点亮状态）
-      _testGift: () => { locked = false; triggerGiftAnimation(); },
-    };
-  })();
-
-  // 完整临摹一遍：累计次数与逐字历史同时更新；每一笔都一次写成时再表扬
+  // 完整临摹一遍：累计次数与逐字历史同时更新；阈值内的完成次数暂存为关闭时的飞星
   function completeWritingTrace(char, volume, flawless) {
     const count = Storage.addTraceCount(char);
     if (!count) return;
     Storage.addTraceHistory({ char, volume: volume || "", count });
-    // 通知奖励模块
-    WriteReward.onTraceComplete(char);
+    if (traceReward && traceReward.char === char && count <= Storage.traceLimit()) {
+      traceReward.stars += 1;
+    }
+    // 每一笔都一次写成时再表扬
     if (!flawless) return;
     const user = Storage.currentUser();
     Speaker.playWritingPraise(user ? user.name : "");
@@ -1194,9 +1017,8 @@
   function showTraceModal(char, cell, volume) {
     const overlay = $("#trace-modal");
     const inner = $("#trace-modal-inner");
+    traceReward = views.writing.classList.contains("hidden") ? null : { char, cell, stars: 0 };
     overlay.classList.remove("hidden");
-    // 初始化奖励模块（只在写字页真正生效）
-    WriteReward.onTraceOpen(char, cell);
     // 模态框模式：田字格与提示挂载到面板，演示/重写挂载到面板上方外侧
     TraceView.open(char, {
       mount: $("#trace-modal-panel"),
@@ -1372,13 +1194,14 @@
   }
 
   // 点框外关闭：整块内容沿原路收缩回源田字格并淡出；
-  // 从写字页打开时顺便刷新次数与推荐字，详情页不需要刷新
+  // 从写字页打开时刷新次数与推荐字，再从原格子逐颗飞出本轮获得的星星
   function closeTraceModal() {
     const overlay = $("#trace-modal");
     if (overlay.classList.contains("hidden") || traceModalBusy) return;
     traceModalBusy = true;
-    // 触发奖励逻辑：关闭临摹框后飞出星星、点亮"写"字笔画
-    WriteReward.onTraceClose();
+    const reward = traceReward;
+    const rewardRect = reward && reward.cell ? reward.cell.getBoundingClientRect() : null;
+    traceReward = null;
     TraceView.close();
     const inner = $("#trace-modal-inner");
     overlay.classList.remove("active");
@@ -1392,7 +1215,10 @@
       inner.style.transform = "";
       inner.style.opacity = "";
       traceModalBusy = false;
-      if (writingVolume && !views.writing.classList.contains("hidden")) renderWriting(writingVolume);
+      if (writingVolume && !views.writing.classList.contains("hidden")) {
+        renderWriting(writingVolume);
+        if (reward && rewardRect && reward.stars) playWritingStars(rewardRect, reward.stars);
+      }
     }, 320);
   }
 
@@ -2347,20 +2173,17 @@
     }, 320);
   }
 
-  // 答对时田字格冒出星星：首次答对时飞向左上角计数处，抵达后触发数字滚动；
-  // 非首次答对仍在原位弹一下后淡出
-  function popStar(card, onArrive) {
-    const rect = card.getBoundingClientRect();
+  // 从指定矩形中心冒出星星；传入目标与回调时沿用答对后的蓄力飞行动画
+  function popStarAt(rect, onArrive, target, extraClass) {
     const fromX = rect.left + rect.width / 2;
     const fromY = rect.top + rect.height / 2;
     const star = document.createElement("div");
     star.className = onArrive ? "star-pop star-fly" : "star-pop";
+    if (extraClass) star.classList.add(extraClass);
     star.textContent = "⭐";
     star.style.left = fromX - 32 + "px";
     star.style.top = fromY - 32 + "px";
     if (onArrive) {
-      // 目标：左上角计数里的星星图标
-      const target = $("#quiz-stars .qs-icon");
       const tRect = target.getBoundingClientRect();
       star.style.setProperty("--dx", `${tRect.left + tRect.width / 2 - fromX}px`);
       star.style.setProperty("--dy", `${tRect.top + tRect.height / 2 - fromY}px`);
@@ -2374,6 +2197,12 @@
     } else {
       setTimeout(() => star.remove(), 1000);
     }
+  }
+
+  // 答对时田字格冒出星星：首次答对时飞向左上角计数处，抵达后触发数字滚动；
+  // 非首次答对仍在原位弹一下后淡出
+  function popStar(card, onArrive) {
+    popStarAt(card.getBoundingClientRect(), onArrive, $("#quiz-stars .qs-icon"));
   }
 
   /* ---------- 烟花特效：首次选对时从点击位置连续绽放 ---------- */
@@ -2607,6 +2436,8 @@
       session.userName && session.volume ? `${session.userName} · ${session.volume}` : "";
     // 本组星星数决定礼物挑选次数：5 颗 1 件，6~9 颗 2 件，10 颗及以上 3 件
     giftQuota = giftQuotaFor(session.stars);
+    // 本组全对（拿满星星）时才让 GIFTS_FIXED 中的礼物进入礼物袋
+    giftAllCorrect = session.total > 0 && session.stars >= session.total;
     giftPicked = [];
     giftClaimed = false;
     renderGiftReward();
@@ -3567,9 +3398,10 @@
   }
 
   // 组装一批礼物（每批 50 件，顺序随机）：
-  // withFixed=true 为首批，GIFTS_FIXED 里的礼物必在；false 为「换一批」，完全不含固定礼物
+  // withFixed=true 为首批，本组全对时 GIFTS_FIXED 里的礼物必在；false 为「换一批」，完全不含固定礼物
   function buildGiftBag(withFixed) {
-    const fixed = fixedGiftNames();
+    // 固定礼物只在「本组全对（拿满星星）」且首批时加入
+    const fixed = withFixed && giftAllCorrect ? fixedGiftNames() : [];
     const all = Object.keys(giftCatalog());
     const bagSize = Math.min(50, all.length);
     if (fixed.length > bagSize) {
@@ -3916,6 +3748,7 @@
     }
     const user = Storage.currentUser();
     if (user && Storage.learnMode(user.id) === "write") {
+      resetWritingMark();
       renderWriting(volume);
       Speaker.playWritingWelcome(user.name);
     } else enterVolume(user, volume);
@@ -4342,13 +4175,13 @@
   $("#btn-gift").addEventListener("click", () => {
     openGiftView("quiz");
   });
-  // 小书桌副标题右侧的礼物图标：进入礼物展柜，返回时回到小书桌
-  $("#btn-volume-gift").addEventListener("click", () => {
-    openGiftView("volumes");
-  });
   // 写字页顶部的礼物图标：进入礼物展柜，返回时回到写字页
   $("#btn-writing-gift").addEventListener("click", () => {
     openGiftView("writing");
+  });
+  // 小书桌副标题右侧的礼物图标：进入礼物展柜，返回时回到小书桌
+  $("#btn-volume-gift").addEventListener("click", () => {
+    openGiftView("volumes");
   });
   // 结束页礼物入口：未领取时打开礼物袋，已领取时直接查看展柜
   $("#btn-gift-open").addEventListener("click", () => {
@@ -4766,6 +4599,4 @@
   renderHome();
   // 首屏就绪：收起加载遮罩
   if (window.__boot) window.__boot.finish();
-  // 调试/测试用：把 WriteReward 暴露到 window，控制台可调用 WriteReward._testGift()
-  window.WriteReward = WriteReward;
 })();

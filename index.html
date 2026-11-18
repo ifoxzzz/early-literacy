@@ -7,7 +7,7 @@
   <script>
     // 全局唯一版本号（同时用于缓存失效）：改动任何 css/js/音频后递增版本号，
     // 如 1.0.0 → 1.0.1，即可让全部缓存失效；首页右下角显示的也是这个版本
-    var CACHE_VERSION = "1.1.29";
+    var CACHE_VERSION = "1.1.39";
     window.APP_VERSION = CACHE_VERSION;
     // 资源缓存标记：应用设置里「清理资源缓存」后更换。音频、字体、笔顺、图片等
     // 下载型资源的 URL 都会带上它，点一次清理即可绕过浏览器里的旧副本。
@@ -145,7 +145,7 @@
 
   <!-- 首页：选择小朋友 -->
   <section id="view-home" class="view">
-    <!-- 全屏引导：进入首页 0.2 秒后从顶部缓缓拉下，仅当前环境支持全屏时出现 -->
+    <!-- 全屏引导：进入首页 0.5 秒后从顶部缓缓拉下，仅当前环境支持全屏时出现 -->
     <div class="fullscreen-tip hidden" id="fullscreen-tip" role="status">
       <span class="fullscreen-tip-icon" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -243,7 +243,20 @@
         </div>
       </div>
       <div class="quiz-status">
-        <h2 class="writing-section" id="writing-recommend-title">推荐练习</h2>
+        <!-- 左侧："写"字奖励图案（用真实笔顺数据渲染，5笔画，每成功临摹一个字点亮一笔） -->
+        <div class="write-reward" id="write-reward" title="写一写奖励进度">
+          <div class="write-reward-frame" id="write-reward-frame">
+            <!-- 真实笔画由 WriteReward.init() 用 STROKES_DATA['写'].strokes 注入，
+                 坐标系经 scale(1,-1) translate(0,-900) 翻转后以 900x900 显示 -->
+            <svg class="write-reward-svg" id="write-reward-svg" viewBox="0 0 900 900" aria-label="写">
+              <g transform="scale(1,-1) translate(0,-900)" id="write-reward-group"></g>
+            </svg>
+          </div>
+        </div>
+        <!-- 中间：晃动的礼物按钮 -->
+        <button class="btn-gift" id="btn-writing-gift" aria-label="我的礼物" title="我的礼物">
+          <span class="gift-icon">🎁</span>
+        </button>
         <button class="btn-tools-show" id="btn-writing-tools-show"
           aria-expanded="false" aria-controls="writing-tools" aria-label="显示顶部按钮">
           <span class="dot"></span><span class="dot"></span><span class="dot"></span>
@@ -252,7 +265,10 @@
     </header>
     <div class="writing-grid writing-grid-main" id="writing-recommend"></div>
     <p class="writing-empty hidden" id="writing-recommend-empty">推荐的字都练够啦，可以在「练习设置」里调高换字阈值</p>
-    <h2 class="writing-section" id="writing-others-title">其他汉字</h2>
+    <div class="writing-titles-row">
+      <h2 class="writing-section writing-section-left" id="writing-recommend-title">推荐练习 ▼</h2>
+      <h2 class="writing-section writing-section-right" id="writing-others-title">▲ 其他汉字</h2>
+    </div>
     <div class="writing-scroll" id="writing-scroll">
       <div class="writing-grid writing-grid-mini" id="writing-others"></div>
       <p class="writing-empty hidden" id="writing-empty">本册没有要求书写的字</p>

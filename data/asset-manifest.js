@@ -2545,6 +2545,7 @@ window.ASSET_HASH = {
   "phrases/giftNew.mp3": "91ef4d17c2",
   "phrases/giftSaved.mp3": "9a207f01ef",
   "phrases/help.mp3": "a047cdd2bc",
+  "phrases/mysteryGiftArriving.mp3": "752c4446a4",
   "phrases/mysteryOpen.mp3": "4cc593f247",
   "phrases/pickBag1.mp3": "0f3b57a6c3",
   "phrases/pickBag2.mp3": "1074e743bc",

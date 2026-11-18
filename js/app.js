@@ -3327,7 +3327,7 @@
     if (on) dismissFullscreenTip();
   }
 
-  // 首页全屏引导条：进入首页 2 秒后从顶部拉下，本次页面加载只提示一次
+  // 首页全屏引导条：进入首页 0.2 秒后从顶部拉下，本次页面加载只提示一次
   const fullscreenTip = $("#fullscreen-tip");
   let fullscreenTipTimer = 0;
   let fullscreenTipHideTimer = 0;
@@ -3346,7 +3346,7 @@
     if (fullscreenTip.classList.contains("hidden")) return;
     clearTimeout(fullscreenTipHideTimer);
     fullscreenTip.classList.remove("show");
-    fullscreenTipHideTimer = setTimeout(() => fullscreenTip.classList.add("hidden"), 800);
+    fullscreenTipHideTimer = setTimeout(() => fullscreenTip.classList.add("hidden"), 600);
   }
 
   function scheduleFullscreenTip() {
@@ -3357,7 +3357,7 @@
       // 已经离开首页就不再打扰，下次回到首页重新计时
       if (views.home.classList.contains("hidden")) return;
       showFullscreenTip();
-    }, 2000);
+    }, 200);
   }
 
   /* ---------- 界面字号（全局设置） ---------- */
@@ -4311,6 +4311,12 @@
     }
   });
   $("#btn-fullscreen-tip-close").addEventListener("click", dismissFullscreenTip);
+  // 点击悬浮条以外的区域也关闭提示；点击仍会正常传递给下方元素
+  document.addEventListener("click", (e) => {
+    if (fullscreenTip.classList.contains("hidden")) return;
+    if (fullscreenTip.contains(e.target)) return;
+    dismissFullscreenTip();
+  });
   // 界面字号（全局设置）：五档滑块，拖动时立即生效
   $("#ui-font-range").addEventListener("input", (e) => {
     const idx = Number(e.target.value);

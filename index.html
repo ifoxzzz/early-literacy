@@ -7,7 +7,7 @@
   <script>
     // 全局唯一版本号（同时用于缓存失效）：改动任何 css/js/音频后递增版本号，
     // 如 1.0.0 → 1.0.1，即可让全部缓存失效；首页右下角显示的也是这个版本
-    var CACHE_VERSION = "1.1.26";
+    var CACHE_VERSION = "1.1.29";
     window.APP_VERSION = CACHE_VERSION;
     // 资源缓存标记：应用设置里「清理资源缓存」后更换。音频、字体、笔顺、图片等
     // 下载型资源的 URL 都会带上它，点一次清理即可绕过浏览器里的旧副本。
@@ -145,7 +145,7 @@
 
   <!-- 首页：选择小朋友 -->
   <section id="view-home" class="view">
-    <!-- 全屏引导：进入首页 2 秒后从顶部缓缓拉下，仅当前环境支持全屏时出现 -->
+    <!-- 全屏引导：进入首页 0.2 秒后从顶部缓缓拉下，仅当前环境支持全屏时出现 -->
     <div class="fullscreen-tip hidden" id="fullscreen-tip" role="status">
       <span class="fullscreen-tip-icon" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

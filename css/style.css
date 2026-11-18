@@ -4852,6 +4852,28 @@ body.hide-note .hint-bar {
   filter: drop-shadow(0 0 1px rgba(255, 213, 74, 0.75));
 }
 
+/* 点亮瞬间：金色笔画分身从旁边略高处放大出现，再收拢贴合到真实笔画上并淡出 */
+.writing-mark-stroke-ghost {
+  fill: #ffd54a;
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: writing-mark-stroke-attach 0.46s cubic-bezier(0.35, 0.7, 0.3, 1) forwards;
+}
+
+@keyframes writing-mark-stroke-attach {
+  0% {
+    opacity: 0;
+    transform: translate(var(--gx, 12px), var(--gy, -14px)) scale(1.6) rotate(-5deg);
+  }
+  16% { opacity: 1; }
+  58% {
+    opacity: 1;
+    transform: translate(calc(var(--gx, 12px) * 0.32), calc(var(--gy, -14px) * 0.32)) scale(1.14) rotate(-1.5deg);
+  }
+  100% { opacity: 0; transform: translate(0, 0) scale(1) rotate(0); }
+}
+
 /* 五笔全亮后，四条边的连续金色虚线沿顺时针方向无缝游动 */
 .writing-mark::after {
   content: "";

@@ -677,7 +677,22 @@
     cancelWritingStars();
     writingMarkLit = 0;
     $("#writing-mark").classList.remove("light-pop");
+    document.querySelectorAll(".writing-mark-stroke-ghost").forEach((ghost) => ghost.remove());
     paintWritingMark();
+  }
+
+  // 点亮特效：复制刚点亮的一笔作为金色分身，从笔画旁放大出现，再收拢贴合原笔画
+  function spawnWritingMarkGhost(index) {
+    const source = writingMarkPaths[index];
+    if (!source || !source.parentNode) return;
+    const ghost = source.cloneNode(false);
+    ghost.setAttribute("class", "writing-mark-stroke-ghost");
+    // 左右交替出现，避免每一笔都从同一侧飞入
+    const dir = index % 2 === 0 ? 1 : -1;
+    ghost.style.setProperty("--gx", `${dir * 13}px`);
+    ghost.style.setProperty("--gy", "-16px");
+    ghost.addEventListener("animationend", () => ghost.remove());
+    source.parentNode.appendChild(ghost);
   }
 
   function lightWritingMarkStroke() {
@@ -685,6 +700,7 @@
     if (writingMarkLit >= total) return; // 五笔全亮后，后续星星仍飞但不再重复播放点亮反馈
     writingMarkLit += 1;
     paintWritingMark();
+    spawnWritingMarkGhost(writingMarkLit - 1);
     const mark = $("#writing-mark");
     mark.classList.remove("light-pop");
     void mark.offsetWidth; // 星星连续到达时也能重新播放缩放动画

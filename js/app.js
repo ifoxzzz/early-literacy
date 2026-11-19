@@ -1045,9 +1045,10 @@
     }
     // 临摹完成后启动 3 秒自动关闭倒计时（一次写对或多遍写完都触发）
     startTraceCloseCountdown();
-    // 每一笔都一次写成时再表扬 + 加一颗奖杯星星
-    if (!flawless) return;
+    // 只要完成就加一颗奖杯星星
     addTraceTrophyStar();
+    // 每一笔都一次写成时再表扬
+    if (!flawless) return;
     const user = Storage.currentUser();
     Speaker.playWritingPraise(user ? user.name : "");
   }
@@ -1063,7 +1064,7 @@
     if (!el || el.children.length >= 5) return;
     const star = document.createElement("span");
     star.className = "trace-star";
-    star.textContent = "★";
+    star.textContent = "⭐";
     el.appendChild(star);
   }
 

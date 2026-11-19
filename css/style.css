@@ -4693,15 +4693,15 @@ body.hide-note .hint-bar {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  height: 28px;
+  height: 32px;
 }
 
 .trace-trophy-stars .trace-star {
   display: inline-block;
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
   color: #f2a541;
-  font-size: 18px;
+  font-size: 24px;
   line-height: 1;
   opacity: 0;
   transform: scale(0.2);
@@ -5477,7 +5477,8 @@ body.hide-note .hint-bar {
 #trace-modal-actions #btn-trace-close {
   position: static;
   inset: auto;
-  padding: 10px clamp(17px, 3.6vw, 31px);
+  padding: 13px clamp(17px, 3.6vw, 31px);
+  font-size: calc(clamp(22px, 5vmin, 32px) * var(--fs));
   transform: none;
   white-space: nowrap;
   pointer-events: auto;

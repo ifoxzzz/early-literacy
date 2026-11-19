@@ -7,7 +7,7 @@
   <script>
     // 全局唯一版本号（同时用于缓存失效）：改动任何 css/js/音频后递增版本号，
     // 如 1.0.0 → 1.0.1，即可让全部缓存失效；首页右下角显示的也是这个版本
-    var CACHE_VERSION = "1.1.45";
+    var CACHE_VERSION = "1.1.50";
     window.APP_VERSION = CACHE_VERSION;
     // 资源缓存标记：应用设置里「清理资源缓存」后更换。音频、字体、笔顺、图片等
     // 下载型资源的 URL 都会带上它，点一次清理即可绕过浏览器里的旧副本。
@@ -199,9 +199,7 @@
         <button type="button" class="setting-switch-btn" data-v="read">认字</button>
         <button type="button" class="setting-switch-btn" data-v="write">写字</button>
       </span>
-      <button class="volume-gift" id="btn-volume-gift" aria-label="我的礼物" title="我的礼物">
-        <span class="gift-icon">🎁</span>
-      </button>
+      <button class="volume-gift" id="btn-volume-gift" aria-label="我的礼物橱窗" title="我的礼物橱窗"></button>
     </div>
     <div class="volume-list" id="volume-list"></div>
     <div class="volume-actions">
@@ -244,9 +242,7 @@
       </div>
       <div class="quiz-status">
         <span class="writing-mark" id="writing-mark" aria-label="写一写">写</span>
-        <button class="btn-gift" id="btn-writing-gift" aria-label="我的礼物" title="我的礼物">
-          <span class="gift-icon">🎁</span>
-        </button>
+        <button class="btn-gift" id="btn-writing-gift" aria-label="我的礼物橱窗" title="我的礼物橱窗"></button>
         <button class="btn-tools-show" id="btn-writing-tools-show"
           aria-expanded="false" aria-controls="writing-tools" aria-label="显示顶部按钮">
           <span class="dot"></span><span class="dot"></span><span class="dot"></span>
@@ -611,9 +607,7 @@
       </div>
       <div class="quiz-status">
         <span id="quiz-stars" data-count="0"><span class="qs-icon">⭐</span><span class="qs-num" id="quiz-star-num">0</span></span>
-        <button class="btn-gift" id="btn-gift" aria-label="我的礼物">
-          <span class="gift-icon">🎁</span>
-        </button>
+        <button class="btn-gift" id="btn-gift" aria-label="我的礼物橱窗" title="我的礼物橱窗"></button>
         <button class="btn-tools-show" id="btn-tools-show"
           aria-expanded="false" aria-controls="quiz-tools" aria-label="显示顶部按钮">
           <span class="dot"></span><span class="dot"></span><span class="dot"></span>
@@ -644,7 +638,8 @@
     <div class="result-new-wrap" id="result-new"></div>
     <div class="gift-reward hidden" id="gift-reward">
       <p class="gift-reward-tip" id="gift-reward-tip"></p>
-      <button class="btn btn-primary" id="btn-gift-open">打开礼物袋 🎁</button>
+      <button class="gift-mini-shelf result-gift-shelf" id="btn-gift-open"
+        aria-label="打开礼物袋" title="打开礼物袋"></button>
     </div>
     <p class="result-footer" id="result-footer"></p>
     <button class="btn btn-primary" id="btn-continue">继续答题</button>

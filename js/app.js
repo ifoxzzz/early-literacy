@@ -80,6 +80,48 @@
   let giftsReturnView = "quiz";
   let giftShelfMode = "shelf"; // "shelf" 橱窗 / "box" 收纳盒 / "list" 记录
 
+  /* ---------- 通用九宫格迷你礼物橱窗 ---------- */
+  // 可复用于任意礼物入口：传入容器元素与可选尺寸（数字按 px，也接受 CSS 长度）。
+  // 按橱窗顺序展示前 9 件礼物，不足留空；空橱窗居中显示会放大晃动的 🎁。
+  const GiftMiniShelf = {
+    render(el, options) {
+      if (!el) return;
+      const opts = options || {};
+      el.classList.add("gift-mini-shelf");
+      if (opts.size != null) {
+        el.style.setProperty("--gms-size", typeof opts.size === "number" ? `${opts.size}px` : opts.size);
+      }
+      let items = [];
+      try {
+        items = Storage.currentId() ? Storage.gifts().slice(0, 9) : [];
+      } catch (e) {
+        items = [];
+      }
+      const catalog = window.GIFTS || {};
+      const cells = [];
+      for (let i = 0; i < 9; i++) {
+        const gift = items[i];
+        // 神秘礼物与清单缺失时统一回落为 🎁
+        const icon = gift ? catalog[gift.name] || "🎁" : "";
+        let cls = "gms-cell";
+        if (!gift) cls += " is-empty";
+        else if (gift.name === MYSTERY_GIFT_NAME) cls += " is-mystery";
+        cells.push(`<span class="${cls}" aria-hidden="true">${icon}</span>`);
+      }
+      el.innerHTML =
+        '<span class="gms-grid" aria-hidden="true">' + cells.join("") + "</span>" +
+        (items.length ? "" : '<span class="gms-empty"><span class="gift-icon" aria-hidden="true">🎁</span></span>');
+      el.classList.toggle("has-fresh", items.some((gift) => gift.fresh));
+    },
+  };
+  window.GiftMiniShelf = GiftMiniShelf; // 供其他页面或模块按需复用
+
+  function renderGiftMiniShelves() {
+    GiftMiniShelf.render($("#btn-gift"));
+    GiftMiniShelf.render($("#btn-writing-gift"));
+    GiftMiniShelf.render($("#btn-volume-gift"));
+  }
+
   function show(name) {
     Object.values(views).forEach((v) => v.classList.add("hidden"));
     views[name].classList.remove("hidden");
@@ -96,6 +138,8 @@
     else WakeLock.disable();
     // 离开礼物展柜时停止礼物音频逐个加载，避免阻塞后续操作
     if (name !== "gifts") stopGiftAudioPrefetch();
+    // 进入练习/写字/小书桌页时刷新迷你礼物橱窗
+    if (name === "quiz" || name === "writing" || name === "volumes") renderGiftMiniShelves();
   }
 
   /* ---------- 屏幕常亮：练习时避免手机自动息屏 ---------- */
@@ -729,9 +773,6 @@
   async function playWritingGiftFlight() {
     if (writingGiftFlight) return;
     cancelWritingStars(); // 全亮后不再接收本轮多余星星，防止复位后又被旧星星点亮
-    // 全亮即发放：先把神秘礼物放进橱窗第一格。动画可能被提前打开的橱窗打断，
-    // 放在动画开始前可保证任何时机进入礼物页都能看到新礼物。
-    Storage.addGifts([MYSTERY_GIFT_NAME]);
     const mark = $("#writing-mark");
     const targetEl = $("#btn-writing-gift .gift-icon") || $("#btn-writing-gift");
     if (!mark || !targetEl || typeof mark.animate !== "function") {
@@ -830,7 +871,10 @@
       ], { duration: 1350, easing: "cubic-bezier(0.4, 0, 0.2, 1)" });
       if (!active()) return;
 
-      // 5) 礼物已飞入礼物按钮：播报橱窗有新礼物的提示
+      // 5) 礼物已飞入礼物按钮：在橱窗第一格放入「神秘礼物」，刷新入口并播报提示。
+      // 动画被提前打开的橱窗打断时不会走到这里，礼物视为丢失。
+      Storage.addGifts([MYSTERY_GIFT_NAME]);
+      GiftMiniShelf.render($("#btn-writing-gift"));
       Speaker.playMysteryGiftFly();
     } catch (e) {
       // 切页时 cancel() 会让 finished Promise reject；清理由 finally 统一处理
@@ -2686,11 +2730,14 @@
         return;
       }
       $("#gift-reward-tip").textContent = `已放入礼物橱窗：${giftPicked.map(giftIconOnly).join(" ")}`;
-      $("#btn-gift-open").textContent = "查看我的礼物 🎁";
+      $("#btn-gift-open").setAttribute("aria-label", "查看我的礼物");
+      $("#btn-gift-open").title = "查看我的礼物";
     } else {
       $("#gift-reward-tip").textContent = `本组可以挑选 ${giftQuota} 件礼物！`;
-      $("#btn-gift-open").textContent = "打开礼物袋 🎁";
+      $("#btn-gift-open").setAttribute("aria-label", "打开礼物袋");
+      $("#btn-gift-open").title = "打开礼物袋";
     }
+    GiftMiniShelf.render($("#btn-gift-open"));
   }
 
   // 橱窗：三种状态（橱窗 / 收纳盒 / 记录），按 localStorage 记忆「橱窗 / 记录」偏好

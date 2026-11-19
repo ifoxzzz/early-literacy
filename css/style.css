@@ -130,25 +130,13 @@ body {
   font-size: calc(clamp(16px, 3.4vmin, 20px) * var(--fs));
 }
 
-/* 礼物入口：沿用练习页的晃动动画，图标尺寸更大 */
+/* 礼物入口：九宫格迷你橱窗，尺寸比顶部入口略大，与选册页整体更协调 */
 .volume-gift {
+  --gms-size: 46px;
   justify-self: end;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 56px;
-  height: 48px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
   cursor: pointer;
   font: inherit;
   -webkit-tap-highlight-color: transparent;
-}
-
-.volume-gift .gift-icon {
-  font-size: calc(clamp(30px, 6.6vmin, 42px) * var(--fs));
 }
 
 /* 选册页底部：左「练习记录」、中「退出」（与其他页面返回按钮同色）、右「练习设置」
@@ -2521,6 +2509,104 @@ body.hide-pinyin #view-card .card .pinyin {
   }
 }
 
+/* ---------- 通用九宫格迷你礼物橱窗（GiftMiniShelf） ----------
+   尺寸由 --gms-size 控制（JS 传入 options.size 时写到行内样式，也可在场景 CSS 里覆盖）：
+   空橱窗居中显示会放大晃动的 🎁；有礼物时按顺序摆放前 9 件，不足留空，像手机图标收纳框。 */
+.gift-mini-shelf {
+  --gms-size: 40px;
+  --gms-gap: 2px;
+  --gms-pad: 3px;
+  position: relative;
+  display: block;
+  width: var(--gms-size);
+  height: var(--gms-size);
+  padding: var(--gms-pad);
+  border: 1.5px solid #e6c68f;
+  border-radius: calc(var(--gms-size) * 0.26);
+  background: linear-gradient(155deg, #fffdf6 0%, #f9ecd2 58%, #f3dfb8 100%);
+  box-shadow: 0 2px 0 #ddbf87, 0 4px 10px rgba(176, 128, 52, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  box-sizing: border-box;
+  /* 用独立的 scale 属性做轻微呼吸，避免覆盖按钮自身的 transform 居中/按压效果 */
+  animation: gift-mini-shelf-breathe 3.6s ease-in-out infinite;
+}
+
+@keyframes gift-mini-shelf-breathe {
+  0%, 100% {
+    scale: 1;
+  }
+  50% {
+    scale: 1.045;
+  }
+}
+
+/* 顶部礼物入口沿用 .btn-gift 的绝对居中定位，不被组件的 relative 覆盖 */
+.btn-gift.gift-mini-shelf {
+  position: absolute;
+}
+
+.gms-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: var(--gms-gap);
+  width: 100%;
+  height: 100%;
+}
+
+.gms-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 22%;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: calc(var(--gms-size) * 0.2);
+  line-height: 1;
+}
+
+.gms-cell.is-empty {
+  background: rgba(255, 255, 255, 0.26);
+}
+
+/* 神秘礼物在橱窗里用暖金底突出，图标统一显示为 🎁 */
+.gms-cell.is-mystery {
+  background: linear-gradient(150deg, #ffe9a8, #ffd166);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
+}
+
+.gms-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.gms-empty .gift-icon {
+  font-size: calc(var(--gms-size) * 0.62);
+}
+
+/* 按下时轻微回弹，保留按钮的点击手感 */
+.btn-gift:active {
+  transform: translate(-50%, -50%) scale(0.94);
+}
+
+/* 橱窗里有未查看的新礼物时，右上角亮一颗小红点 */
+.gift-mini-shelf.has-fresh::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid #fffdf5;
+  border-radius: 50%;
+  background: #ef5b5b;
+  box-shadow: 0 1px 4px rgba(214, 66, 66, 0.5);
+}
+
 /* 无背景框的三个点，逐个放大再恢复形成波浪动画 */
 .btn-tools-show {
   display: inline-flex;
@@ -3166,10 +3252,19 @@ body.hide-note .hint-bar {
   line-height: 1.5;
 }
 
-#view-result .gift-reward .btn {
-  margin-top: 0;
-  padding: 10px 26px;
-  font-size: calc(clamp(16px, 3.5vmin, 20px) * var(--fs));
+/* 结束页礼物入口：大号迷你橱窗，替代原来的文字按钮 */
+#view-result .gift-reward .result-gift-shelf {
+  --gms-size: clamp(84px, 16vmin, 104px);
+  --gms-gap: 4px;
+  --gms-pad: 7px;
+  margin-top: 2px;
+  border-width: 2px;
+  border-radius: calc(var(--gms-size) * 0.24);
+  cursor: pointer;
+}
+
+#view-result .gift-reward .result-gift-shelf:active {
+  transform: scale(0.96);
 }
 
 /* 展柜页：页面本身不滚动，橱窗内容过多时在内部滚动，垃圾篓与返回按钮固定在底部 */
@@ -4496,6 +4591,10 @@ body.hide-note .hint-bar {
 
 @media (prefers-reduced-motion: reduce) {
   .gift-icon {
+    animation: none;
+  }
+
+  .gift-mini-shelf {
     animation: none;
   }
 

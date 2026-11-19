@@ -4920,6 +4920,53 @@ body.hide-note .hint-bar {
   will-change: transform, opacity;
 }
 
+/* 礼物周围萤火虫般的细小爱心 / 星点 / 彩带：各自绕礼物小圈飞舞，颜色与半径随机 */
+.writing-gift-flight-sparks {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.writing-gift-flight-spark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-size: calc(8px * var(--fs));
+  line-height: 1;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  animation: writing-gift-spark-orbit var(--dur, 1.8s) linear infinite;
+  animation-delay: var(--delay, 0s);
+  will-change: transform, opacity;
+}
+
+.writing-gift-flight-spark.is-ribbon {
+  width: calc(3px * var(--fs));
+  height: calc(7px * var(--fs));
+  border-radius: 1px;
+  background: var(--c, #ffb703);
+  font-size: 0;
+}
+
+@keyframes writing-gift-spark-orbit {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(0deg) translateX(var(--r, 26px)) rotate(var(--tilt, 0deg)) scale(0.65);
+  }
+  12% { opacity: 1; }
+  50% {
+    transform: translate(-50%, -50%) rotate(180deg) translateX(var(--r, 26px)) rotate(calc(-180deg + var(--tilt, 0deg))) scale(1.1);
+  }
+  88% { opacity: 0.85; }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(360deg) translateX(var(--r, 26px)) rotate(calc(-360deg + var(--tilt, 0deg))) scale(0.65);
+  }
+}
+
 .writing-gift-flight-gift,
 .writing-gift-flight-balloon {
   position: absolute;

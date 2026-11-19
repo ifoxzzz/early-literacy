@@ -729,6 +729,9 @@
   async function playWritingGiftFlight() {
     if (writingGiftFlight) return;
     cancelWritingStars(); // 全亮后不再接收本轮多余星星，防止复位后又被旧星星点亮
+    // 全亮即发放：先把神秘礼物放进橱窗第一格。动画可能被提前打开的橱窗打断，
+    // 放在动画开始前可保证任何时机进入礼物页都能看到新礼物。
+    Storage.addGifts([MYSTERY_GIFT_NAME]);
     const mark = $("#writing-mark");
     const targetEl = $("#btn-writing-gift .gift-icon") || $("#btn-writing-gift");
     if (!mark || !targetEl || typeof mark.animate !== "function") {
@@ -751,6 +754,24 @@
     el.className = "writing-gift-flight";
     el.setAttribute("aria-hidden", "true");
     el.innerHTML = '<span class="writing-gift-flight-balloon">🎈</span><span class="writing-gift-flight-gift">🎁</span>';
+    // 礼物周围撒一圈极小的爱心、星点与彩带，各自以不同半径和速度绕飞
+    const sparkColors = ["#ff5b7f", "#ffb703", "#8ecae6", "#c77dff", "#f72585", "#4cc9f0", "#90be6d", "#ff9f1c"];
+    const sparks = document.createElement("span");
+    sparks.className = "writing-gift-flight-sparks";
+    for (let i = 0; i < 14; i++) {
+      const shape = i % 3;
+      const spark = document.createElement("span");
+      spark.className = "writing-gift-flight-spark" + (shape === 2 ? " is-ribbon" : "");
+      spark.textContent = shape === 0 ? "♥" : shape === 1 ? "✦" : "";
+      spark.style.color = sparkColors[i % sparkColors.length];
+      spark.style.setProperty("--c", sparkColors[(i + 3) % sparkColors.length]);
+      spark.style.setProperty("--r", `${18 + Math.random() * 18}px`);
+      spark.style.setProperty("--dur", `${1.3 + Math.random() * 1.1}s`);
+      spark.style.setProperty("--delay", `${-Math.random() * 1.6}s`);
+      spark.style.setProperty("--tilt", `${Math.random() * 50 - 25}deg`);
+      sparks.appendChild(spark);
+    }
+    el.appendChild(sparks);
     document.body.appendChild(el);
     const balloon = el.querySelector(".writing-gift-flight-balloon");
     const flight = { el, animations: [] };
@@ -809,8 +830,7 @@
       ], { duration: 1350, easing: "cubic-bezier(0.4, 0, 0.2, 1)" });
       if (!active()) return;
 
-      // 5) 礼物已飞入礼物按钮：在橱窗第一格放入一件「神秘礼物」并播报提示
-      Storage.addGifts([MYSTERY_GIFT_NAME]);
+      // 5) 礼物已飞入礼物按钮：播报橱窗有新礼物的提示
       Speaker.playMysteryGiftFly();
     } catch (e) {
       // 切页时 cancel() 会让 finished Promise reject；清理由 finally 统一处理

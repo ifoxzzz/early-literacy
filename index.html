@@ -7,7 +7,7 @@
   <script>
     // 全局唯一版本号（同时用于缓存失效）：改动任何 css/js/音频后递增版本号，
     // 如 1.0.0 → 1.0.1，即可让全部缓存失效；首页右下角显示的也是这个版本
-    var CACHE_VERSION = "1.1.84";
+    var CACHE_VERSION = "1.2.0";
     window.APP_VERSION = CACHE_VERSION;
     // 资源缓存标记：应用设置里「清理资源缓存」后更换。音频、字体、笔顺、图片等
     // 下载型资源的 URL 都会带上它，点一次清理即可绕过浏览器里的旧副本。
@@ -166,10 +166,13 @@
     <button class="admin-entry" id="btn-admin" title="应用设置">⚙</button>
     <!-- 版本号：首页右下角小字，不干扰小朋友点击 -->
     <p class="home-version" id="home-version"></p>
-    <!-- 站点地址：首页底部居中，点击弹出作者信息浮层 -->
-    <button class="site-link" id="btn-about" type="button">kid.foxzzz.com</button>
+    <!-- 关于入口：首页底部居中，点击弹出作者信息浮层 -->
+    <button class="site-link" id="btn-about" type="button">
+      <span class="site-hint" id="site-hint" aria-hidden="true"><i></i><i></i><i></i></span>
+      关于我
+    </button>
 
-    <!-- 作者信息浮层：点击站点地址打开，点浮层外区域关闭 -->
+    <!-- 作者信息浮层：点击「关于我」打开，点浮层外区域关闭 -->
     <div class="about-mask hidden" id="about-mask">
       <div class="about-card" role="dialog" aria-modal="true" aria-labelledby="about-title">
         <div class="about-hero">
@@ -177,7 +180,7 @@
           <h2 class="about-title" id="about-title">关于我</h2>
           <p class="about-author">foxzzz</p>
         </div>
-        <p class="about-intro">给儿子做的识字小游戏，他很爱玩。手机 / 平板 / 电脑都能运行，平板体验最佳。使用方法很简单，直接打开网址 <strong>kid.foxzzz.com</strong> 就行，若是使用过程中遇到 BUG 或是有好的想法建议都可以找我，我会慢慢改进完善。</p>
+        <p class="about-intro">儿子上幼儿园了，到了识字启蒙的年龄，我便按自己的想法做了这款「宝贝趣味识字」小应用。制作过程中，儿子一边试玩，我一边根据他的反馈改进趣味性，我乐在其中，他也兴趣盎然。若你对这款小应用感兴趣，不妨试试：手机、平板、电脑都能运行（平板体验最佳），无需安装，浏览器打开 <strong>kid.foxzzz.com</strong> 即可使用。</p>
         <dl class="about-list">
           <div class="about-row">
             <dt>📮 邮箱</dt>

@@ -1,6 +1,6 @@
 // 自动生成：资源内容哈希清单（由 tools/scripts/build_asset_manifest.py 维护，请勿手改）
 // 前端把它拼进资源 URL（?h=...）：内容不变则 URL 不变，浏览器缓存直接命中。
-// 当前包含音频、字体与笔顺数据，可按需扩展到图片等资源。
+// 当前包含音频、字体、笔顺数据与图片。
 window.ASSET_HASH = {
   "fonts/kaiti.woff2": "40b29abf71",
   "gifts/%E4%B8%89%E5%8F%B6%E8%8D%89.mp3": "3da6971fec",

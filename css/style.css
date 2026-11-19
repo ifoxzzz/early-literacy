@@ -1030,7 +1030,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------- 站点地址：首页底部居中，点击弹出作者信息 ---------- */
+/* ---------- 首页底部「关于我」入口：点击弹出作者信息 ---------- */
 .site-link {
   position: fixed;
   left: 50%;
@@ -1053,7 +1053,122 @@ body {
   text-decoration: underline;
 }
 
-/* 首页底部固定着站点地址（约 30px 高）与右下角版本号：首页额外留出这段底部内边距，
+/* 首页「关于我」入口上方的小气泡：轻轻冒出来提示「这里可以点」，停留几秒后再收回去。
+   配色与文字同系、尺寸很小，保持低调不抢注意力；pointer-events 关掉，
+   点气泡等同于点下面的「关于我」按钮 */
+.site-hint {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 3px);
+  width: 27px;
+  height: 17px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2.5px;
+  background: #fffdf5;
+  border: 1px solid #ecdcbf;
+  border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(160, 120, 60, 0.12);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 8px) scale(0.6);
+  transform-origin: 50% 120%;
+}
+
+/* 气泡底部的小尖角，指向下面的网址 */
+.site-hint::after {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  background: #fffdf5;
+  border-right: 1px solid #ecdcbf;
+  border-bottom: 1px solid #ecdcbf;
+  border-radius: 0 0 2px 0;
+  transform: rotate(45deg);
+}
+
+/* 三个点依次亮起，像正在输入的气泡 */
+.site-hint i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #b7a78d;
+  animation: site-hint-dot 1.3s ease-in-out infinite;
+}
+
+.site-hint i:nth-child(2) {
+  animation-delay: 0.16s;
+}
+
+.site-hint i:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+/* 每次回到首页由 JS 重新加上这个类，气泡便重新冒一次 */
+.site-hint.site-hint-on {
+  animation: site-hint-rise 6.5s ease-in-out 1.4s forwards;
+}
+
+@keyframes site-hint-rise {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 8px) scale(0.6);
+  }
+  /* 先升起并渐显（约 0.6s），然后原地停留，最后往下收回并淡出 */
+  9%,
+  68% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  82%,
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 8px) scale(0.7);
+  }
+}
+
+@keyframes site-hint-dot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-hint.site-hint-on {
+    animation: site-hint-fade 6.5s ease-in-out 1.4s forwards;
+  }
+  .site-hint i {
+    animation: none;
+    opacity: 0.45;
+  }
+}
+
+/* 减弱动效时只淡入淡出，不做上下移动 */
+@keyframes site-hint-fade {
+  0%,
+  82%,
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 0) scale(1);
+  }
+  9%,
+  68% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+/* 首页底部固定着「关于我」入口（约 30px 高）与右下角版本号：首页额外留出这段底部内边距，
    保证「+ 创建小朋友」按钮和名字气泡不会压到它们 */
 #view-home {
   padding-bottom: 48px;
@@ -1386,7 +1501,6 @@ body {
   align-items: center;
   padding: 12px 14px;
   font-size: calc(clamp(14px, 3.2vmin, 17px) * var(--fs));
-  transition: background 0.15s;
 }
 
 .about-row + .about-row {
@@ -1466,31 +1580,39 @@ body {
   border: none;
   box-shadow: none;
   transform-origin: center center;
-  /* 初始小尺寸 + 透明；关闭时用 transition 收缩 */
+  /* 初始小尺寸 + 透明；展开/收起各自由 animation 负责，不用 transition */
   transform: scale(0.35) rotate(-6deg);
   opacity: 0;
-  transition:
-    transform 0.3s cubic-bezier(0.55, 0.08, 0.68, 0.25),
-    opacity 0.22s ease;
   pointer-events: none;
 }
 
-/* 展开 + 呼吸：用 animation 替代 transition，避免两者在 transform 上冲突
-   第一个关键帧：从小放大归正 + 渐显（0.42s）
-   第二个关键帧：延迟 0.42s 后启动无限循环的呼吸 */
+/* 展开 + 呼吸：第一个动画从小放大归正并渐显（0.42s），
+   第二个动画延迟 0.42s 后启动无限循环的呼吸 */
 .avatar-zoom.show .avatar-zoom-img {
-  transition: none;
   opacity: 1;
   pointer-events: auto;
   animation: avatar-expand 0.42s cubic-bezier(0.22, 1.15, 0.36, 1) forwards,
              avatar-breath 8s ease-in-out 0.42s infinite;
 }
 
-/* 收缩：kill 掉展开/呼吸动画，让 base 的 transition 自然接管 */
+/* 收起：展开的反向动作。必须用独立 animation 而不是 transition——展开时
+   transform 由 animation 控制，若同一帧移除动画再靠 transition 过渡，
+   浏览器不会产生过渡（前后计算值一次性跳到终态），看起来就是"啪"地消失。 */
 .avatar-zoom.closing .avatar-zoom-img {
-  animation: none;
-  transform: scale(0.4) rotate(5deg);
-  opacity: 0;
+  animation: avatar-collapse 0.3s cubic-bezier(0.45, 0.05, 0.75, 0.3) forwards;
+  pointer-events: none;
+}
+
+/* 收起：正常大小 → 缩小并微微旋转、渐隐 */
+@keyframes avatar-collapse {
+  from {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  to {
+    transform: scale(0.35) rotate(-6deg);
+    opacity: 0;
+  }
 }
 
 /* 展开：缩小旋转 → 正常大小归正 + 渐显 */
@@ -1512,8 +1634,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .avatar-zoom,
-  .avatar-zoom-img {
+  .avatar-zoom {
     transition: opacity 0.18s ease;
   }
   .avatar-zoom-img {

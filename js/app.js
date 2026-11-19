@@ -144,6 +144,8 @@
     if (name !== "gifts") stopGiftAudioPrefetch();
     // 进入练习/写字/小书桌/结束页时刷新迷你礼物橱窗（从礼物展柜返回时礼物可能已变化）
     if (name === "quiz" || name === "writing" || name === "volumes" || name === "result") renderGiftMiniShelves();
+    // 回到首页时，「关于我」入口上的小气泡重新冒一次
+    if (name === "home") replaySiteHint();
   }
 
   /* ---------- 屏幕常亮：练习时避免手机自动息屏 ---------- */
@@ -3709,6 +3711,20 @@
   let fullscreenTipTimer = 0;
   let fullscreenTipHideTimer = 0;
   let fullscreenTipShown = false;
+  let fullscreenTipIdleTimer = 0;
+
+  // 引导条展示后，用户 5 秒内没有任何操作就自动收回；有操作则重新计时
+  const FULLSCREEN_TIP_IDLE_MS = 5000;
+
+  function resetFullscreenTipIdle() {
+    clearTimeout(fullscreenTipIdleTimer);
+    if (!fullscreenTip.classList.contains("show")) return;
+    fullscreenTipIdleTimer = setTimeout(dismissFullscreenTip, FULLSCREEN_TIP_IDLE_MS);
+  }
+
+  ["pointerdown", "keydown", "wheel"].forEach((type) => {
+    document.addEventListener(type, resetFullscreenTipIdle, { passive: true });
+  });
 
   function showFullscreenTip() {
     fullscreenTipShown = true;
@@ -3717,11 +3733,13 @@
     // 强制回流，让「屏幕外 + 透明」的起始状态先生效，再加 show 触发下拉动画
     void fullscreenTip.offsetWidth;
     fullscreenTip.classList.add("show");
+    resetFullscreenTipIdle();
   }
 
   function dismissFullscreenTip() {
     if (fullscreenTip.classList.contains("hidden")) return;
     clearTimeout(fullscreenTipHideTimer);
+    clearTimeout(fullscreenTipIdleTimer);
     fullscreenTip.classList.remove("show");
     fullscreenTipHideTimer = setTimeout(() => fullscreenTip.classList.add("hidden"), 800);
   }
@@ -3996,6 +4014,7 @@
   bindScrollFx($("#gift-list"));
   bindScrollFx($("#gift-box"));
   bindScrollFx($("#gift-grid"));
+  bindScrollFx($(".about-card"));
   window.addEventListener("resize", () => {
     updateScrollFade($("#volume-list"));
     updateScrollFade($("#word-list"), $("#word-sheet"));
@@ -4750,14 +4769,20 @@
   // 首页右下角版本号：与 index.html 里的 CACHE_VERSION 保持一致
   $("#home-version").textContent = "v" + (window.APP_VERSION || "");
 
-  // 作者信息浮层：点底部站点地址打开，点浮层以外区域关闭
+  // 作者信息浮层：点首页底部「关于我」打开，点浮层以外区域关闭
   const aboutMask = $("#about-mask");
   const aboutAvatarSmall = $("#about-avatar");
   const aboutAvatarBig = $("#avatar-zoom-img");
 
-  // 两张头像都走 Resource 下载管线 + blob 缓存，带 epoch 自动清缓存
-  const AVATAR_SMALL_URL = Resource.url("assets/images/about/avatar_small.jpg");
-  const AVATAR_BIG_URL = Resource.url("assets/images/about/avatar.jpg");
+  // 图片地址与音频/字体一致：拼上内容哈希（清单里查不到时回落到版本号），
+  // 再带上资源缓存标记；内容没变的头像跨版本不会重复下载
+  function imageUrl(rel) {
+    const ver = Resource.hash(rel) || window.APP_VERSION || "1";
+    return Resource.url(`assets/${rel}?h=${ver}`);
+  }
+
+  const AVATAR_SMALL_URL = imageUrl("images/about/avatar_small.jpg");
+  const AVATAR_BIG_URL = imageUrl("images/about/avatar.jpg");
 
   // preload 完后把 img.src 换成 blobUrl；已缓存过（blobUrl 存在）则直接同步替换
   function applyBlobSrc(imgEl, url) {
@@ -4830,21 +4855,27 @@
     avatarZoomClosing = true;
     avatarZoom.classList.remove("show");
     avatarZoom.classList.add("closing");
-    avatarZoom.addEventListener(
-      "transitionend",
-      function onEnd(e) {
-        if (e.target !== avatarZoom) return;
-        avatarZoom.removeEventListener("transitionend", onEnd);
-        avatarZoom.classList.remove("closing");
-        avatarZoom.classList.add("hidden");
-        avatarZoomClosing = false;
-      },
-      { once: false }
-    );
+    avatarZoom.addEventListener("transitionend", function onEnd(e) {
+      if (e.target !== avatarZoom) return;
+      avatarZoom.removeEventListener("transitionend", onEnd);
+      avatarZoom.classList.remove("closing");
+      avatarZoom.classList.add("hidden");
+      avatarZoomClosing = false;
+    });
   };
 
   aboutAvatarSmall.addEventListener("click", openAvatarZoom);
   avatarZoom.addEventListener("click", closeAvatarZoom);
+
+  // 「关于我」入口上的小气泡：每次回到首页重新播一次「冒出 → 停留 → 收回」动画，
+  // 只提示一下这个入口可点，不常驻、不抢注意力
+  const siteHintEl = $("#site-hint");
+  function replaySiteHint() {
+    if (!siteHintEl) return;
+    siteHintEl.classList.remove("site-hint-on");
+    void siteHintEl.offsetWidth; // 强制回流，让动画从头开始
+    siteHintEl.classList.add("site-hint-on");
+  }
 
   // 先按设置与系统字体放大倍数确定界面字号，再渲染首页，避免首屏字号跳变
   applyUiFont();

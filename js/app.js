@@ -1025,6 +1025,8 @@
   let traceModalFrom = null; // 源田字格相对视口中心的偏移，关闭时沿原路缩回
   let traceModalBusy = false; // 开关动画进行中，避免重复触发
   let traceReward = null; // 写字页本轮临摹的源格子与待飞星数量；详情页为 null
+  let traceCloseCountdown = 0; // 临摹完成后自动关闭倒计时；0 表示未启动
+  let traceCloseCountdownTimer = null;
 
   // 同步写字页顶部手势/语音按钮的高亮（与临摹页共享同一份设置）
   function refreshWritingToggles() {
@@ -1041,10 +1043,48 @@
     if (traceReward && traceReward.char === char && count <= Storage.traceLimit()) {
       traceReward.stars += 1;
     }
+    // 临摹完成后启动 3 秒自动关闭倒计时（一次写对或多遍写完都触发）
+    startTraceCloseCountdown();
     // 每一笔都一次写成时再表扬
     if (!flawless) return;
     const user = Storage.currentUser();
     Speaker.playWritingPraise(user ? user.name : "");
+  }
+
+  /* ---------- 临摹完成后自动关闭倒计时 ---------- */
+  function startTraceCloseCountdown() {
+    cancelTraceCloseCountdown();
+    traceCloseCountdown = 3;
+    const btn = $("#btn-trace-close");
+    if (btn) {
+      btn.classList.add("countdown");
+      btn.innerHTML = `✕ 关闭 <span class="countdown-badge">${traceCloseCountdown}</span>`;
+    }
+    traceCloseCountdownTimer = setInterval(() => {
+      traceCloseCountdown -= 1;
+      if (btn) {
+        btn.innerHTML = traceCloseCountdown > 0
+          ? `✕ 关闭 <span class="countdown-badge">${traceCloseCountdown}</span>`
+          : "✕ 关闭";
+      }
+      if (traceCloseCountdown <= 0) {
+        cancelTraceCloseCountdown();
+        closeTraceModal();
+      }
+    }, 1000);
+  }
+
+  function cancelTraceCloseCountdown() {
+    if (traceCloseCountdownTimer) {
+      clearInterval(traceCloseCountdownTimer);
+      traceCloseCountdownTimer = null;
+    }
+    traceCloseCountdown = 0;
+    const btn = $("#btn-trace-close");
+    if (btn) {
+      btn.classList.remove("countdown");
+      btn.textContent = "✕ 关闭";
+    }
   }
 
   // 点田字格：与礼物放大框一致，从源格子缩小/半透明状态放大到视口中央。
@@ -1097,6 +1137,7 @@
   function showTraceModal(char, cell, volume) {
     const overlay = $("#trace-modal");
     const inner = $("#trace-modal-inner");
+    cancelTraceCloseCountdown();
     traceReward = views.writing.classList.contains("hidden") ? null : { char, cell, stars: 0 };
     overlay.classList.remove("hidden");
     // 模态框模式：田字格与提示挂载到面板，演示/重写挂载到面板上方外侧
@@ -1279,6 +1320,7 @@
     const overlay = $("#trace-modal");
     if (overlay.classList.contains("hidden") || traceModalBusy) return;
     traceModalBusy = true;
+    cancelTraceCloseCountdown();
     const reward = traceReward;
     const rewardRect = reward && reward.cell ? reward.cell.getBoundingClientRect() : null;
     traceReward = null;
@@ -3875,6 +3917,14 @@
   // 临摹模态框：与礼物放大框一致，只有点内容区域外才关闭
   $("#trace-modal").addEventListener("click", (e) => {
     if (e.target.closest(".trace-modal-inner")) return;
+    closeTraceModal();
+  });
+  // 临摹模态框内任何 pointerdown 都中断自动关闭倒计时
+  $("#trace-modal").addEventListener("pointerdown", () => {
+    if (traceCloseCountdownTimer) cancelTraceCloseCountdown();
+  });
+  // 「关闭」按钮：手动点击立即关闭
+  $("#btn-trace-close").addEventListener("click", () => {
     closeTraceModal();
   });
   // 写字页顶部按钮条折叠 / 展开（与临摹页、练习页一致）

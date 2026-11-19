@@ -3059,6 +3059,14 @@
         injectMysteryParticles(card, 2, 1);
       });
     }
+
+    // 同步内存态：上面 markGiftSeen 只清了 localStorage，内存里的 giftItems 仍是旧引用（fresh 还在）。
+    // 若不在这里清掉，后续拖拽排序 persistGiftOrder 或收纳盒交换 swapBoxGiftIntoWardrobe
+    // 整体 saveGifts 时会把 fresh:true 又写回 localStorage，导致切换模式时「发现新礼物」语音重复触发。
+    // 放在渲染之后是因为本次橱窗卡片仍需凭 g.fresh 显示新礼物闪烁。
+    giftItems.forEach((g) => {
+      if (g.fresh) g.fresh = false;
+    });
   }
 
   // 被挤进收纳盒：卡片从橱窗最后一行的位置飞向收纳盒按钮，缩小淡出后消失
@@ -4744,14 +4752,99 @@
 
   // 作者信息浮层：点底部站点地址打开，点浮层以外区域关闭
   const aboutMask = $("#about-mask");
-  const openAbout = () => aboutMask.classList.remove("hidden");
+  const aboutAvatarSmall = $("#about-avatar");
+  const aboutAvatarBig = $("#avatar-zoom-img");
+
+  // 两张头像都走 Resource 下载管线 + blob 缓存，带 epoch 自动清缓存
+  const AVATAR_SMALL_URL = Resource.url("assets/images/about/avatar_small.jpg");
+  const AVATAR_BIG_URL = Resource.url("assets/images/about/avatar.jpg");
+
+  // preload 完后把 img.src 换成 blobUrl；已缓存过（blobUrl 存在）则直接同步替换
+  function applyBlobSrc(imgEl, url) {
+    const blobUrl = Resource.getBlobUrl(url);
+    if (blobUrl) {
+      imgEl.src = blobUrl;
+      return true;
+    }
+    return false;
+  }
+
+  // 预加载一张图片并把它挂到 img 元素上；已缓存则立刻替换不弹进度条
+  function preloadAndApply(imgEl, url, title) {
+    if (applyBlobSrc(imgEl, url)) return Promise.resolve(); // 已缓存，直接跳过
+    showLoading(title);
+    return Resource.preload([url], (done, total) => updateLoading(done, total)).then(() => {
+      const applied = applyBlobSrc(imgEl, url);
+      // 如果 Resource 因为超时等原因没拿到 blob，兜底用原始 URL 让浏览器渲染
+      if (!applied) imgEl.src = url;
+      hideLoading();
+    });
+  }
+
+  let aboutOpening = false; // 防抖：避免 aboutMask 打开过程中重复点击触发多次 preload
+
+  const openAbout = () => {
+    if (aboutOpening) return;
+    aboutOpening = true;
+    preloadAndApply(aboutAvatarSmall, AVATAR_SMALL_URL, "正在加载头像...")
+      .then(() => {
+        aboutMask.classList.remove("hidden");
+      })
+      .finally(() => {
+        aboutOpening = false;
+      });
+  };
+
   const closeAbout = () => aboutMask.classList.add("hidden");
+
   $("#btn-about").addEventListener("click", openAbout);
   $("#btn-about-close").addEventListener("click", closeAbout);
   // 遮罩本身铺满全屏，只有点在遮罩上（即浮层以外区域）才关闭
   aboutMask.addEventListener("click", (e) => {
     if (e.target === aboutMask) closeAbout();
   });
+
+  // 头像大图预览：点小头像 → 先 preload 原图（若未缓存）→ 展开大图
+  const avatarZoom = $("#avatar-zoom");
+  let avatarZoomClosing = false;
+  let avatarZoomOpening = false;
+
+  const openAvatarZoom = () => {
+    if (avatarZoomOpening || avatarZoomClosing) return;
+    avatarZoomOpening = true;
+    preloadAndApply(aboutAvatarBig, AVATAR_BIG_URL, "正在加载大图...")
+      .then(() => {
+        avatarZoomClosing = false;
+        avatarZoom.classList.remove("hidden", "closing");
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => avatarZoom.classList.add("show"));
+        });
+      })
+      .finally(() => {
+        avatarZoomOpening = false;
+      });
+  };
+
+  const closeAvatarZoom = () => {
+    if (avatarZoomClosing) return;
+    avatarZoomClosing = true;
+    avatarZoom.classList.remove("show");
+    avatarZoom.classList.add("closing");
+    avatarZoom.addEventListener(
+      "transitionend",
+      function onEnd(e) {
+        if (e.target !== avatarZoom) return;
+        avatarZoom.removeEventListener("transitionend", onEnd);
+        avatarZoom.classList.remove("closing");
+        avatarZoom.classList.add("hidden");
+        avatarZoomClosing = false;
+      },
+      { once: false }
+    );
+  };
+
+  aboutAvatarSmall.addEventListener("click", openAvatarZoom);
+  avatarZoom.addEventListener("click", closeAvatarZoom);
 
   // 先按设置与系统字体放大倍数确定界面字号，再渲染首页，避免首屏字号跳变
   applyUiFont();

@@ -7,7 +7,7 @@
   <script>
     // 全局唯一版本号（同时用于缓存失效）：改动任何 css/js/音频后递增版本号，
     // 如 1.0.0 → 1.0.1，即可让全部缓存失效；首页右下角显示的也是这个版本
-    var CACHE_VERSION = "1.1.75";
+    var CACHE_VERSION = "1.1.84";
     window.APP_VERSION = CACHE_VERSION;
     // 资源缓存标记：应用设置里「清理资源缓存」后更换。音频、字体、笔顺、图片等
     // 下载型资源的 URL 都会带上它，点一次清理即可绕过浏览器里的旧副本。
@@ -172,20 +172,29 @@
     <!-- 作者信息浮层：点击站点地址打开，点浮层外区域关闭 -->
     <div class="about-mask hidden" id="about-mask">
       <div class="about-card" role="dialog" aria-modal="true" aria-labelledby="about-title">
-        <h2 class="about-title" id="about-title">关于</h2>
+        <div class="about-hero">
+          <img class="about-avatar" id="about-avatar" alt="作者头像" />
+          <h2 class="about-title" id="about-title">关于我</h2>
+          <p class="about-author">foxzzz</p>
+        </div>
+        <p class="about-intro">给儿子做的识字小游戏，他很爱玩。手机 / 平板 / 电脑都能运行，平板体验最佳。使用方法很简单，直接打开网址 <strong>kid.foxzzz.com</strong> 就行，若是使用过程中遇到 BUG 或是有好的想法建议都可以找我，我会慢慢改进完善。</p>
         <dl class="about-list">
-          <div class="about-row"><dt>作者</dt><dd>foxzzz</dd></div>
           <div class="about-row">
-            <dt>邮箱</dt>
+            <dt>📮 邮箱</dt>
             <dd><a href="mailto:i@foxzzz.com">i@foxzzz.com</a></dd>
           </div>
           <div class="about-row">
-            <dt>网址</dt>
+            <dt>🌐 网址</dt>
             <dd><a href="https://kid.foxzzz.com/" target="_blank" rel="noopener">kid.foxzzz.com</a></dd>
           </div>
         </dl>
         <button class="btn btn-ghost about-close" id="btn-about-close">关闭</button>
       </div>
+    </div>
+
+    <!-- 头像大图预览 overlay：点击小头像触发，展开/收缩动画 + 模糊蒙版 -->
+    <div class="avatar-zoom hidden" id="avatar-zoom" role="dialog" aria-modal="true">
+      <img class="avatar-zoom-img" id="avatar-zoom-img" alt="作者头像大图" />
     </div>
   </section>
 

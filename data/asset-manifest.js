@@ -406,6 +406,8 @@ window.ASSET_HASH = {
   "gifts/%E9%BB%91%E6%97%97.mp3": "f5d0311033",
   "gifts/%E9%BC%A0%E6%A0%87.mp3": "aa187b8e92",
   "gifts/T%E6%81%A4.mp3": "1d358d66fa",
+  "images/about/avatar.jpg": "9f72ae6b28",
+  "images/about/avatar_small.jpg": "0de689c338",
   "note/%E4%B8%80_yi1.mp3": "d617224282",
   "note/%E4%B8%81_ding1.mp3": "b943c082bb",
   "note/%E4%B8%83_qi1.mp3": "efd535f46f",

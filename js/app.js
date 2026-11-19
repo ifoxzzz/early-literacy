@@ -1045,10 +1045,26 @@
     }
     // 临摹完成后启动 3 秒自动关闭倒计时（一次写对或多遍写完都触发）
     startTraceCloseCountdown();
-    // 每一笔都一次写成时再表扬
+    // 每一笔都一次写成时再表扬 + 加一颗奖杯星星
     if (!flawless) return;
+    addTraceTrophyStar();
     const user = Storage.currentUser();
     Speaker.playWritingPraise(user ? user.name : "");
+  }
+
+  /* ---------- 临摹奖杯星星：成功完成一次加一颗，最多5颗 ---------- */
+  function resetTraceTrophyStars() {
+    const el = $("#trace-trophy-stars");
+    if (el) el.innerHTML = "";
+  }
+
+  function addTraceTrophyStar() {
+    const el = $("#trace-trophy-stars");
+    if (!el || el.children.length >= 5) return;
+    const star = document.createElement("span");
+    star.className = "trace-star";
+    star.textContent = "★";
+    el.appendChild(star);
   }
 
   /* ---------- 临摹完成后自动关闭倒计时 ---------- */
@@ -1138,6 +1154,7 @@
     const overlay = $("#trace-modal");
     const inner = $("#trace-modal-inner");
     cancelTraceCloseCountdown();
+    resetTraceTrophyStars();
     traceReward = views.writing.classList.contains("hidden") ? null : { char, cell, stars: 0 };
     overlay.classList.remove("hidden");
     // 模态框模式：田字格与提示挂载到面板，演示/重写挂载到面板上方外侧

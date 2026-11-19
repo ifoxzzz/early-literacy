@@ -123,6 +123,7 @@
     GiftMiniShelf.render($("#btn-gift"));
     GiftMiniShelf.render($("#btn-writing-gift"));
     GiftMiniShelf.render($("#btn-volume-gift"));
+    GiftMiniShelf.render($("#btn-gift-open"));
   }
 
   function show(name) {
@@ -141,8 +142,8 @@
     else WakeLock.disable();
     // 离开礼物展柜时停止礼物音频逐个加载，避免阻塞后续操作
     if (name !== "gifts") stopGiftAudioPrefetch();
-    // 进入练习/写字/小书桌页时刷新迷你礼物橱窗
-    if (name === "quiz" || name === "writing" || name === "volumes") renderGiftMiniShelves();
+    // 进入练习/写字/小书桌/结束页时刷新迷你礼物橱窗（从礼物展柜返回时礼物可能已变化）
+    if (name === "quiz" || name === "writing" || name === "volumes" || name === "result") renderGiftMiniShelves();
   }
 
   /* ---------- 屏幕常亮：练习时避免手机自动息屏 ---------- */

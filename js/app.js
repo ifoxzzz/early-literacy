@@ -81,6 +81,9 @@
   let giftShelfMode = "shelf"; // "shelf" 橱窗 / "box" 收纳盒 / "list" 记录
 
   /* ---------- 通用九宫格迷你礼物橱窗 ---------- */
+  // 神秘礼物：名称为「神秘礼物」，被打开后随机变成清单中其他非神秘礼物
+  const MYSTERY_GIFT_NAME = "神秘礼物";
+
   // 可复用于任意礼物入口：传入容器元素与可选尺寸（数字按 px，也接受 CSS 长度）。
   // 按橱窗顺序展示前 9 件礼物，不足留空；空橱窗居中显示会放大晃动的 🎁。
   const GiftMiniShelf = {
@@ -2636,8 +2639,6 @@
   /* ---------- 礼物兑换与展柜 ---------- */
   const giftCatalog = () => window.GIFTS || {};
 
-  // 神秘礼物：名称为「神秘礼物」，被打开后随机变成清单中其他非神秘礼物
-  const MYSTERY_GIFT_NAME = "神秘礼物";
   const MYSTERY_CONFETTI_COLORS = ["#f2c94c", "#e74c3c", "#3498db", "#2ecc71", "#9b59b6", "#ff6b9d"];
   const MYSTERY_BALLOON_EMOJIS = ["💖", "💝", "🎈", "⭐", "✨", "🎊"];
   // 打开神秘礼物时从中央四溅的道具：彩带、星星、爱心等

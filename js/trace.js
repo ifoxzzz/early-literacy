@@ -617,7 +617,7 @@
   }
 
   // 把临摹单元（田字格舞台 + 提示条）挂载到模态框面板；
-  // 演示/重写按钮放到面板上方外侧
+  // 按钮条（奖杯星星 + 演示/重写/关闭）放到面板上方外侧的 actions 容器
   function mountTraceTo(container, actionMount) {
     if (actionMount) actionMount.appendChild($(".trace-bar"));
     container.appendChild(stageEl);

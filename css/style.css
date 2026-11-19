@@ -4662,15 +4662,9 @@ body.hide-note .hint-bar {
   --trace-size: min(88vw, 58vh, 460px);
 }
 
-/* 演示 / 重写：参照练习页「再听一遍」，紧贴田字格上方；
-   用绝对定位而不挤占布局，保证田字格始终留在舞台正中 */
+/* 按钮条：竖向排列「奖杯星星 + 演示/重写/关闭」。打开模态框时 trace.js 把整个
+   .trace-bar 移入 #trace-modal-actions（绝对定位在面板顶缘外侧），这里只定义内部布局 */
 .trace-bar {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  /* 上移：按钮自身高度 + 半个田字格 + 与田字格的间距 */
-  transform: translate(-50%, calc(-100% - var(--trace-size) / 2 - 14px));
-  z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -4726,17 +4720,6 @@ body.hide-note .hint-bar {
   }
 }
 
-/* 演示 / 重写：去掉按钮底部投影，贴在面板上方时更轻巧 */
-.trace-bar .btn {
-  box-shadow: none;
-}
-
-/* 窄屏收窄左右内边距，保证两个按钮并排不溢出 */
-.trace-bar .btn-read {
-  padding: 10px clamp(18px, 4vw, 34px);
-  white-space: nowrap;
-}
-
 .trace-stage {
   position: relative;
   flex: 1;
@@ -4747,8 +4730,7 @@ body.hide-note .hint-bar {
   justify-content: center;
 }
 
-/* 屏幕矮（手机横屏等）：绝对定位的按钮可能顶到顶部按钮条，
-   改为与田字格一起流式居中，按钮仍在田字格正上方 */
+/* 屏幕矮（手机横屏等）：缩小田字格，舞台改为纵向流式居中 */
 @media (max-height: 620px) {
   .trace-host {
     --trace-size: min(88vw, 52vh, 460px);
@@ -4758,56 +4740,12 @@ body.hide-note .hint-bar {
     flex-direction: column;
     gap: 10px;
   }
-
-  .trace-bar {
-    position: static;
-    transform: none;
-  }
 }
 
-/* 宽屏横屏：参照练习页 quiz-side，「演示」「重写」移到田字格左右两侧垂直居中，
-   纵向空间全部留给田字格，田字格因此可以更大 */
+/* 宽屏横屏：压缩田字格宽度上限，避免过高 */
 @media (orientation: landscape) and (min-width: 760px) {
   .trace-host {
     --trace-size: min(calc(88vw - 340px), 72vh, 560px);
-  }
-
-  .trace-bar {
-    position: absolute;
-    inset: 0;
-    transform: none;
-    display: block;
-    pointer-events: none;
-  }
-
-  #btn-trace-demo,
-  #btn-trace-reset {
-    position: absolute;
-    top: 50%;
-    padding: 10px 18px;
-    font-size: calc(clamp(15px, 2.6vmin, 20px) * var(--fs));
-    white-space: nowrap;
-    pointer-events: auto;
-  }
-
-  #btn-trace-demo {
-    /* 左侧空白区正中：空白总宽 = 舞台宽 - 田字格宽，取四分之一 */
-    left: calc((100% - var(--trace-size)) / 4);
-    transform: translate(-50%, -50%);
-  }
-
-  #btn-trace-reset {
-    left: auto;
-    right: calc((100% - var(--trace-size)) / 4);
-    transform: translate(50%, -50%);
-  }
-
-  #btn-trace-demo:active {
-    transform: translate(-50%, -50%) scale(0.97);
-  }
-
-  #btn-trace-reset:active {
-    transform: translate(50%, -50%) scale(0.97);
   }
 }
 
@@ -5419,7 +5357,7 @@ body.hide-note .hint-bar {
 
 /* 内容只有田字格与下方提示，不再使用固定高度，整体接近正方形 */
 .trace-modal-panel {
-  --trace-size: min(70vw, 46vh, 380px);
+  --trace-size: min(70vw, 60vh, 460px);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -5445,6 +5383,13 @@ body.hide-note .hint-bar {
   }
 }
 
+/* 宽屏横屏：两侧空间充足，给田字格更大上限 */
+@media (orientation: landscape) and (min-width: 760px) {
+  .trace-modal-panel {
+    --trace-size: min(60vh, 560px);
+  }
+}
+
 .trace-modal-panel .trace-tip {
   width: 100%;
   margin: 10px 0 0;
@@ -5461,48 +5406,34 @@ body.hide-note .hint-bar {
   transform: translateX(-50%);
 }
 
-.trace-modal-actions .trace-bar {
-  position: static;
-  display: flex;
-  gap: 0;
-  transform: none;
-  width: auto;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-#trace-modal-actions #btn-trace-demo,
-#trace-modal-actions #btn-trace-reset,
-#trace-modal-actions #btn-trace-close {
-  position: static;
-  inset: auto;
-  padding: 13px clamp(17px, 3.6vw, 31px);
-  font-size: calc(clamp(26px, 6vmin, 38px) * var(--fs));
-  transform: none;
+/* 演示/重写/关闭：直角长方形，配色与写字页顶部「手势」按钮一致；
+   position: relative 供悬停提示与倒计时数字圈定位 */
+#trace-modal-actions .trace-action-btn {
+  position: relative;
+  padding: 10px clamp(17px, 3.4vw, 26px);
+  font-size: calc(clamp(20px, 4.3vmin, 29px) * var(--fs));
+  letter-spacing: 0.04em;
   white-space: nowrap;
-  pointer-events: auto;
-  border-radius: 0;
   border: 0;
   border-left: 1px solid #cbbfa5;
+  border-radius: 0;
   background: #e8dcc8;
   color: #8a7a63;
   box-shadow: none;
-  font-size: calc(clamp(13px, 2.8vmin, 17px) * var(--fs));
-  letter-spacing: 0.04em;
   transition: background 0.16s ease, color 0.16s ease;
 }
 
-#trace-modal-actions #btn-trace-demo:hover,
-#trace-modal-actions #btn-trace-reset:hover,
-#trace-modal-actions #btn-trace-close:hover {
+#trace-modal-actions .trace-action-btn:first-child {
+  border-left: 0;
+}
+
+#trace-modal-actions .trace-action-btn:hover {
   background: #d9efd3;
   color: #3a6d48;
 }
 
-#trace-modal-actions #btn-trace-demo:active,
-#trace-modal-actions #btn-trace-reset:active,
-#trace-modal-actions #btn-trace-close:active {
+/* 按下只变色，不缩放（用 !important 压过全局 .btn:active 的 scale(0.94)） */
+#trace-modal-actions .trace-action-btn:active {
   background: #f2a541 !important;
   color: #fff !important;
   transform: none !important;
@@ -5511,15 +5442,7 @@ body.hide-note .hint-bar {
 
 /* 悬停提示（桌面端显示，触屏不触发） */
 @media (hover: hover) {
-  #trace-modal-actions #btn-trace-demo[data-tip],
-  #trace-modal-actions #btn-trace-reset[data-tip],
-  #trace-modal-actions #btn-trace-close[data-tip] {
-    position: relative;
-  }
-
-  #trace-modal-actions #btn-trace-demo[data-tip]::after,
-  #trace-modal-actions #btn-trace-reset[data-tip]::after,
-  #trace-modal-actions #btn-trace-close[data-tip]::after {
+  #trace-modal-actions .trace-action-btn[data-tip]::after {
     content: attr(data-tip);
     position: absolute;
     top: calc(100% + 8px);
@@ -5538,23 +5461,13 @@ body.hide-note .hint-bar {
     z-index: 10;
   }
 
-  #trace-modal-actions #btn-trace-demo[data-tip]:hover::after,
-  #trace-modal-actions #btn-trace-reset[data-tip]:hover::after,
-  #trace-modal-actions #btn-trace-close[data-tip]:hover::after {
+  #trace-modal-actions .trace-action-btn[data-tip]:hover::after {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
   }
 }
 
-#trace-modal-actions #btn-trace-demo {
-  border-left: 0;
-}
-
-/* 倒计时期间：按钮保持原样，数字圈用绝对定位浮在按钮右上角，不占按钮宽度 */
-#trace-modal-actions #btn-trace-close {
-  position: relative;
-}
-
+/* 倒计时数字圈：绝对定位在关闭按钮内右侧、垂直居中，不占按钮宽度 */
 #trace-modal-actions #btn-trace-close .countdown-badge {
   position: absolute;
   top: 50%;
@@ -5566,24 +5479,17 @@ body.hide-note .hint-bar {
   width: 22px;
   height: 22px;
   border-radius: 999px;
-  background: #f2a541;
+  background: #d1603d;
   color: #fff;
   font-size: calc(clamp(11px, 2.2vmin, 13px) * var(--fs));
   font-weight: 700;
   line-height: 1;
-  box-shadow: 0 1px 4px rgba(242, 165, 65, 0.55);
+  box-shadow: 0 1px 4px rgba(209, 96, 61, 0.55);
 }
 
 #trace-modal-actions #btn-trace-close.countdown {
   background: #e8dcc8;
   color: #8a7a63;
-  box-shadow: none;
-}
-
-#trace-modal-actions #btn-trace-demo:active,
-#trace-modal-actions #btn-trace-reset:active,
-#trace-modal-actions #btn-trace-close:active {
-  transform: scale(0.97);
   box-shadow: none;
 }
 

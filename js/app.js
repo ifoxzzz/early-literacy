@@ -1027,6 +1027,7 @@
   let traceReward = null; // 写字页本轮临摹的源格子与待飞星数量；详情页为 null
   let traceCloseCountdown = 0; // 临摹完成后自动关闭倒计时；0 表示未启动
   let traceCloseCountdownTimer = null;
+  let traceCloseDelayTimer = null; // 完成后延迟 1 秒再启动倒计时的定时器
 
   // 同步写字页顶部手势/语音按钮的高亮（与临摹页共享同一份设置）
   function refreshWritingToggles() {
@@ -1043,10 +1044,11 @@
     if (traceReward && traceReward.char === char && count <= Storage.traceLimit()) {
       traceReward.stars += 1;
     }
-    // 临摹完成后启动 3 秒自动关闭倒计时（一次写对或多遍写完都触发）
-    startTraceCloseCountdown();
-    // 只要完成就加一颗奖杯星星
-    addTraceTrophyStar();
+    // 临摹完成后延迟 1 秒再启动 3 秒自动关闭倒计时（一次写对或多遍写完都触发）
+    if (traceCloseDelayTimer) clearTimeout(traceCloseDelayTimer);
+    traceCloseDelayTimer = setTimeout(startTraceCloseCountdown, 1000);
+    // 完成即加一颗奖杯星星，但累计次数超出换字阈值后不再加
+    if (count <= Storage.traceLimit()) addTraceTrophyStar();
     // 每一笔都一次写成时再表扬
     if (!flawless) return;
     const user = Storage.currentUser();
@@ -1092,6 +1094,10 @@
   }
 
   function cancelTraceCloseCountdown() {
+    if (traceCloseDelayTimer) {
+      clearTimeout(traceCloseDelayTimer);
+      traceCloseDelayTimer = null;
+    }
     if (traceCloseCountdownTimer) {
       clearInterval(traceCloseCountdownTimer);
       traceCloseCountdownTimer = null;

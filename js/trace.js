@@ -557,6 +557,12 @@
 
   svg.addEventListener("pointerdown", (e) => {
     if (!ready || pointerId !== null || demoOn) return;
+    // 整字已写完：点击田字格区域等同于点「重写」按钮
+    if (idx >= strokes.length) {
+      e.preventDefault();
+      $("#btn-trace-reset").click();
+      return;
+    }
     e.preventDefault();
     pointerId = e.pointerId;
     liftGate = false; // 新的一次落笔

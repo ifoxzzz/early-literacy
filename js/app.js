@@ -3695,53 +3695,82 @@
   }
   const fsApi = getFullscreenApi();
 
-  // 进入全屏前先记录当时是横屏还是竖屏；全屏生效后按记录的方向锁定，
-  // 避免全屏后被设备旋转或浏览器强制翻转，把已经排好的版面打乱。
-  // 桌面浏览器与 iOS 不支持方向锁定，静默跳过即可。
-  function readScreenOrientation() {
+  // 进入全屏前先记录当时的横竖屏（记录到具体朝向，如 portrait-primary），
+  // 全屏生效后按记录的方向锁定，避免浏览器 / 设备把已经排好的版面转成另一种方向。
+  // 桌面浏览器、部分安卓平板与 iOS 不支持方向锁定，静默忽略即可。
+  function readOrientationLock() {
     const type = screen.orientation && screen.orientation.type;
-    if (type) return type.indexOf("landscape") === 0 ? "landscape" : "portrait";
+    if (/^(portrait|landscape)-(primary|secondary)$/.test(type)) return type;
     if (typeof window.orientation === "number") {
-      return Math.abs(window.orientation) === 90 ? "landscape" : "portrait";
+      const angle = window.orientation;
+      if (Math.abs(angle) === 90) return angle === 90 ? "landscape-primary" : "landscape-secondary";
+      return angle === 0 ? "portrait-primary" : "portrait-secondary";
     }
-    return window.innerWidth > window.innerHeight ? "landscape" : "portrait";
+    return window.innerWidth > window.innerHeight ? "landscape-primary" : "portrait-primary";
   }
 
-  function lockScreenOrientation(orientation) {
+  // 方向锁定：优先标准 API，其次旧安卓 / 旧 WebKit 的前缀写法；不支持时静默失败
+  function lockOrientation(type) {
+    if (!type) return;
     const so = screen.orientation;
-    if (!so || typeof so.lock !== "function") return;
-    try {
-      const result = so.lock(orientation);
-      if (result && typeof result.catch === "function") result.catch(() => {});
-    } catch (err) {
-      /* 不支持或未处于全屏时忽略 */
+    if (so && typeof so.lock === "function") {
+      try {
+        const result = so.lock(type);
+        if (result && typeof result.catch === "function") result.catch(() => {});
+      } catch (err) {}
+      return;
     }
+    ["lockOrientation", "mozLockOrientation", "msLockOrientation"].forEach((name) => {
+      if (typeof screen[name] !== "function") return;
+      try {
+        const result = screen[name](type);
+        if (result && typeof result.catch === "function") result.catch(() => {});
+      } catch (err) {}
+    });
   }
 
   function unlockScreenOrientation() {
     const so = screen.orientation;
-    if (!so || typeof so.unlock !== "function") return;
-    try {
-      so.unlock();
-    } catch (err) {
-      /* 不支持时忽略 */
+    if (so && typeof so.unlock === "function") {
+      try {
+        so.unlock();
+      } catch (err) {}
+      return;
     }
+    ["unlockOrientation", "mozUnlockOrientation", "msUnlockOrientation"].forEach((name) => {
+      if (typeof screen[name] !== "function") return;
+      try {
+        screen[name]();
+      } catch (err) {}
+    });
+  }
+
+  // 进入全屏时记录的方向；全屏期间按它锁定，退出时清空
+  let fullscreenOrientation = "";
+
+  function applyFullscreenOrientation() {
+    if (!fullscreenOrientation || !fsApi || !fsApi.active()) return;
+    lockOrientation(fullscreenOrientation);
   }
 
   // 两个入口共用：记录方向 → 进入全屏 → 全屏生效后按记录的方向锁定
   function enterFullscreen() {
     if (!fsApi || !fsApi.available()) return;
-    const orientation = readScreenOrientation();
-    const lock = () => lockScreenOrientation(orientation);
+    const orientation = readOrientationLock();
+    fullscreenOrientation = orientation;
+    // 点击手势内先锁一次（部分浏览器要求锁定由用户操作触发），
+    // 全屏就绪后再补几次：浏览器若进入全屏时自行转了方向，这里会被转回来
+    lockOrientation(orientation);
+    [0, 200, 600].forEach((ms) => setTimeout(applyFullscreenOrientation, ms));
     try {
       const result = fsApi.enter();
       if (result && typeof result.then === "function") {
         result.then(() => {
-          lock();
+          applyFullscreenOrientation();
           refreshFullscreen();
         }, refreshFullscreen);
       } else {
-        lock();
+        applyFullscreenOrientation();
         refreshFullscreen();
       }
     } catch (err) {
@@ -3758,8 +3787,6 @@
       .querySelectorAll("button")
       .forEach((b) => b.classList.toggle("active", (b.dataset.v === "on") === on));
     if (on) dismissFullscreenTip();
-    // 退出全屏时解除方向锁定，交还给系统自动旋转
-    else unlockScreenOrientation();
   }
 
   // 首页全屏引导条：进入首页 0.5 秒后从顶部拉下，本次页面加载只提示一次
@@ -4765,8 +4792,18 @@
       refreshFullscreen();
     }
   });
-  // 按 Esc 或浏览器自行退出全屏时，同步胶囊按钮状态
-  if (fsApi) document.addEventListener(fsApi.event, refreshFullscreen);
+  // 按 Esc 或浏览器自行退出全屏时，同步胶囊按钮状态；进入时补锁方向，退出时解除锁定
+  if (fsApi) {
+    document.addEventListener(fsApi.event, () => {
+      if (fsApi.active()) {
+        applyFullscreenOrientation();
+      } else {
+        fullscreenOrientation = "";
+        unlockScreenOrientation();
+      }
+      refreshFullscreen();
+    });
+  }
   // 首页全屏引导条：一键开启全屏（按进入时的横竖屏方向锁定），成功后自动收起
   $("#btn-fullscreen-tip").addEventListener("click", () => enterFullscreen());
   $("#btn-fullscreen-tip-close").addEventListener("click", dismissFullscreenTip);

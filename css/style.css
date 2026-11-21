@@ -1060,8 +1060,8 @@ body {
 }
 
 /* 首页「关于我」入口上方的小气泡：轻轻冒出来提示「这里可以点」，停留几秒后再收回去。
-   配色与文字同系、尺寸很小，保持低调不抢注意力；pointer-events 关掉，
-   点气泡等同于点下面的「关于我」按钮 */
+   配色与文字同系、尺寸很小，保持低调不抢注意力；气泡也可点击，
+   点击事件冒泡到「关于我」按钮，打开同一个作者信息浮层 */
 .site-hint {
   position: absolute;
   left: 50%;
@@ -1077,7 +1077,8 @@ body {
   border-radius: 999px;
   box-shadow: 0 2px 6px rgba(160, 120, 60, 0.12);
   opacity: 0;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
   transform: translate(-50%, 8px) scale(0.6);
   transform-origin: 50% 120%;
 }

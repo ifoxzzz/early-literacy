@@ -3695,6 +3695,60 @@
   }
   const fsApi = getFullscreenApi();
 
+  // 进入全屏前先记录当时是横屏还是竖屏；全屏生效后按记录的方向锁定，
+  // 避免全屏后被设备旋转或浏览器强制翻转，把已经排好的版面打乱。
+  // 桌面浏览器与 iOS 不支持方向锁定，静默跳过即可。
+  function readScreenOrientation() {
+    const type = screen.orientation && screen.orientation.type;
+    if (type) return type.indexOf("landscape") === 0 ? "landscape" : "portrait";
+    if (typeof window.orientation === "number") {
+      return Math.abs(window.orientation) === 90 ? "landscape" : "portrait";
+    }
+    return window.innerWidth > window.innerHeight ? "landscape" : "portrait";
+  }
+
+  function lockScreenOrientation(orientation) {
+    const so = screen.orientation;
+    if (!so || typeof so.lock !== "function") return;
+    try {
+      const result = so.lock(orientation);
+      if (result && typeof result.catch === "function") result.catch(() => {});
+    } catch (err) {
+      /* 不支持或未处于全屏时忽略 */
+    }
+  }
+
+  function unlockScreenOrientation() {
+    const so = screen.orientation;
+    if (!so || typeof so.unlock !== "function") return;
+    try {
+      so.unlock();
+    } catch (err) {
+      /* 不支持时忽略 */
+    }
+  }
+
+  // 两个入口共用：记录方向 → 进入全屏 → 全屏生效后按记录的方向锁定
+  function enterFullscreen() {
+    if (!fsApi || !fsApi.available()) return;
+    const orientation = readScreenOrientation();
+    const lock = () => lockScreenOrientation(orientation);
+    try {
+      const result = fsApi.enter();
+      if (result && typeof result.then === "function") {
+        result.then(() => {
+          lock();
+          refreshFullscreen();
+        }, refreshFullscreen);
+      } else {
+        lock();
+        refreshFullscreen();
+      }
+    } catch (err) {
+      refreshFullscreen();
+    }
+  }
+
   // 胶囊按钮状态始终跟随真实全屏状态：按 Esc 或浏览器自行退出时也会同步
   function refreshFullscreen() {
     const supported = !!(fsApi && fsApi.available());
@@ -3704,6 +3758,8 @@
       .querySelectorAll("button")
       .forEach((b) => b.classList.toggle("active", (b.dataset.v === "on") === on));
     if (on) dismissFullscreenTip();
+    // 退出全屏时解除方向锁定，交还给系统自动旋转
+    else unlockScreenOrientation();
   }
 
   // 首页全屏引导条：进入首页 0.5 秒后从顶部拉下，本次页面加载只提示一次
@@ -4695,8 +4751,12 @@
     if (!btn || !fsApi || !fsApi.available()) return;
     const want = btn.dataset.v === "on";
     if (want === fsApi.active()) return;
+    if (want) {
+      enterFullscreen();
+      return;
+    }
     try {
-      const result = want ? fsApi.enter() : fsApi.exit();
+      const result = fsApi.exit();
       // 标准 API 返回 Promise：成功或失败都按真实状态刷新，避免界面误报
       if (result && typeof result.then === "function") {
         result.then(refreshFullscreen, refreshFullscreen);
@@ -4707,18 +4767,8 @@
   });
   // 按 Esc 或浏览器自行退出全屏时，同步胶囊按钮状态
   if (fsApi) document.addEventListener(fsApi.event, refreshFullscreen);
-  // 首页全屏引导条：一键开启全屏，成功后自动收起；× 直接关闭提示
-  $("#btn-fullscreen-tip").addEventListener("click", () => {
-    if (!fsApi || !fsApi.available()) return;
-    try {
-      const result = fsApi.enter();
-      if (result && typeof result.then === "function") {
-        result.then(refreshFullscreen, refreshFullscreen);
-      }
-    } catch (err) {
-      refreshFullscreen();
-    }
-  });
+  // 首页全屏引导条：一键开启全屏（按进入时的横竖屏方向锁定），成功后自动收起
+  $("#btn-fullscreen-tip").addEventListener("click", () => enterFullscreen());
   $("#btn-fullscreen-tip-close").addEventListener("click", dismissFullscreenTip);
   // 点击悬浮条以外的任意区域也收起提示；不拦截事件，点击照常传递给下方元素
   document.addEventListener("click", (e) => {

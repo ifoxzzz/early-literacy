@@ -228,6 +228,77 @@
     }).catch(function () { /* 忽略网络失败 */ });
   }
 
+  // ---------- 浏览器 / 操作系统解析（基于 UA） ----------
+  function parseBrowser(ua) {
+    ua = ua || "";
+    var m;
+    if (/Edg\//.test(ua)) { m = ua.match(/Edg\/([\d.]+)/); return m ? "Edge " + m[1] : "Edge"; }
+    if (/OPR\//.test(ua) || /Opera/.test(ua)) { m = ua.match(/(?:OPR|Opera)\/([\d.]+)/); return m ? "Opera " + m[1] : "Opera"; }
+    if (/Chrome\//.test(ua) && !/Chromium/.test(ua)) { m = ua.match(/Chrome\/([\d.]+)/); return m ? "Chrome " + m[1] : "Chrome"; }
+    if (/Firefox\//.test(ua)) { m = ua.match(/Firefox\/([\d.]+)/); return m ? "Firefox " + m[1] : "Firefox"; }
+    if (/Safari\//.test(ua) && !/Chrome/.test(ua)) { m = ua.match(/Version\/([\d.]+)/); return m ? "Safari " + m[1] : "Safari"; }
+    return "Unknown";
+  }
+
+  function parseOS(ua) {
+    ua = ua || "";
+    if (/Windows NT 10/.test(ua)) return "Windows 10/11";
+    if (/Windows NT/.test(ua)) return "Windows";
+    if (/Mac OS X/.test(ua)) return "macOS";
+    if (/iPhone OS/.test(ua) || /iPad/.test(ua)) return "iOS";
+    if (/Android/.test(ua)) {
+      var m = ua.match(/Android ([\d.]+)/);
+      return m ? "Android " + m[1] : "Android";
+    }
+    if (/Linux/.test(ua)) return "Linux";
+    return "Unknown";
+  }
+
+  // ---------- 采集当前设备 / 浏览器环境信息 ----------
+  function collectEnv() {
+    var nav = global.navigator || {};
+    var ua = nav.userAgent || "";
+    var screen = global.screen || {};
+    var tz = null;
+    try {
+      tz = (global.Intl && Intl.DateTimeFormat)
+        ? Intl.DateTimeFormat().resolvedOptions().timeZone
+        : null;
+    } catch (e) { tz = null; }
+    return {
+      browser: parseBrowser(ua),
+      os: parseOS(ua),
+      screen_w: screen.width ? Math.round(screen.width) : null,
+      screen_h: screen.height ? Math.round(screen.height) : null,
+      viewport_w: global.innerWidth ? Math.round(global.innerWidth) : null,
+      viewport_h: global.innerHeight ? Math.round(global.innerHeight) : null,
+      device_pixel_ratio: global.devicePixelRatio
+        ? Number(global.devicePixelRatio.toFixed(2))
+        : null,
+      language: nav.language || null,
+      timezone: tz,
+      user_agent: ua || null,
+    };
+  }
+
+  // ---------- 业务：进入小朋友活跃事件（每次插一条，含环境信息 + IP） ----------
+  // uid: 小朋友本地 ID
+  // source: 入口来源，如 'home' / 'new_user' / 'switch'
+  // childName: 小朋友名称
+  function reportEnterChild(uid, source, childName) {
+    var env = collectEnv();
+    var payload = Object.assign({
+      did: getDid(),
+      child_uid: uid || null,
+      child_name: childName || null,
+      event_type: "enter_child",
+      source: source || null,
+      app_version: global.APP_VERSION || null,
+    }, env);
+    // 静默上报，不阻塞主流程
+    post("activity_event", payload).catch(function () { /* 忽略网络失败 */ });
+  }
+
   // ---------- 清理（仅调试用） ----------
   function resetBinding(uid) {
     localStorage.removeItem(bidKey(uid));
@@ -250,6 +321,7 @@
     upload: upload,
     download: download,
     reportActivity: reportActivity,
+    reportEnterChild: reportEnterChild,
     resetBinding: resetBinding,
   };
 })(window);

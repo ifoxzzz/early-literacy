@@ -3898,6 +3898,8 @@
     const user = Storage.users().find((u) => u.id === card.dataset.id);
     if (!user) return;
     Storage.setCurrent(user.id);
+    // 埋点：进入小朋友（含设备/浏览器/分辨率等环境信息与 IP）
+    try { if (window.Cloud) Cloud.reportEnterChild(user.id, "home", user.name); } catch (e) { /* Cloud 未加载时静默 */ }
     enteringUser = true;
     let loadingShown = false;
     const showTimer = setTimeout(() => {
@@ -4107,8 +4109,10 @@
       nameInput.focus();
       return;
     }
-    Storage.addUser(name);
+    const newUser = Storage.addUser(name);
     afterUserAdded();
+    // 埋点：新建并进入小朋友（含设备/浏览器/分辨率等环境信息与 IP）
+    try { if (newUser && window.Cloud) Cloud.reportEnterChild(newUser.id, "new_user", newUser.name); } catch (e) { /* 静默 */ }
   });
   nameInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") $("#btn-user-ok").click();

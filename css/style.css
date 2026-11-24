@@ -5859,3 +5859,66 @@ body.hide-note .hint-bar {
     transition: none;
   }
 }
+
+/* ---------- 云端同步对话框 ---------- */
+.cloud-code-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 12px;
+  background: #faf7f0;
+  border: 1px solid #e6ddce;
+  border-radius: 8px;
+  word-break: break-all;
+}
+
+.cloud-code {
+  flex: 1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: calc(clamp(12px, 2.8vmin, 16px) * var(--fs));
+  color: #5a4a38;
+  line-height: 1.5;
+  letter-spacing: 0.5px;
+}
+
+.cloud-code-box .btn {
+  flex: 0 0 auto;
+  padding: 6px 14px;
+}
+
+.cloud-code-input {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 10px 0 6px;
+  padding: 10px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: calc(clamp(12px, 2.8vmin, 15px) * var(--fs));
+  color: #5a4a38;
+  background: #faf7f0;
+  border: 1.5px solid #e6ddce;
+  border-radius: 8px;
+  resize: none;
+  outline: none;
+  line-height: 1.5;
+  letter-spacing: 0.3px;
+}
+
+.cloud-code-input:focus {
+  border-color: #d1603d;
+}
+
+.cloud-download-status {
+  min-height: 1.2em;
+  margin: 4px 0 0;
+  font-size: calc(clamp(12px, 2.8vmin, 15px) * var(--fs));
+  color: #9b8669;
+}
+
+.cloud-download-status.error {
+  color: #c0392b;
+}
+
+.cloud-download-status.success {
+  color: #27ae60;
+}

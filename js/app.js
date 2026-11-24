@@ -3695,89 +3695,6 @@
   }
   const fsApi = getFullscreenApi();
 
-  // 进入全屏前先记录当时的横竖屏（记录到具体朝向，如 portrait-primary），
-  // 全屏生效后按记录的方向锁定，避免浏览器 / 设备把已经排好的版面转成另一种方向。
-  // 桌面浏览器、部分安卓平板与 iOS 不支持方向锁定，静默忽略即可。
-  function readOrientationLock() {
-    const type = screen.orientation && screen.orientation.type;
-    if (/^(portrait|landscape)-(primary|secondary)$/.test(type)) return type;
-    if (typeof window.orientation === "number") {
-      const angle = window.orientation;
-      if (Math.abs(angle) === 90) return angle === 90 ? "landscape-primary" : "landscape-secondary";
-      return angle === 0 ? "portrait-primary" : "portrait-secondary";
-    }
-    return window.innerWidth > window.innerHeight ? "landscape-primary" : "portrait-primary";
-  }
-
-  // 方向锁定：优先标准 API，其次旧安卓 / 旧 WebKit 的前缀写法；不支持时静默失败
-  function lockOrientation(type) {
-    if (!type) return;
-    const so = screen.orientation;
-    if (so && typeof so.lock === "function") {
-      try {
-        const result = so.lock(type);
-        if (result && typeof result.catch === "function") result.catch(() => {});
-      } catch (err) {}
-      return;
-    }
-    ["lockOrientation", "mozLockOrientation", "msLockOrientation"].forEach((name) => {
-      if (typeof screen[name] !== "function") return;
-      try {
-        const result = screen[name](type);
-        if (result && typeof result.catch === "function") result.catch(() => {});
-      } catch (err) {}
-    });
-  }
-
-  function unlockScreenOrientation() {
-    const so = screen.orientation;
-    if (so && typeof so.unlock === "function") {
-      try {
-        so.unlock();
-      } catch (err) {}
-      return;
-    }
-    ["unlockOrientation", "mozUnlockOrientation", "msUnlockOrientation"].forEach((name) => {
-      if (typeof screen[name] !== "function") return;
-      try {
-        screen[name]();
-      } catch (err) {}
-    });
-  }
-
-  // 进入全屏时记录的方向；全屏期间按它锁定，退出时清空
-  let fullscreenOrientation = "";
-
-  function applyFullscreenOrientation() {
-    if (!fullscreenOrientation || !fsApi || !fsApi.active()) return;
-    lockOrientation(fullscreenOrientation);
-  }
-
-  // 两个入口共用：记录方向 → 进入全屏 → 全屏生效后按记录的方向锁定
-  function enterFullscreen() {
-    if (!fsApi || !fsApi.available()) return;
-    const orientation = readOrientationLock();
-    fullscreenOrientation = orientation;
-    // 点击手势内先锁一次（部分浏览器要求锁定由用户操作触发），
-    // 全屏就绪后再补几次：浏览器若进入全屏时自行转了方向，这里会被转回来
-    lockOrientation(orientation);
-    [0, 200, 600].forEach((ms) => setTimeout(applyFullscreenOrientation, ms));
-    try {
-      const result = fsApi.enter();
-      if (result && typeof result.then === "function") {
-        result.then(() => {
-          applyFullscreenOrientation();
-          refreshFullscreen();
-        }, refreshFullscreen);
-      } else {
-        applyFullscreenOrientation();
-        refreshFullscreen();
-      }
-    } catch (err) {
-      refreshFullscreen();
-    }
-  }
-
   // 胶囊按钮状态始终跟随真实全屏状态：按 Esc 或浏览器自行退出时也会同步
   function refreshFullscreen() {
     const supported = !!(fsApi && fsApi.available());
@@ -4365,6 +4282,208 @@
     }
   });
 
+  /* ---------- 云端同步（基于 Cloud.js） ---------- */
+
+  // 上传：导出当前用户数据 → 调 Cloud.upload → 弹恢复码或冲突提示
+  var cloudConflict = null; // 暂存冲突时的服务端信息，供后续决策
+
+  $("#btn-cloud-upload").addEventListener("click", async () => {
+    var user = Storage.currentUser();
+    if (!user) {
+      showDataMessage("无法上传", "尚未选择小朋友，请先选择后再试。");
+      return;
+    }
+    var backup;
+    try {
+      backup = Storage.exportUserData(user.id);
+    } catch (e) {
+      showDataMessage("导出失败", e.message || "无法读取当前小朋友的数据。");
+      return;
+    }
+
+    showDataMessage("正在上传…", "请稍候。"); // 先提示一个过渡
+    try {
+      var result = await Cloud.upload(user.id, backup);
+      if (result.ok) {
+        // 上传成功 → 显示恢复码对话框
+        var code = Cloud.buildRecoveryCode(user.id);
+        var note = result.isNew
+          ? "首次云端上传成功，下面是你的恢复码。"
+          : "云端上传成功。下面的恢复码未变，之前保存过可以直接用。";
+        $("#cloud-recovery-note").textContent = note;
+        $("#cloud-recovery-code").textContent = code;
+        $("#cloud-recovery-dialog").classList.remove("hidden");
+        // 隐藏 data-message（如果还显示的话）
+        dataMessageDialog.classList.add("hidden");
+      } else if (result.conflict) {
+        // 版本冲突
+        cloudConflict = {
+          user: user,
+          revision: result.revision,
+          recovery_code: result.recovery_code,
+        };
+        var time = result.server_updated_at
+          ? new Date(result.server_updated_at).toLocaleString()
+          : "未知";
+        $("#cloud-conflict-note").textContent =
+          "云端已有较新版本（第 " + result.server_revision + " 版，更新时间 " + time + "）。" +
+          "选择「下载最新版本」会拉取云端数据到当前小朋友；选择「强制覆盖」会用本地数据覆盖云端（会丢失对方改动）。";
+        dataMessageDialog.classList.add("hidden");
+        $("#cloud-conflict-dialog").classList.remove("hidden");
+      } else {
+        showDataMessage("上传失败", result.error || "未知错误。");
+      }
+    } catch (err) {
+      showDataMessage("上传失败", err.message || "网络异常。");
+    }
+  });
+
+  // 恢复码对话框：复制 + 关闭
+  $("#btn-cloud-copy").addEventListener("click", function () {
+    var code = $("#cloud-recovery-code").textContent;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(
+        function () { $("#btn-cloud-copy").textContent = "已复制"; },
+        function () { fallbackCopy(code); }
+      );
+    } else {
+      fallbackCopy(code);
+    }
+  });
+  function fallbackCopy(text) {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); } catch (e) {}
+    document.body.removeChild(ta);
+    $("#btn-cloud-copy").textContent = "已复制";
+  }
+  $("#cloud-recovery-dialog").addEventListener("click", function (e) {
+    if (e.target === this) this.classList.add("hidden");
+  });
+  $("#btn-cloud-recovery-close").addEventListener("click", function () {
+    $("#cloud-recovery-dialog").classList.add("hidden");
+    $("#btn-cloud-copy").textContent = "复制";
+  });
+
+  // 版本冲突对话框
+  $("#cloud-conflict-dialog").addEventListener("click", function (e) {
+    if (e.target === this) this.classList.add("hidden");
+  });
+  $("#btn-cloud-conflict-download").addEventListener("click", async function () {
+    $("#cloud-conflict-dialog").classList.add("hidden");
+    if (!cloudConflict) return;
+    // 下载云端最新版本到当前小朋友
+    var r = await Cloud.download(cloudConflict.recovery_code);
+    handleCloudDownloadResult(r);
+    cloudConflict = null;
+  });
+  $("#btn-cloud-conflict-force").addEventListener("click", async function () {
+    $("#cloud-conflict-dialog").classList.add("hidden");
+    if (!cloudConflict) return;
+    // 强制覆盖：先下载拿到服务端 revision，然后用更高 base_revision 再上传
+    var user = cloudConflict.user;
+    var backup = Storage.exportUserData(user.id);
+    var bind = Cloud.bindFromRecoveryCode(user.id, cloudConflict.recovery_code);
+    // 把 revision 手动拉高 1000，确保服务器认为这是新版本
+    Cloud.setRevision(user.id, (cloudConflict.revision || 0) + 1000);
+    var r = await Cloud.upload(user.id, backup);
+    if (r.ok) {
+      showDataMessage("已覆盖", "本地数据已强制上传到云端。");
+    } else {
+      showDataMessage("覆盖失败", r.error || "未知错误。");
+    }
+    cloudConflict = null;
+  });
+
+  // 恢复对话框：输入恢复码下载
+  $("#btn-cloud-download").addEventListener("click", function () {
+    $("#cloud-recovery-input").value = "";
+    $("#cloud-download-status").textContent = "";
+    $("#cloud-download-status").className = "cloud-download-status";
+    $("#cloud-download-dialog").classList.remove("hidden");
+    $("#cloud-recovery-input").focus();
+  });
+  $("#cloud-download-dialog").addEventListener("click", function (e) {
+    if (e.target === this) this.classList.add("hidden");
+  });
+  $("#btn-cloud-download-cancel").addEventListener("click", function () {
+    $("#cloud-download-dialog").classList.add("hidden");
+  });
+  $("#cloud-recovery-input").addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      $("#btn-cloud-download-go").click();
+    }
+  });
+  $("#btn-cloud-download-go").addEventListener("click", async function () {
+    var code = $("#cloud-recovery-input").value.trim();
+    var statusEl = $("#cloud-download-status");
+    if (!code) {
+      statusEl.textContent = "请先粘贴恢复码。";
+      statusEl.className = "cloud-download-status error";
+      return;
+    }
+    statusEl.textContent = "正在从云端恢复…";
+    statusEl.className = "cloud-download-status";
+    try {
+      var result = await Cloud.download(code);
+      if (!result.ok) {
+        statusEl.textContent = result.error || "恢复失败。";
+        statusEl.className = "cloud-download-status error";
+        return;
+      }
+      $("#cloud-download-dialog").classList.add("hidden");
+      handleCloudDownloadResult(result);
+    } catch (err) {
+      statusEl.textContent = err.message || "网络错误。";
+      statusEl.className = "cloud-download-status error";
+    }
+  });
+
+  // 下载成功后的处理：让用户选择覆盖当前小朋友还是新建
+  async function handleCloudDownloadResult(result) {
+    var user = Storage.currentUser();
+    if (!user) {
+      showDataMessage("无法恢复", "尚未选择小朋友，请先选择后再试。");
+      return;
+    }
+    // 校验数据格式
+    try {
+      Storage.validateUserData(result.payload);
+    } catch (err) {
+      showDataMessage("数据损坏", err.message || "云端数据格式不正确。");
+      return;
+    }
+    var fromName = (result.payload && result.payload.user && result.payload.user.name) ||
+      (result.backup_name || "云端备份");
+    showDataMessage(
+      "恢复数据",
+      "即将把「" + fromName + "」的云端数据恢复到当前小朋友「" + user.name + "」，" +
+        "覆盖其学习进度、练习记录、礼物与练习设置。此操作不可恢复。" +
+        "\n\n（恢复后会自动绑定云端恢复码，后续可继续上传/同步。）"
+    );
+    // 覆盖导入
+    try {
+      var apply = Storage.importUserData(result.payload);
+      // 绑定恢复码到当前小朋友
+      Cloud.bindFromRecoveryCode(user.id, result.bid + "::" + result.secret);
+      Cloud.setRevision(user.id, result.revision);
+      refreshSettings(user);
+      showDataMessage(
+        "恢复成功",
+        "已恢复 " + apply.progress + " 个字的学习进度、" + apply.history + " 条认字记录、" +
+          apply.traceHistory + " 条写字记录、" + apply.gifts + " 件礼物与 " +
+          apply.giftLog + " 条礼物领取记录。"
+      );
+    } catch (err) {
+      showDataMessage("恢复失败", err.message);
+    }
+  }
+
   $("#btn-history").addEventListener("click", openHistory);
   // 结束本组练习（已作答的记录保留），回到该小朋友的册目选择页
   // 不用系统 confirm：手机端 WebView 的系统对话框可能触发返回或关闭页面等不一致行为；
@@ -4778,12 +4897,8 @@
     if (!btn || !fsApi || !fsApi.available()) return;
     const want = btn.dataset.v === "on";
     if (want === fsApi.active()) return;
-    if (want) {
-      enterFullscreen();
-      return;
-    }
     try {
-      const result = fsApi.exit();
+      const result = want ? fsApi.enter() : fsApi.exit();
       // 标准 API 返回 Promise：成功或失败都按真实状态刷新，避免界面误报
       if (result && typeof result.then === "function") {
         result.then(refreshFullscreen, refreshFullscreen);
@@ -4792,20 +4907,20 @@
       refreshFullscreen();
     }
   });
-  // 按 Esc 或浏览器自行退出全屏时，同步胶囊按钮状态；进入时补锁方向，退出时解除锁定
-  if (fsApi) {
-    document.addEventListener(fsApi.event, () => {
-      if (fsApi.active()) {
-        applyFullscreenOrientation();
-      } else {
-        fullscreenOrientation = "";
-        unlockScreenOrientation();
+  // 按 Esc 或浏览器自行退出全屏时，同步胶囊按钮状态
+  if (fsApi) document.addEventListener(fsApi.event, refreshFullscreen);
+  // 首页全屏引导条：一键开启全屏，成功后自动收起；× 直接关闭提示
+  $("#btn-fullscreen-tip").addEventListener("click", () => {
+    if (!fsApi || !fsApi.available()) return;
+    try {
+      const result = fsApi.enter();
+      if (result && typeof result.then === "function") {
+        result.then(refreshFullscreen, refreshFullscreen);
       }
+    } catch (err) {
       refreshFullscreen();
-    });
-  }
-  // 首页全屏引导条：一键开启全屏（按进入时的横竖屏方向锁定），成功后自动收起
-  $("#btn-fullscreen-tip").addEventListener("click", () => enterFullscreen());
+    }
+  });
   $("#btn-fullscreen-tip-close").addEventListener("click", dismissFullscreenTip);
   // 点击悬浮条以外的任意区域也收起提示；不拦截事件，点击照常传递给下方元素
   document.addEventListener("click", (e) => {
@@ -4855,6 +4970,11 @@
 
   // 首页右下角版本号：与 index.html 里的 CACHE_VERSION 保持一致
   $("#home-version").textContent = "v" + (window.APP_VERSION || "");
+
+  // 匿名活跃上报：每天打开应用时上报一次设备活跃
+  try {
+    Cloud.reportActivity(Storage.currentId(), "device");
+  } catch (e) { /* Cloud 模块未加载时静默忽略 */ }
 
   // 作者信息浮层：点首页底部「关于我」打开，点浮层以外区域关闭
   const aboutMask = $("#about-mask");

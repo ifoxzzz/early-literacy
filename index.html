@@ -7,7 +7,7 @@
   <script>
     // 全局唯一版本号（同时用于缓存失效）：改动任何 css/js/音频后递增版本号，
     // 如 1.0.0 → 1.0.1，即可让全部缓存失效；首页右下角显示的也是这个版本
-    var CACHE_VERSION = "1.2.3";
+    var CACHE_VERSION = "1.2.5";
     window.APP_VERSION = CACHE_VERSION;
     // 资源缓存标记：应用设置里「清理资源缓存」后更换。音频、字体、笔顺、图片等
     // 下载型资源的 URL 都会带上它，点一次清理即可绕过浏览器里的旧副本。
@@ -392,6 +392,14 @@
         <input type="file" id="import-file" accept=".json,application/json" hidden />
         <p class="settings-tip">导出会将这位小朋友的全部数据保存为 JSON 文件；导入会覆盖其学习进度、练习记录、礼物与练习设置。</p>
         <div class="setting-row">
+          <span class="setting-label">云端同步</span>
+          <span class="setting-opts">
+            <button class="btn btn-skip" id="btn-cloud-upload">上传到云端</button>
+            <button class="btn btn-skip" id="btn-cloud-download">从云端恢复</button>
+          </span>
+        </div>
+        <p class="settings-tip">上传后会生成一段恢复码，请保管好；换设备时在新设备上点「从云端恢复」并粘贴恢复码即可。</p>
+        <div class="setting-row">
           <span class="setting-label">学习记录</span>
           <span class="setting-opts">
             <button class="btn btn-danger" id="btn-learning-reset">学习重置</button>
@@ -537,6 +545,47 @@
       <p class="dialog-note" id="data-message-note"></p>
       <div class="dialog-btns">
         <button class="btn btn-primary" id="btn-data-message-ok">知道了</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 云端上传恢复码对话框：显示恢复码，让用户复制 -->
+  <div class="dialog-mask hidden" id="cloud-recovery-dialog">
+    <div class="dialog">
+      <p class="dialog-title">云端上传成功</p>
+      <p class="dialog-note" id="cloud-recovery-note">请妥善保存下面的恢复码，换设备时需要它。</p>
+      <div class="cloud-code-box">
+        <code class="cloud-code" id="cloud-recovery-code"></code>
+        <button class="btn btn-skip" id="btn-cloud-copy">复制</button>
+      </div>
+      <div class="dialog-btns">
+        <button class="btn btn-primary" id="btn-cloud-recovery-close">我已保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 云端恢复对话框：输入恢复码下载 -->
+  <div class="dialog-mask hidden" id="cloud-download-dialog">
+    <div class="dialog">
+      <p class="dialog-title">从云端恢复</p>
+      <p class="dialog-note">粘贴老设备上复制的恢复码（以 bid::secret 格式），恢复小朋友的学习数据。</p>
+      <textarea class="cloud-code-input" id="cloud-recovery-input" rows="2" placeholder="粘贴恢复码..."></textarea>
+      <p class="cloud-download-status" id="cloud-download-status"></p>
+      <div class="dialog-btns">
+        <button class="btn btn-skip" id="btn-cloud-download-cancel">取消</button>
+        <button class="btn btn-primary" id="btn-cloud-download-go">下一步</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 云端版本冲突对话框：选择下载最新或强制覆盖 -->
+  <div class="dialog-mask hidden" id="cloud-conflict-dialog">
+    <div class="dialog">
+      <p class="dialog-title">云端数据有更新</p>
+      <p class="dialog-note" id="cloud-conflict-note">检测到云端有较新版本的数据，是否下载最新版本？</p>
+      <div class="dialog-btns">
+        <button class="btn btn-skip" id="btn-cloud-conflict-force">强制覆盖云端</button>
+        <button class="btn btn-primary" id="btn-cloud-conflict-download">下载最新版本</button>
       </div>
     </div>
   </div>
@@ -717,6 +766,7 @@
       "js/speaker.js",
       "js/sound.js",
       "js/trace.js",
+      "js/cloud.js",
       "js/app.js",
     ];
     __boot.setTotal(bootScripts.length);

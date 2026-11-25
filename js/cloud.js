@@ -1,6 +1,10 @@
 // ===== Cloud Sync 前端模块 =====
 // 无账号体系的云端备份：DID(设备) + BID(云端备份ID) + secret(恢复码)
-// 调用 Supabase Edge Function 完成 upload / download / activity
+// 通过 Supabase Edge Function 完成四件事：
+//   upload / download  小朋友数据的上传与恢复（跨设备同步）
+//   activity           每日活跃上报（数据库按天去重）
+//   activity_event     进入小朋友时的事件上报（含设备/浏览器环境信息）
+// 所有上报都是 fire-and-forget，网络失败静默忽略，不影响本地功能
 
 (function (global) {
   "use strict";
@@ -90,24 +94,20 @@
   }
 
   // ---------- 从恢复码恢复绑定（换机时调用） ----------
-  // 用户输入老设备上复制的恢复码，恢复 BID + secret
+  // 恢复码格式：bid::secret（前半段是云端标识，后半段是密钥）
+  // 用户弄错格式时给更友好的提示，而不是抛技术细节
   function bindFromRecoveryCode(uid, recoveryCode) {
-    // 约定恢复码格式：前半段是 bid，后半段是 secret，用 "::" 分隔
-    // 如果用户只粘了 secret（旧格式），则无法恢复
-    var parts = recoveryCode.split("::");
-    if (parts.length !== 2) {
+    var binding;
+    try {
+      binding = parseRecoveryCode(recoveryCode);
+    } catch (e) {
       throw new Error("恢复码格式不正确，请确认完整复制了老设备上的恢复码。");
     }
-    var bid = parts[0].trim();
-    var secret = parts[1].trim();
-    if (!bid || !secret) {
-      throw new Error("恢复码不完整。");
-    }
-    setBid(uid, bid);
-    setSecret(uid, secret);
-    // revision 清 0，下载成功后会更新
+    setBid(uid, binding.bid);
+    setSecret(uid, binding.secret);
+    // 版本号清 0，下载成功后由 download 的返回值更新
     setRevision(uid, 0);
-    return { bid: bid, secret: secret };
+    return binding;
   }
 
   // ---------- 构建恢复码 ----------
@@ -119,7 +119,8 @@
   }
 
   // ---------- HTTP 调用 ----------
-
+  // 统一 POST 封装：返回服务端 JSON 并附加 _status
+  // 网关异常（502/504）返回的可能是 HTML，这里兜底成统一结构，避免调用方只看到「网络错误」
   function post(action, payload) {
     var body = Object.assign({ action: action }, payload || {});
     return fetch(FUNCTION_URL, {
@@ -127,7 +128,13 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }).then(function (res) {
-      return res.json().then(function (data) {
+      return res.text().then(function (text) {
+        var data;
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          data = { ok: false, error: "服务返回异常（HTTP " + res.status + "）" };
+        }
         data._status = res.status;
         return data;
       });
@@ -209,14 +216,19 @@
     });
   }
 
+  // 解析 "bid::secret"，两段都不能为空
   function parseRecoveryCode(code) {
-    var parts = code.split("::");
+    var parts = String(code || "").split("::");
     if (parts.length !== 2) throw new Error("恢复码格式不正确。");
-    return { bid: parts[0].trim(), secret: parts[1].trim() };
+    var bid = parts[0].trim();
+    var secret = parts[1].trim();
+    if (!bid || !secret) throw new Error("恢复码不完整。");
+    return { bid: bid, secret: secret };
   }
 
   // ---------- 业务：活跃上报 ----------
-  // 每次打开应用或开始练习时调用（去重由服务端 upsert 保证）
+  // 应用启动时上报一次；同一天重复调用由数据库主键去重
+  // type = "device" 只按设备统计；"child" 精确到某个小朋友
   function reportActivity(uid, type) {
     var actorType = type === "device" ? "device" : "child";
     var actorId = actorType === "device" ? getDid() : (getDid() + ":" + uid);
@@ -229,9 +241,14 @@
   }
 
   // ---------- 浏览器 / 操作系统解析（基于 UA） ----------
+  // 只做大致归类，用于后台统计，不追求 100% 精确
   function parseBrowser(ua) {
     ua = ua || "";
     var m;
+    // iOS 上所有浏览器都是 WebKit 内核，UA 里带各自标识，需要先于 Chrome/Safari 判断
+    if ((m = ua.match(/EdgiOS\/([\d.]+)/))) return "Edge " + m[1];
+    if ((m = ua.match(/CriOS\/([\d.]+)/))) return "Chrome " + m[1];
+    if ((m = ua.match(/FxiOS\/([\d.]+)/))) return "Firefox " + m[1];
     if (/Edg\//.test(ua)) { m = ua.match(/Edg\/([\d.]+)/); return m ? "Edge " + m[1] : "Edge"; }
     if (/OPR\//.test(ua) || /Opera/.test(ua)) { m = ua.match(/(?:OPR|Opera)\/([\d.]+)/); return m ? "Opera " + m[1] : "Opera"; }
     if (/Chrome\//.test(ua) && !/Chromium/.test(ua)) { m = ua.match(/Chrome\/([\d.]+)/); return m ? "Chrome " + m[1] : "Chrome"; }
@@ -244,8 +261,11 @@
     ua = ua || "";
     if (/Windows NT 10/.test(ua)) return "Windows 10/11";
     if (/Windows NT/.test(ua)) return "Windows";
-    if (/Mac OS X/.test(ua)) return "macOS";
     if (/iPhone OS/.test(ua) || /iPad/.test(ua)) return "iOS";
+    // iPadOS 13+ 默认把自己伪装成 macOS，用触屏点数区分（Mac 一般没有多点触控）
+    if (/Mac OS X/.test(ua)) {
+      return global.navigator && navigator.maxTouchPoints > 1 ? "iOS" : "macOS";
+    }
     if (/Android/.test(ua)) {
       var m = ua.match(/Android ([\d.]+)/);
       return m ? "Android " + m[1] : "Android";
@@ -255,6 +275,7 @@
   }
 
   // ---------- 采集当前设备 / 浏览器环境信息 ----------
+  // screen_* 与 viewport_* 都是 CSS 像素；物理分辨率需再乘 device_pixel_ratio
   function collectEnv() {
     var nav = global.navigator || {};
     var ua = nav.userAgent || "";
@@ -281,10 +302,11 @@
     };
   }
 
-  // ---------- 业务：进入小朋友活跃事件（每次插一条，含环境信息 + IP） ----------
+  // ---------- 业务：进入小朋友活跃事件（每次插一条） ----------
   // uid: 小朋友本地 ID
-  // source: 入口来源，如 'home' / 'new_user' / 'switch'
-  // childName: 小朋友名称
+  // source: 入口来源，当前有 'home'（首页卡片）、'new_user'（新建小朋友）
+  // childName: 小朋友名字，便于后台直接辨认
+  // IP 不在前端采集，由 Edge Function 从请求头补，客户端无法伪造
   function reportEnterChild(uid, source, childName) {
     var env = collectEnv();
     var payload = Object.assign({
